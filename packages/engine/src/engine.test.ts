@@ -525,6 +525,50 @@ describe("Hash (Kap. 4)", () => {
   });
 });
 
+describe("Benchmark (Kap. 15)", () => {
+  /** Logo in der Groessenordnung, die Kap. 15 nennt: rund 10.000 Stiche. */
+  const logo = () =>
+    design([
+      fillObjekt("flaeche", polygonOf(rect(0, 0, 100, 60)), { stitchLengthMm: 2 }),
+      satinObjekt("rand", rect(0, 0, 100, 60), rect(-1.5, -1.5, 103, 63), { threadIndex: 1 }),
+      runningObjekt("detail", [pt(10, 30), pt(90, 30)], { threadIndex: 1 }),
+    ]);
+
+  it("plant ein Logo mit rund 10.000 Stichen unter 300 ms", () => {
+    const d = logo();
+    planDesign(d); // aufwaermen (WASM, JIT)
+    const start = performance.now();
+    const plan = planDesign(d);
+    const dauer = performance.now() - start;
+    expect(plan.stats.stitches).toBeGreaterThan(9000);
+    expect(dauer).toBeLessThan(300);
+  });
+
+  it("rechnet ein einzelnes Objekt unter 100 ms neu", () => {
+    const obj = fillObjekt("flaeche", polygonOf(rect(0, 0, 100, 60)), { stitchLengthMm: 2 });
+    generateFill(obj); // aufwaermen
+    const start = performance.now();
+    const r = generateFill(obj);
+    const dauer = performance.now() - start;
+    expect(r.stitches.length).toBeGreaterThan(5000);
+    expect(dauer).toBeLessThan(100);
+  });
+
+  it("spart die Neuberechnung, wenn sich nichts geaendert hat", () => {
+    const cache = createCache();
+    const d = logo();
+    planDesign(d, { cache });
+    const start = performance.now();
+    planDesign(d, { cache });
+    const mitCache = performance.now() - start;
+
+    const start2 = performance.now();
+    planDesign(d);
+    const ohneCache = performance.now() - start2;
+    expect(mitCache).toBeLessThan(ohneCache);
+  });
+});
+
 describe("Pipeline (Kap. 4)", () => {
   it("plant ein Design bis zum Stichplan", () => {
     const d = design([

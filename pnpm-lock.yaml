@@ -8,6 +8,15 @@ importers:
 
   .:
     devDependencies:
+      '@texma-stitch/engine':
+        specifier: workspace:*
+        version: link:packages/engine
+      '@texma-stitch/geometry':
+        specifier: workspace:*
+        version: link:packages/geometry
+      '@texma-stitch/render':
+        specifier: workspace:*
+        version: link:packages/render
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.3
