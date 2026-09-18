@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Kontur-Motiv fuer den Demo-Lauf: Ring, Bogen, Schriftzuglinie. Kein
+     Phase-0-Golden-File, sondern nur ein Beispiel zum Ausprobieren. -->
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:inkstitch="http://inkstitch.org/namespace"
+     width="60mm" height="45mm" viewBox="0 0 60 45">
+  <g transform="translate(30,20)">
+    <path id="ring-aussen" d="M -18 0 A 18 18 0 1 1 18 0 A 18 18 0 1 1 -18 0 Z"
+          stroke="#101010" fill="none"
+          inkstitch:running_stitch_length_mm="2.2" />
+    <path id="ring-innen" d="M -11 0 A 11 11 0 1 0 11 0 A 11 11 0 1 0 -11 0 Z"
+          stroke="#101010" fill="none"
+          inkstitch:running_stitch_length_mm="2.2" />
+    <path id="balken" d="M -11 0 L 11 0" stroke="#c8102e" fill="none"
+          inkstitch:repeats="3" inkstitch:trim_after="true" />
+  </g>
+  <path id="unterstrich" d="M 8 40 C 20 36, 40 36, 52 40" stroke="#c8102e" fill="none"
+        inkstitch:running_stitch_length_mm="2" />
+</svg>

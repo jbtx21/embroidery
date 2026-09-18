@@ -1,4 +1,4 @@
-/** Verschieben, Drehen, Skalieren — gebraucht vom Fill (Kap. 8.1) und vom Text. */
+/** Translate, rotate, scale — used by the fill (spec §8.1) and by lettering. */
 import type { Point, Polygon, Polyline } from "./types.js";
 
 export type Transform = (p: Point) => Point;

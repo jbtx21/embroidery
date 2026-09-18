@@ -1,8 +1,8 @@
 /**
- * Datenmodell der Engine (Kap. 3).
+ * Engine data model (spec §3).
  *
- * Gespeichert werden nur Objekte, nie Stiche (Kap. 1). Alle Laengen in
- * Millimetern, Winkel in Grad, Koordinaten wie SVG (y nach unten).
+ * Only objects are stored, never stitches (spec §1). All lengths in millimetres,
+ * angles in degrees, coordinates as in SVG (y down).
  */
 import type { Point, Polygon, Polyline } from "@texma-stitch/geometry";
 
@@ -37,14 +37,14 @@ export type FillUnderlay = {
 export type FillObject = Base & {
   type: "fill";
   shape: Polygon;
-  /** Stichrichtung. */
+  /** Stitch direction. */
   angleDeg: number;
-  /** Reihenabstand = Dichte. */
+  /** Row spacing, i.e. density. */
   rowSpacingMm: number;
   stitchLengthMm: number;
-  /** Versatz ueber n Reihen. */
+  /** Stagger across n rows. */
   staggerRows: number;
-  /** Offset nach aussen (+) oder innen (-). */
+  /** Offset outwards (+) or inwards (-). */
   pullCompMm: number;
   underlay: FillUnderlay;
   startPoint?: Point;
@@ -63,17 +63,17 @@ export type SatinObject = Base & {
   type: "satin";
   railA: Polyline;
   railB: Polyline;
-  /** Optionale Sprossen zur Paarung — das Werkzeug gegen Verdrehen (Kap. 7.1). */
+  /** Optional rungs steering the pairing — the tool against twisting (spec §7.1). */
   rungs: [Point, Point][];
-  /** Zickzack-Abstand, Spitze zu Spitze auf derselben Rail. */
+  /** Zigzag spacing, peak to peak on the same rail. */
   spacingMm: number;
   pullCompMm: number;
-  /** Darueber Split-Satin (Kap. 7.4). */
+  /** Above this width, split satin kicks in (spec §7.4). */
   maxWidthMm: number;
   underlay: SatinUnderlay;
-  /** Kurzstiche in engen Kurven (Kap. 7.5). */
+  /** Short stitches in tight curves (spec §7.5). */
   shortStitches: boolean;
-  /** Spalte vom anderen Ende her sticken. */
+  /** Stitch the column from the other end. */
   reverse: boolean;
 };
 
@@ -82,7 +82,7 @@ export type RunningObject = Base & {
   path: Polyline;
   closed: boolean;
   stitchLengthMm: number;
-  /** 1 = Laufstich, 3/5 = Bean Stitch. */
+  /** 1 = running stitch, 3/5 = bean stitch. */
   repeats: 1 | 3 | 5;
 };
 
@@ -104,13 +104,13 @@ export type Design = {
   widthMm: number;
   heightMm: number;
   preset: PresetId;
-  /** Reihenfolge = Stickreihenfolge. */
+  /** Order of the list is the stitching order. */
   objects: StitchObject[];
   threads: Thread[];
 };
 
 // ---------------------------------------------------------------------------
-// Ausgabe
+// Output
 // ---------------------------------------------------------------------------
 
 export type StitchCommand = "stitch" | "jump" | "trim" | "color" | "stop" | "end";
@@ -120,9 +120,9 @@ export type Stitch = {
   y: number;
   cmd: StitchCommand;
   /**
-   * Verriegelungsstich (Kap. 10.3). Erweiterung ueber Kap. 3 hinaus: das
-   * Nachbearbeiten entfernt Ministiche (Kap. 11) und wuerde sonst genau die
-   * Verriegelung wegwerfen, die sie schuetzen soll.
+   * Lock stitch (spec §10.3). Extension beyond spec §3: post-processing removes
+   * tiny stitches (spec §11) and would otherwise throw away exactly the lock
+   * stitches it is meant to protect — those are 0.3 mm short by definition.
    */
   tie?: true;
 };
@@ -139,9 +139,9 @@ export type Stats = {
   trims: number;
   colorChanges: number;
   bboxMm: { w: number; h: number };
-  /** Schaetzung (Kap. 11). */
+  /** Estimate (spec §11). */
   runtimeSec: number;
-  /** Stiche pro mm^2 im dichtesten 1-mm-Raster. */
+  /** Stitches per mm^2 in the densest 1 mm cell. */
   densityMax: number;
 };
 

@@ -1,13 +1,13 @@
 /**
- * Presets (Kap. 14) und Maschinenprofile. Startwerte — in Phase 5 gegen
- * Probestickungen justieren.
+ * Presets (spec §14) and machine profiles. Starting values — to be adjusted
+ * against test sew-outs in phase 5.
  */
 import type { FillUnderlay, PresetId, SatinUnderlay } from "./types.js";
 
 export type Preset = {
   id: PresetId;
   label: string;
-  /** Reihenabstand des Fill = Dichte. */
+  /** Fill row spacing, i.e. density. */
   fillRowSpacingMm: number;
   fillStitchLengthMm: number;
   fillStaggerRows: number;
@@ -15,18 +15,16 @@ export type Preset = {
   pullCompMm: number;
   fillUnderlay: FillUnderlay;
   satinUnderlay: SatinUnderlay;
-  hinweis?: string;
+  note?: string;
 };
 
-const fillUnterlage = (
+const fillUnderlayOf = (
   fill: FillUnderlay["fill"],
   insetMm = 0.4,
   spacingMm = 2.0,
 ): FillUnderlay => ({ contour: true, fill, spacingMm, insetMm });
 
-const satinUnterlage = (
-  opts: Partial<SatinUnderlay> = {},
-): SatinUnderlay => ({
+const satinUnderlayOf = (opts: Partial<SatinUnderlay> = {}): SatinUnderlay => ({
   center: false,
   contour: true,
   zigzag: true,
@@ -44,9 +42,9 @@ export const PRESETS: Record<PresetId, Preset> = {
     fillStaggerRows: 4,
     satinSpacingMm: 0.38,
     pullCompMm: 0.2,
-    fillUnderlay: fillUnterlage("single"),
-    satinUnderlay: satinUnterlage(),
-    hinweis: "Standard",
+    fillUnderlay: fillUnderlayOf("single"),
+    satinUnderlay: satinUnderlayOf(),
+    note: "Standard",
   },
   softshell: {
     id: "softshell",
@@ -56,8 +54,8 @@ export const PRESETS: Record<PresetId, Preset> = {
     fillStaggerRows: 4,
     satinSpacingMm: 0.4,
     pullCompMm: 0.25,
-    fillUnderlay: fillUnterlage("single"),
-    satinUnderlay: satinUnterlage(),
+    fillUnderlay: fillUnderlayOf("single"),
+    satinUnderlay: satinUnderlayOf(),
   },
   fleece: {
     id: "fleece",
@@ -67,9 +65,9 @@ export const PRESETS: Record<PresetId, Preset> = {
     fillStaggerRows: 4,
     satinSpacingMm: 0.4,
     pullCompMm: 0.3,
-    fillUnderlay: fillUnterlage("double"),
-    satinUnderlay: satinUnterlage({ insetMm: 0.3 }),
-    hinweis: "Topping empfohlen",
+    fillUnderlay: fillUnderlayOf("double"),
+    satinUnderlay: satinUnderlayOf({ insetMm: 0.3 }),
+    note: "Topping empfohlen",
   },
   cap: {
     id: "cap",
@@ -79,9 +77,9 @@ export const PRESETS: Record<PresetId, Preset> = {
     fillStaggerRows: 4,
     satinSpacingMm: 0.38,
     pullCompMm: 0.15,
-    fillUnderlay: fillUnterlage("single"),
-    satinUnderlay: satinUnterlage({ center: true, zigzag: false }),
-    hinweis: "Reihenfolge Mitte → außen, unten → oben",
+    fillUnderlay: fillUnderlayOf("single"),
+    satinUnderlay: satinUnderlayOf({ center: true, zigzag: false }),
+    note: "Reihenfolge Mitte → außen, unten → oben",
   },
   frottee: {
     id: "frottee",
@@ -91,9 +89,9 @@ export const PRESETS: Record<PresetId, Preset> = {
     fillStaggerRows: 4,
     satinSpacingMm: 0.35,
     pullCompMm: 0.2,
-    fillUnderlay: fillUnterlage("double"),
-    satinUnderlay: satinUnterlage(),
-    hinweis: "Knockdown-Fill unter Motiv, Topping",
+    fillUnderlay: fillUnderlayOf("double"),
+    satinUnderlay: satinUnderlayOf(),
+    note: "Knockdown-Fill unter Motiv, Topping",
   },
 };
 
@@ -106,7 +104,7 @@ export type MachineProfile = {
   maxJumpMm: number;
 };
 
-export const MASCHINE_STANDARD: MachineProfile = {
+export const MACHINE_DEFAULT: MachineProfile = {
   id: "standard",
   label: "Standard 800 U/min",
   rpm: 800,
@@ -115,7 +113,7 @@ export const MASCHINE_STANDARD: MachineProfile = {
   maxJumpMm: 12.1,
 };
 
-export const MASCHINE_CAP: MachineProfile = {
+export const MACHINE_CAP: MachineProfile = {
   id: "cap",
   label: "Cap-Rahmen",
   rpm: 700,
@@ -124,9 +122,9 @@ export const MASCHINE_CAP: MachineProfile = {
   maxJumpMm: 12.1,
 };
 
-export const MASCHINEN: Record<string, MachineProfile> = {
-  standard: MASCHINE_STANDARD,
-  cap: MASCHINE_CAP,
+export const MACHINES: Record<string, MachineProfile> = {
+  standard: MACHINE_DEFAULT,
+  cap: MACHINE_CAP,
 };
 
 export const preset = (id: PresetId): Preset => PRESETS[id];

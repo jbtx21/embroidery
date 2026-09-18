@@ -1,5 +1,6 @@
-/** Renderer (Kap. 12): Stichplan auf Canvas 2D. */
+/** Renderer (spec §12): stitch plan on Canvas 2D, plus SVG and PNG output. */
 export * from "./context.js";
-export * from "./farbe.js";
+export * from "./color.js";
 export * from "./render.js";
 export * from "./svg.js";
+export * from "./node.js";

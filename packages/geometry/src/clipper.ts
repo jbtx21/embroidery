@@ -1,12 +1,13 @@
 /**
- * Bruecke zu Clipper2 (WASM). Einzige Fremdabhaengigkeit der Engine (Kap. 2).
+ * Bridge to Clipper2 (WASM). The only third-party dependency of the engine
+ * (spec §2).
  *
- * Clipper rechnet ganzzahlig; wir skalieren Millimeter mit 1/1000 mm. Das ist zwei
- * Groessenordnungen feiner als die DST-Einheit (0,1 mm) — Rundung hier faellt im
- * Export nicht auf, und die Skalierung ist fest, also deterministisch.
+ * Clipper works on integers; we scale millimetres by 1/1000 mm. That is two
+ * orders of magnitude finer than the DST unit (0.1 mm), so rounding here never
+ * shows up in the export, and the scale is fixed, hence deterministic.
  *
- * Das Modul muss einmal geladen werden: `await initGeometry()`. Danach sind alle
- * Geometriefunktionen synchron — die Engine bleibt damit frei von Promises.
+ * The module must be loaded once via `await initGeometry()`. After that every
+ * geometry function is synchronous — which keeps the engine free of promises.
  */
 import ClipperFactory, {
   type Clipper2Module,
@@ -15,16 +16,16 @@ import ClipperFactory, {
 import type { Point, Polygon, Polyline } from "./types.js";
 import { openRing, orient, pointInRing, signedArea } from "./polygon.js";
 
-/** Clipper-Einheiten je Millimeter. */
+/** Clipper units per millimetre. */
 export const SCALE = 1000;
 
-/** Bogentoleranz fuer runde Ecken beim Offset, in Millimetern. */
+/** Arc tolerance for round joins on offsets, in millimetres. */
 const ARC_TOLERANCE_MM = 0.02;
 
 let mod: Clipper2Module | undefined;
 let loading: Promise<void> | undefined;
 
-/** Laedt das WASM-Modul. Mehrfachaufrufe teilen sich denselben Ladevorgang. */
+/** Loads the WASM module. Repeated calls share the same load. */
 export function initGeometry(): Promise<void> {
   if (mod) return Promise.resolve();
   loading ??= ClipperFactory().then((m) => {
@@ -37,16 +38,14 @@ export const isGeometryReady = (): boolean => mod !== undefined;
 
 export function clipper(): Clipper2Module {
   if (!mod) {
-    throw new Error(
-      "Geometrie nicht initialisiert — vor dem ersten Aufruf `await initGeometry()` ausfuehren.",
-    );
+    throw new Error("Geometry not initialised — call `await initGeometry()` before first use.");
   }
   return mod;
 }
 
 const toUnit = (v: number): number => Math.round(v * SCALE);
 
-/** Ring zu flachem Koordinatenarray in Clipper-Einheiten. */
+/** Ring to a flat coordinate array in Clipper units. */
 function ringToCoords(ring: Polyline): number[] {
   const out: number[] = [];
   for (const p of ring) {
@@ -56,8 +55,8 @@ function ringToCoords(ring: Polyline): number[] {
 }
 
 /**
- * Ringe zu Paths64. Der Aufrufer muss das Ergebnis mit `.delete()` freigeben —
- * dafuer gibt es `withPaths`.
+ * Rings to Paths64. The caller must release the result with `.delete()` — that
+ * is what `withPaths` is for.
  */
 export function ringsToPaths(ringList: Polyline[]): Paths64 {
   const c = clipper();
@@ -72,12 +71,12 @@ export function ringsToPaths(ringList: Polyline[]): Paths64 {
   return paths;
 }
 
-/** Paths64 zurueck zu Ringen in Millimetern. */
+/** Paths64 back to rings in millimetres. */
 export function pathsToRings(paths: Paths64): Polyline[] {
   const out: Polyline[] = [];
   for (let i = 0; i < paths.size(); i++) {
     const path = paths.get(i);
-    const view = path.view(); // x, y, z im Dreierschritt
+    const view = path.view(); // x, y, z in steps of three
     const ring: Polyline = [];
     for (let j = 0; j + 2 < view.length; j += 3) {
       const x = view[j];
@@ -91,7 +90,7 @@ export function pathsToRings(paths: Paths64): Polyline[] {
   return out;
 }
 
-/** Fuehrt `fn` aus und gibt alle uebergebenen Paths64 danach zuverlaessig frei. */
+/** Runs `fn` and reliably releases every Paths64 handed in afterwards. */
 export function withPaths<T>(paths: Paths64[], fn: () => T): T {
   try {
     return fn();
@@ -101,18 +100,18 @@ export function withPaths<T>(paths: Paths64[], fn: () => T): T {
 }
 
 /**
- * Flache Ringliste zurueck in Polygone mit Loechern buendeln.
+ * Bundle a flat list of rings back into polygons with holes.
  *
- * Verschachtelungstiefe per Punkt-in-Ring: gerade Tiefe = Aussenring, ungerade =
- * Loch. Jedes Loch gehoert zum kleinsten Ring, der es enthaelt. O(n^2), aber n ist
- * die Zahl der Ringe einer Stickform — zweistellig, nicht mehr.
+ * Nesting depth via point-in-ring: even depth is an outer ring, odd is a hole.
+ * Each hole belongs to the smallest ring containing it. O(n^2), but n is the
+ * number of rings in an embroidery shape — two digits, not more.
  */
 export function ringsToPolygons(ringList: Polyline[]): Polygon[] {
   const usable = ringList.filter((r) => r.length >= 3 && Math.abs(signedArea(r)) > 1e-9);
   const areas = usable.map((r) => Math.abs(signedArea(r)));
 
   const depth = usable.map((ring, i) => {
-    const probe = ringPoint(ring);
+    const probe = ringProbePoint(ring);
     let d = 0;
     for (let j = 0; j < usable.length; j++) {
       if (i === j) continue;
@@ -122,36 +121,33 @@ export function ringsToPolygons(ringList: Polyline[]): Polygon[] {
   });
 
   const polygons: Polygon[] = [];
-  const indexOfOuter = new Map<number, number>();
+  const outerIndex = new Map<number, number>();
   for (let i = 0; i < usable.length; i++) {
     if (depth[i]! % 2 === 0) {
-      indexOfOuter.set(i, polygons.length);
+      outerIndex.set(i, polygons.length);
       polygons.push({ outer: orient(usable[i]!, true), holes: [] });
     }
   }
   for (let i = 0; i < usable.length; i++) {
     if (depth[i]! % 2 === 0) continue;
-    const probe = ringPoint(usable[i]!);
+    const probe = ringProbePoint(usable[i]!);
     let bestOuter = -1;
     for (let j = 0; j < usable.length; j++) {
       if (depth[j]! % 2 !== 0 || j === i) continue;
       if (!pointInRing(usable[j]!, probe)) continue;
       if (bestOuter === -1 || areas[j]! < areas[bestOuter]!) bestOuter = j;
     }
-    if (bestOuter === -1) continue; // Loch ohne Huelle — verwerfen statt raten
-    polygons[indexOfOuter.get(bestOuter)!]!.holes.push(orient(usable[i]!, false));
+    if (bestOuter === -1) continue; // hole without a shell — drop it rather than guess
+    polygons[outerIndex.get(bestOuter)!]!.holes.push(orient(usable[i]!, false));
   }
   return polygons;
 }
 
 /**
- * Ein Punkt, der sicher im Inneren des Rings liegt: der Schwerpunkt taugt bei
- * konkaven Formen nicht, deshalb der Mittelpunkt eines Diagonalstrahls.
+ * A point safely inside the ring: the centroid fails on concave shapes, so we
+ * take the midpoint of the first edge nudged along the inward normal.
  */
-function ringPoint(ring: Polyline): Point {
-  // Mittelpunkt der ersten Kante leicht nach innen versetzt ist fuer die reine
-  // Verschachtelungsfrage genau genug, solange er nicht auf einer anderen Kante
-  // liegt — dafuer der kleine Versatz entlang der Innennormalen.
+function ringProbePoint(ring: Polyline): Point {
   const a = ring[0]!;
   const b = ring[1]!;
   const mx = (a.x + b.x) / 2;
@@ -159,7 +155,7 @@ function ringPoint(ring: Polyline): Point {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const l = Math.hypot(dx, dy) || 1;
-  // Innen liegt bei positiver Flaeche (Uhrzeigersinn im SVG-System) links.
+  // With a positive area (clockwise in the SVG system) the inside is on the left.
   const s = signedArea(ring) > 0 ? 1 : -1;
   const eps = 1e-4;
   return { x: mx + (s * -dy * eps) / l, y: my + (s * dx * eps) / l };

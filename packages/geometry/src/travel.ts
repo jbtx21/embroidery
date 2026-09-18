@@ -1,16 +1,17 @@
 /**
- * Kuerzester Weg von a nach b, der im Polygon bleibt (Kap. 5, `insideTravel`).
+ * Shortest path from a to b that stays inside the polygon (spec §5,
+ * `insideTravel`).
  *
- * Sichtbarkeitsgraph ueber Kontur und Loecher plus Dijkstra. Der haeufige Fall —
- * a sieht b direkt — wird vorher abgefangen, sonst wuerde der Fill bei jedem
- * Sektionswechsel einen Graphen bauen (Kap. 8.5).
+ * Visibility graph over the outline and its holes plus Dijkstra. The common case
+ * — a sees b directly — is caught first, otherwise the fill would build a graph
+ * on every section change (spec §8.5).
  */
 import type { Point, Polygon, Polyline } from "./types.js";
 import { pointInPolygon, rings } from "./polygon.js";
 import { simplify } from "./simplify.js";
 import { dist } from "./vec.js";
 
-/** Grobere Vereinfachung fuer den Graphen: 0,1 mm aendern den Reiseweg nicht. */
+/** Coarser simplification for the graph: 0.1 mm does not change the travel path. */
 const GRAPH_SIMPLIFY_MM = 0.1;
 
 type Edge = { a: Point; b: Point };
@@ -28,12 +29,12 @@ function polygonEdges(poly: Polygon): Edge[] {
 const cross2 = (ax: number, ay: number, bx: number, by: number): number => ax * by - ay * bx;
 
 /**
- * Liegt die Strecke a-b vollstaendig im Polygon?
+ * Does the segment a-b lie entirely inside the polygon?
  *
- * Erst alle Beruehrpunkte mit der Kontur sammeln, dann die Mitte jedes Abschnitts
- * dazwischen pruefen. Das faengt auch den Fall ab, in dem die Strecke genau durch
- * einen einspringenden Eckpunkt laeuft und ausserhalb weiterlaeuft — ein reiner
- * Kreuzungstest sieht das nicht.
+ * First collect every touch point with the outline, then check the midpoint of
+ * each stretch in between. That also catches the case where the segment runs
+ * exactly through a reflex vertex and continues outside — a plain crossing test
+ * does not see that.
  */
 export function segmentInside(poly: Polygon, a: Point, b: Point, edges?: Edge[]): boolean {
   const abx = b.x - a.x;
@@ -56,7 +57,7 @@ export function segmentInside(poly: Polygon, a: Point, b: Point, edges?: Edge[])
         ts.push(Math.min(1, Math.max(0, t)));
       }
     } else if (Math.abs(cross2(acx, acy, abx, aby)) <= eps * Math.max(1, abLen)) {
-      // kollinear: Endpunkte der Kante auf ab projizieren
+      // Collinear: project the edge endpoints onto ab.
       for (const p of [e.a, e.b]) {
         const t = ((p.x - a.x) * abx + (p.y - a.y) * aby) / (abLen * abLen);
         if (t > -eps && t < 1 + eps) ts.push(Math.min(1, Math.max(0, t)));
@@ -76,17 +77,16 @@ export function segmentInside(poly: Polygon, a: Point, b: Point, edges?: Edge[])
 }
 
 /**
- * Reiseweg innerhalb des Polygons. Gibt immer mindestens [a, b] zurueck: wenn
- * kein Weg im Inneren existiert (a oder b liegen draussen, oder die Form
- * zerfaellt), ist die direkte Strecke das ehrlichste Ergebnis — der Aufrufer
- * erkennt das daran, dass der Weg nicht innen liegt, und macht daraus einen
- * Sprung.
+ * Travel path inside the polygon. Always returns at least [a, b]: when no
+ * interior path exists (a or b lie outside, or the shape falls apart), the
+ * straight line is the honest answer — the caller notices that the path does not
+ * lie inside and turns it into a jump.
  */
 export function insideTravel(poly: Polygon, a: Point, b: Point): Polyline {
   const edges = polygonEdges(poly);
   if (segmentInside(poly, a, b, edges)) return [{ ...a }, { ...b }];
 
-  // Graph aufbauen: a, b und alle (vereinfachten) Konturpunkte.
+  // Build the graph: a, b and every (simplified) outline point.
   const nodes: Point[] = [{ ...a }, { ...b }];
   for (const ring of rings(poly)) {
     for (const p of simplify([...ring, ring[0]!], GRAPH_SIMPLIFY_MM).slice(0, -1)) {
@@ -108,7 +108,7 @@ export function insideTravel(poly: Polygon, a: Point, b: Point): Polyline {
     }
   }
 
-  // Dijkstra, lineare Auswahl — n ist die Eckenzahl einer Stickform.
+  // Dijkstra with linear selection — n is the vertex count of one shape.
   const dists = new Array<number>(n).fill(Infinity);
   const prev = new Array<number>(n).fill(-1);
   const done = new Array<boolean>(n).fill(false);

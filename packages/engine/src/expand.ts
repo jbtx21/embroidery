@@ -1,55 +1,55 @@
 /**
- * Text zu Satin aufloesen (Kap. 4 `expand()`, Kap. 9).
+ * Expand text into satin (spec §4 `expand()`, §9).
  *
- * Glyphen sitzen auf der Grundlinie oder auf einem Pfad, werden auf `heightMm`
- * skaliert und bekommen die Satin-Parameter aus dem Preset. Die Verbindung
- * zwischen den Buchstaben entscheidet spaeter `connect()` — hier wird nur
- * festgelegt, wo getrennt werden MUSS (zwischen Woertern, wenn gewuenscht).
+ * Glyphs sit on the baseline or on a path, are scaled to `heightMm` and get
+ * their satin parameters from the preset. How letters are connected is decided
+ * later by `connect()`; all that is fixed here is where a trim is REQUIRED —
+ * between words, if the user asked for it.
  */
 import type { Point, Polyline } from "@texma-stitch/geometry";
 import { cumulativeLengths, pointAt, tangentAt } from "@texma-stitch/geometry";
-import type { Font, FontRegistry } from "./font.js";
-import { kerningOf } from "./font.js";
+import type { Font, FontRegistry } from "@texma-stitch/fonts";
+import { kerningOf } from "@texma-stitch/fonts";
 import type { Preset } from "./presets.js";
 import type { RunningObject, SatinObject, StitchObject, TextObject, Warning } from "./types.js";
-import { warne, WARNUNG } from "./warnings.js";
+import { warn, WARNING } from "./warnings.js";
 
-/** Standard-Wortabstand in Versalhoehen, wenn die Schrift kein Leerzeichen hat. */
-const LEERZEICHEN_ADVANCE = 0.35;
-/** Split-Satin-Schwelle fuer erzeugte Buchstaben (Kap. 7.4). */
+/** Default word gap in cap heights when the font has no space glyph. */
+const SPACE_ADVANCE = 0.35;
+/** Split-satin threshold for generated letters (spec §7.4). */
 const TEXT_MAX_WIDTH_MM = 7;
 
-export type ExpandKontext = { preset: Preset; fonts?: FontRegistry };
+export type ExpandContext = { preset: Preset; fonts?: FontRegistry };
 
-/** Setzt Glyph-Koordinaten (Versalhoehen) an ihre Stelle im Design. */
-type Platzierung = (p: Point) => Point;
+/** Places glyph coordinates (cap heights) at their spot in the design. */
+type Placement = (p: Point) => Point;
 
-function grundlinie(origin: Point, scale: number, versatz: number): Platzierung {
-  return (p) => ({ x: origin.x + (p.x + versatz) * scale, y: origin.y + p.y * scale });
+function baseline(origin: Point, scale: number, advance: number): Placement {
+  return (p) => ({ x: origin.x + (p.x + advance) * scale, y: origin.y + p.y * scale });
 }
 
 /**
- * Auf einem Pfad: x wandert als Bogenlaenge am Pfad entlang, y steht senkrecht
- * dazu. Dadurch kippen die Buchstaben mit der Kurve.
+ * On a path: x travels along the path as arc length, y stands perpendicular to
+ * it. That way the letters tilt with the curve.
  */
-function aufPfad(path: Polyline, scale: number): Platzierung {
+function onPath(path: Polyline, scale: number): Placement {
   const cum = cumulativeLengths(path);
   return (p) => {
     const s = p.x * scale;
-    const basis = pointAt(path, s, cum);
+    const base = pointAt(path, s, cum);
     const t = tangentAt(path, s, cum);
-    // Linke Normale; y zeigt im SVG-System nach unten, also derselbe Dreh wie
-    // auf der Grundlinie.
-    return { x: basis.x - t.y * p.y * scale, y: basis.y + t.x * p.y * scale };
+    // Left normal; y points down in the SVG system, so the same turn as on the
+    // baseline.
+    return { x: base.x - t.y * p.y * scale, y: base.y + t.x * p.y * scale };
   };
 }
 
-function satinAus(
+function satinFrom(
   obj: TextObject,
   preset: Preset,
   id: string,
-  spalte: { railA: Polyline; railB: Polyline; rungs: [Point, Point][] },
-  setze: Platzierung,
+  column: { railA: Polyline; railB: Polyline; rungs: [Point, Point][] },
+  place: Placement,
   trimAfter: SatinObject["trimAfter"],
 ): SatinObject {
   return {
@@ -59,9 +59,9 @@ function satinAus(
     visible: true,
     locked: false,
     trimAfter,
-    railA: spalte.railA.map(setze),
-    railB: spalte.railB.map(setze),
-    rungs: spalte.rungs.map((r) => [setze(r[0]), setze(r[1])] as [Point, Point]),
+    railA: column.railA.map(place),
+    railB: column.railB.map(place),
+    rungs: column.rungs.map((r) => [place(r[0]), place(r[1])] as [Point, Point]),
     spacingMm: preset.satinSpacingMm,
     pullCompMm: preset.pullCompMm,
     maxWidthMm: TEXT_MAX_WIDTH_MM,
@@ -71,11 +71,11 @@ function satinAus(
   };
 }
 
-function laufstichAus(
+function runningFrom(
   obj: TextObject,
   id: string,
   stroke: Polyline,
-  setze: Platzierung,
+  place: Placement,
   trimAfter: RunningObject["trimAfter"],
 ): RunningObject {
   return {
@@ -85,26 +85,26 @@ function laufstichAus(
     visible: true,
     locked: false,
     trimAfter,
-    path: stroke.map(setze),
+    path: stroke.map(place),
     closed: false,
     stitchLengthMm: 2.5,
     repeats: 1,
   };
 }
 
-function textAufloesen(
+function expandText(
   obj: TextObject,
   font: Font,
-  ctx: ExpandKontext,
+  ctx: ExpandContext,
 ): { objects: StitchObject[]; warnings: Warning[] } {
   const warnings: Warning[] = [];
   const objects: StitchObject[] = [];
 
   if (obj.heightMm < font.minHeightMm) {
     warnings.push(
-      warne(
-        WARNUNG.TEXT_TOO_SMALL,
-        `${obj.heightMm} mm liegen unter der Mindesthoehe ${font.minHeightMm} mm von "${font.name}".`,
+      warn(
+        WARNING.TEXT_TOO_SMALL,
+        `${obj.heightMm} mm is below the minimum height ${font.minHeightMm} mm of "${font.name}".`,
         "warn",
         obj.id,
       ),
@@ -112,27 +112,25 @@ function textAufloesen(
   }
 
   const scale = obj.heightMm;
-  const setzeBasis: Platzierung | undefined = obj.onPath
-    ? aufPfad(obj.onPath, scale)
-    : undefined;
+  const pathPlacement: Placement | undefined = obj.onPath ? onPath(obj.onPath, scale) : undefined;
 
-  let stift = 0;
-  const zeichen = [...obj.text];
-  for (let i = 0; i < zeichen.length; i++) {
-    const c = zeichen[i]!;
-    const vorher = zeichen[i - 1];
-    if (vorher) stift += kerningOf(font, vorher, c);
+  let pen = 0;
+  const chars = [...obj.text];
+  for (let i = 0; i < chars.length; i++) {
+    const c = chars[i]!;
+    const prev = chars[i - 1];
+    if (prev) pen += kerningOf(font, prev, c);
 
     const glyph = font.glyphs[c];
     if (!glyph) {
       if (c === " ") {
-        stift += LEERZEICHEN_ADVANCE + obj.letterSpacing;
+        pen += SPACE_ADVANCE + obj.letterSpacing;
         continue;
       }
       warnings.push(
-        warne(
-          WARNUNG.UNSUPPORTED_OBJECT,
-          `Schrift "${font.name}" kennt das Zeichen "${c}" nicht.`,
+        warn(
+          WARNING.UNSUPPORTED_GLYPH,
+          `Font "${font.name}" does not know the character "${c}".`,
           "warn",
           obj.id,
         ),
@@ -140,25 +138,25 @@ function textAufloesen(
       continue;
     }
 
-    // Trennen, wenn das naechste Zeichen ein Leerzeichen ist und der Nutzer
-    // zwischen Woertern trennen will (Kap. 9).
-    const naechstes = zeichen[i + 1];
+    // Cut when the next character is a space and the user wants word-wise trims
+    // (spec §9).
+    const next = chars[i + 1];
     const trimAfter: SatinObject["trimAfter"] =
-      obj.trimBetweenWords && (naechstes === " " || naechstes === undefined) ? "always" : "auto";
+      obj.trimBetweenWords && (next === " " || next === undefined) ? "always" : "auto";
 
-    const versatz = stift;
-    const setze: Platzierung = setzeBasis
-      ? (p) => setzeBasis({ x: p.x + versatz, y: p.y })
-      : grundlinie(obj.origin, scale, versatz);
+    const advance = pen;
+    const place: Placement = pathPlacement
+      ? (p) => pathPlacement({ x: p.x + advance, y: p.y })
+      : baseline(obj.origin, scale, advance);
 
-    glyph.columns.forEach((spalte, k) => {
-      objects.push(satinAus(obj, ctx.preset, `${obj.id}:${i}:s${k}`, spalte, setze, trimAfter));
+    glyph.columns.forEach((column, k) => {
+      objects.push(satinFrom(obj, ctx.preset, `${obj.id}:${i}:s${k}`, column, place, trimAfter));
     });
     (glyph.strokes ?? []).forEach((stroke, k) => {
-      objects.push(laufstichAus(obj, `${obj.id}:${i}:l${k}`, stroke, setze, trimAfter));
+      objects.push(runningFrom(obj, `${obj.id}:${i}:r${k}`, stroke, place, trimAfter));
     });
 
-    stift += glyph.advance + obj.letterSpacing;
+    pen += glyph.advance + obj.letterSpacing;
   }
 
   return { objects, warnings };
@@ -166,7 +164,7 @@ function textAufloesen(
 
 export function expand(
   objects: StitchObject[],
-  ctx: ExpandKontext,
+  ctx: ExpandContext,
 ): { objects: StitchObject[]; warnings: Warning[] } {
   const out: StitchObject[] = [];
   const warnings: Warning[] = [];
@@ -179,18 +177,18 @@ export function expand(
     const font = ctx.fonts?.get(obj.fontId);
     if (!font) {
       warnings.push(
-        warne(
-          WARNUNG.UNSUPPORTED_OBJECT,
-          `Schrift "${obj.fontId}" ist nicht geladen — der Text wird nicht gestickt.`,
+        warn(
+          WARNING.FONT_MISSING,
+          `Font "${obj.fontId}" is not loaded — the text is not stitched.`,
           "error",
           obj.id,
         ),
       );
       continue;
     }
-    const ergebnis = textAufloesen(obj, font, ctx);
-    out.push(...ergebnis.objects);
-    warnings.push(...ergebnis.warnings);
+    const result = expandText(obj, font, ctx);
+    out.push(...result.objects);
+    warnings.push(...result.warnings);
   }
 
   return { objects: out, warnings };

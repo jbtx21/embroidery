@@ -1,141 +1,142 @@
 /**
- * Renderer (Kap. 12).
+ * Renderer (spec §12).
  *
- * Stich = Linie, 0,4 mm breit in WELTkoordinaten, runde Enden, leichter Schatten
- * fuer Fadenoptik. Spruenge gestrichelt grau, Trims als Kreuz, Farbwechsel als
- * Punkt. Modi: Faden, Linien, Punkte; dazu der Sequenz-Regler (`bisStich`).
+ * A stitch is a line, 0.4 mm wide in WORLD coordinates, round caps, with a light
+ * shadow for the thread look. Jumps dashed grey, trims as a cross, colour
+ * changes as a dot. Modes: thread, lines, points, plus the sequence slider
+ * (`upToStitch`).
  *
- * Schnell wird das durch Batching: aufeinanderfolgende Stiche derselben Farbe
- * werden zu EINEM Pfad zusammengefasst und mit zwei stroke-Aufrufen gezeichnet
- * (Schatten, dann Faden) — nicht mit zwei je Stich. Bei 50.000 Stichen ist das
- * der Unterschied zwischen 100.000 Aufrufen und ein paar Dutzend.
+ * Speed comes from batching: consecutive stitches of one colour become a single
+ * path drawn with two stroke calls (shadow, then thread) — not two per stitch.
+ * At 50,000 stitches that is the difference between 100,000 calls and a few
+ * dozen.
  */
 import type { Stitch, StitchPlan, Thread } from "@texma-stitch/engine";
 import type { Ctx2D, View } from "./context.js";
-import { abdunkeln, ERSATZFARBE } from "./farbe.js";
+import { darken, FALLBACK_COLOR } from "./color.js";
 
-export type RenderMode = "faden" | "linien" | "punkte";
+export type RenderMode = "thread" | "lines" | "points";
 
 export type RenderOptions = {
   mode?: RenderMode;
   threads?: Thread[];
   view: View;
-  /** Nur die ersten n Stiche zeichnen — der Sequenz-Regler aus Kap. 12. */
-  bisStich?: number;
-  zeigeSpruenge?: boolean;
-  zeigeTrims?: boolean;
-  zeigeFarbwechsel?: boolean;
-  /** Stichbreite in Millimetern. */
+  /** Draw only the first n stitches — the sequence slider from spec §12. */
+  upToStitch?: number;
+  showJumps?: boolean;
+  showTrims?: boolean;
+  showColorChanges?: boolean;
+  /** Stitch width in millimetres. */
   stitchWidthMm?: number;
-  /** Flaeche, die vor dem Zeichnen geleert wird (Bildpunkte). */
+  /** Area cleared before drawing, in pixels. */
   clear?: { w: number; h: number };
 };
 
 export type RenderStats = {
-  /** Gezeichnete Stiche. */
+  /** Stitches drawn. */
   stitches: number;
-  /** stroke-Aufrufe — das Mass fuer die Batching-Guete. */
+  /** Stroke calls — the measure of how well the batching works. */
   strokes: number;
 };
 
-/** Ein Zug gleicher Farbe: zusammenhaengende Stiche, die am Stueck gezogen werden. */
-type Zug = { farbe: string; punkte: Stitch[] };
+/** A run of one colour: connected stitches drawn in a single go. */
+export type Run = { color: string; points: Stitch[] };
 
-const SPRUNG_FARBE = "#8a8a8a";
-const TRIM_FARBE = "#c0392b";
-const FARBWECHSEL_FARBE = "#2d6cdf";
+const JUMP_COLOR = "#8a8a8a";
+const TRIM_COLOR = "#c0392b";
+const COLOR_CHANGE_COLOR = "#2d6cdf";
 
-function farbeVon(threads: Thread[] | undefined, index: number): string {
-  return threads?.[index]?.hex ?? ERSATZFARBE;
+function colorOf(threads: Thread[] | undefined, index: number): string {
+  return threads?.[index]?.hex ?? FALLBACK_COLOR;
 }
 
+export type Decomposed = {
+  runs: Run[];
+  jumps: [Stitch, Stitch][];
+  trims: Stitch[];
+  colorChanges: Stitch[];
+  drawn: number;
+};
+
 /**
- * Zerlegt den Plan in Zuege, Spruenge, Trims und Farbwechsel. Reine Funktion —
- * hier passiert die Arbeit, das Zeichnen ist danach nur noch Ausgabe.
+ * Splits the plan into runs, jumps, trims and colour changes. A pure function —
+ * this is where the work happens, drawing afterwards is just output.
  */
-export function planZerlegen(
+export function decomposePlan(
   plan: StitchPlan,
   threads: Thread[] | undefined,
-  bisStich?: number,
-): {
-  zuege: Zug[];
-  spruenge: [Stitch, Stitch][];
-  trims: Stitch[];
-  farbwechsel: Stitch[];
-  gezeichnet: number;
-} {
-  const zuege: Zug[] = [];
-  const spruenge: [Stitch, Stitch][] = [];
+  upToStitch?: number,
+): Decomposed {
+  const runs: Run[] = [];
+  const jumps: [Stitch, Stitch][] = [];
   const trims: Stitch[] = [];
-  const farbwechsel: Stitch[] = [];
+  const colorChanges: Stitch[] = [];
 
-  const grenze = bisStich ?? Number.POSITIVE_INFINITY;
-  let gezaehlt = 0;
-  let aktuell: Zug | undefined;
-  let letzter: Stitch | undefined;
+  const limit = upToStitch ?? Number.POSITIVE_INFINITY;
+  let counted = 0;
+  let current: Run | undefined;
+  let last: Stitch | undefined;
 
   for (const block of plan.blocks) {
-    const farbe = farbeVon(threads, block.threadIndex);
+    const color = colorOf(threads, block.threadIndex);
     for (const s of block.stitches) {
       if (s.cmd === "stitch" || s.cmd === "jump") {
-        if (gezaehlt >= grenze) {
-          return { zuege, spruenge, trims, farbwechsel, gezeichnet: gezaehlt };
-        }
-        gezaehlt++;
+        if (counted >= limit) return { runs, jumps, trims, colorChanges, drawn: counted };
+        counted++;
       }
 
       switch (s.cmd) {
         case "stitch": {
-          if (!aktuell || aktuell.farbe !== farbe) {
-            aktuell = { farbe, punkte: [] };
-            zuege.push(aktuell);
-            // Der Zug beginnt dort, wo die Nadel steht — sonst fehlt der erste
-            // Stich nach einem Sprung.
-            if (letzter) aktuell.punkte.push(letzter);
+          if (!current || current.color !== color) {
+            current = { color, points: [] };
+            runs.push(current);
+            // The run starts where the needle is — otherwise the first stitch
+            // after a jump would be missing.
+            if (last) current.points.push(last);
           }
-          aktuell.punkte.push(s);
-          letzter = s;
+          current.points.push(s);
+          last = s;
           break;
         }
         case "jump": {
-          if (letzter) spruenge.push([letzter, s]);
-          aktuell = undefined; // Sprung unterbricht den Zug
-          letzter = s;
+          if (last) jumps.push([last, s]);
+          current = undefined; // a jump breaks the run
+          last = s;
           break;
         }
         case "trim":
           trims.push(s);
-          aktuell = undefined;
+          current = undefined;
           break;
         case "color":
-          farbwechsel.push(s);
-          aktuell = undefined;
+          colorChanges.push(s);
+          current = undefined;
           break;
         case "stop":
         case "end":
-          aktuell = undefined;
+          current = undefined;
           break;
       }
     }
   }
 
-  return { zuege, spruenge, trims, farbwechsel, gezeichnet: gezaehlt };
+  return { runs, jumps, trims, colorChanges, drawn: counted };
 }
 
-function zugZeichnen(ctx: Ctx2D, zug: Zug): void {
+function strokeRun(ctx: Ctx2D, run: Run): void {
   ctx.beginPath();
-  const erster = zug.punkte[0]!;
-  ctx.moveTo(erster.x, erster.y);
-  for (let i = 1; i < zug.punkte.length; i++) {
-    const p = zug.punkte[i]!;
+  const first = run.points[0]!;
+  ctx.moveTo(first.x, first.y);
+  for (let i = 1; i < run.points.length; i++) {
+    const p = run.points[i]!;
     ctx.lineTo(p.x, p.y);
   }
   ctx.stroke();
 }
 
 export function renderPlan(ctx: Ctx2D, plan: StitchPlan, opts: RenderOptions): RenderStats {
-  const mode = opts.mode ?? "faden";
-  const breite = opts.stitchWidthMm ?? 0.4;
+  const mode = opts.mode ?? "thread";
+  const width = opts.stitchWidthMm ?? 0.4;
   const { view } = opts;
 
   ctx.save();
@@ -143,65 +144,65 @@ export function renderPlan(ctx: Ctx2D, plan: StitchPlan, opts: RenderOptions): R
   if (opts.clear) ctx.clearRect(0, 0, opts.clear.w, opts.clear.h);
   ctx.setTransform(view.scale, 0, 0, view.scale, view.offsetX, view.offsetY);
 
-  const zerlegt = planZerlegen(plan, opts.threads, opts.bisStich);
+  const parts = decomposePlan(plan, opts.threads, opts.upToStitch);
   let strokes = 0;
 
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.setLineDash([]);
 
-  if (mode === "punkte") {
-    const r = breite * 0.6;
-    for (const zug of zerlegt.zuege) {
-      ctx.fillStyle = zug.farbe;
+  if (mode === "points") {
+    const r = width * 0.6;
+    for (const run of parts.runs) {
+      ctx.fillStyle = run.color;
       ctx.beginPath();
-      for (const p of zug.punkte) {
+      for (const p of run.points) {
         ctx.moveTo(p.x + r, p.y);
         ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       }
       ctx.fill();
     }
   } else {
-    for (const zug of zerlegt.zuege) {
-      if (zug.punkte.length < 2) continue;
-      if (mode === "faden") {
-        // Schatten: derselbe Pfad, dunkler und minimal breiter. Erst danach der
-        // Faden darueber — das ergibt die Rundung, ohne je Stich zu schattieren.
-        ctx.lineWidth = breite * 1.25;
-        ctx.strokeStyle = abdunkeln(zug.farbe, 0.55);
+    for (const run of parts.runs) {
+      if (run.points.length < 2) continue;
+      if (mode === "thread") {
+        // Shadow: the same path, darker and a touch wider. The thread goes on
+        // top afterwards — that gives the roundness without shading per stitch.
+        ctx.lineWidth = width * 1.25;
+        ctx.strokeStyle = darken(run.color, 0.55);
         ctx.globalAlpha = 0.5;
-        zugZeichnen(ctx, zug);
+        strokeRun(ctx, run);
         strokes++;
         ctx.globalAlpha = 1;
       }
-      ctx.lineWidth = mode === "faden" ? breite : breite * 0.25;
-      ctx.strokeStyle = zug.farbe;
-      zugZeichnen(ctx, zug);
+      ctx.lineWidth = mode === "thread" ? width : width * 0.25;
+      ctx.strokeStyle = run.color;
+      strokeRun(ctx, run);
       strokes++;
     }
   }
 
-  if (opts.zeigeSpruenge !== false && zerlegt.spruenge.length > 0) {
+  if (opts.showJumps !== false && parts.jumps.length > 0) {
     ctx.globalAlpha = 1;
-    ctx.lineWidth = breite * 0.4;
-    ctx.strokeStyle = SPRUNG_FARBE;
+    ctx.lineWidth = width * 0.4;
+    ctx.strokeStyle = JUMP_COLOR;
     ctx.setLineDash([0.8, 0.8]);
     ctx.beginPath();
-    for (const [von, nach] of zerlegt.spruenge) {
-      ctx.moveTo(von.x, von.y);
-      ctx.lineTo(nach.x, nach.y);
+    for (const [from, to] of parts.jumps) {
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
     }
     ctx.stroke();
     strokes++;
     ctx.setLineDash([]);
   }
 
-  if (opts.zeigeTrims !== false && zerlegt.trims.length > 0) {
-    const r = breite * 1.5;
-    ctx.lineWidth = breite * 0.5;
-    ctx.strokeStyle = TRIM_FARBE;
+  if (opts.showTrims !== false && parts.trims.length > 0) {
+    const r = width * 1.5;
+    ctx.lineWidth = width * 0.5;
+    ctx.strokeStyle = TRIM_COLOR;
     ctx.beginPath();
-    for (const t of zerlegt.trims) {
+    for (const t of parts.trims) {
       ctx.moveTo(t.x - r, t.y - r);
       ctx.lineTo(t.x + r, t.y + r);
       ctx.moveTo(t.x + r, t.y - r);
@@ -211,22 +212,22 @@ export function renderPlan(ctx: Ctx2D, plan: StitchPlan, opts: RenderOptions): R
     strokes++;
   }
 
-  if (opts.zeigeFarbwechsel !== false && zerlegt.farbwechsel.length > 0) {
-    const r = breite * 1.2;
-    ctx.fillStyle = FARBWECHSEL_FARBE;
+  if (opts.showColorChanges !== false && parts.colorChanges.length > 0) {
+    const r = width * 1.2;
+    ctx.fillStyle = COLOR_CHANGE_COLOR;
     ctx.beginPath();
-    for (const f of zerlegt.farbwechsel) {
-      ctx.moveTo(f.x + r, f.y);
-      ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
+    for (const c of parts.colorChanges) {
+      ctx.moveTo(c.x + r, c.y);
+      ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
     }
     ctx.fill();
   }
 
   ctx.restore();
-  return { stitches: zerlegt.gezeichnet, strokes };
+  return { stitches: parts.drawn, strokes };
 }
 
-/** Bounding-Box aller Stiche in Millimetern — Grundlage fuer `fitView`. */
+/** Bounding box of every stitch in millimetres — the basis for `fitView`. */
 export function planBbox(plan: StitchPlan): {
   minX: number;
   minY: number;

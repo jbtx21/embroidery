@@ -1,8 +1,8 @@
-/** Bogenlaenge, Punkt bei Laenge, naechster Punkt (Kap. 5). */
+/** Arc length, point at length, nearest point (spec §5). */
 import type { Point, Polyline } from "./types.js";
 import { dist, lerp } from "./vec.js";
 
-/** Kumulierte Laengen: cum[i] = Laenge von Punkt 0 bis Punkt i. cum[0] = 0. */
+/** Cumulative lengths: cum[i] is the length from point 0 to point i, cum[0] = 0. */
 export function cumulativeLengths(poly: Polyline): number[] {
   const cum = new Array<number>(poly.length);
   cum[0] = 0;
@@ -16,10 +16,7 @@ export function arcLength(poly: Polyline): number {
   return sum;
 }
 
-/**
- * Punkt bei Bogenlaenge s. Ausserhalb wird geklemmt, damit Aufrufer keine
- * Sonderfaelle bauen muessen.
- */
+/** Point at arc length s. Clamped outside the path so callers need no edge cases. */
 export function pointAt(poly: Polyline, s: number, cum?: number[]): Point {
   if (poly.length === 0) return { x: 0, y: 0 };
   if (poly.length === 1) return { ...poly[0]! };
@@ -28,7 +25,7 @@ export function pointAt(poly: Polyline, s: number, cum?: number[]): Point {
   if (s <= 0) return { ...poly[0]! };
   if (s >= total) return { ...poly[poly.length - 1]! };
 
-  // Binaersuche auf die kumulierten Laengen.
+  // Binary search over the cumulative lengths.
   let lo = 0;
   let hi = c.length - 1;
   while (hi - lo > 1) {
@@ -41,13 +38,13 @@ export function pointAt(poly: Polyline, s: number, cum?: number[]): Point {
   return lerp(poly[lo]!, poly[hi]!, t);
 }
 
-/** Punkt bei Bogenlaengen-Anteil t in [0,1] — Grundlage der Satin-Paarung (Kap. 7.1). */
+/** Point at arc-length fraction t in [0,1] — the basis of satin pairing (spec §7.1). */
 export function pointAtFraction(poly: Polyline, t: number, cum?: number[]): Point {
   const c = cum ?? cumulativeLengths(poly);
   return pointAt(poly, t * c[c.length - 1]!, c);
 }
 
-/** Tangentenrichtung bei Bogenlaenge s (normiert). */
+/** Normalised tangent direction at arc length s. */
 export function tangentAt(poly: Polyline, s: number, cum?: number[]): Point {
   if (poly.length < 2) return { x: 1, y: 0 };
   const c = cum ?? cumulativeLengths(poly);
@@ -64,15 +61,15 @@ export function tangentAt(poly: Polyline, s: number, cum?: number[]): Point {
 }
 
 export type NearestResult = {
-  /** Der naechstgelegene Punkt auf der Polyline. */
+  /** The closest point on the polyline. */
   point: Point;
-  /** Abstand zu p. */
+  /** Distance to p. */
   distance: number;
-  /** Index des Segments, auf dem der Punkt liegt (Segment i geht von i nach i+1). */
+  /** Index of the segment the point lies on (segment i runs from i to i+1). */
   index: number;
-  /** Parameter 0..1 innerhalb des Segments. */
+  /** Parameter 0..1 within that segment. */
   t: number;
-  /** Bogenlaenge vom Anfang bis zum Punkt. */
+  /** Arc length from the start of the polyline up to the point. */
   length: number;
 };
 

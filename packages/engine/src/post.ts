@@ -1,17 +1,16 @@
 /**
- * Nachbearbeitung (Kap. 11).
+ * Post-processing (spec §11).
  *
- * - Stiche unter 0,3 mm entfernen, ausser Verriegelung (die IST kurz).
- * - Stiche und Spruenge ueber 12,1 mm teilen — das DST-Limit sind 121 Einheiten
- *   zu 0,1 mm je Achse; eine euklidische Laenge von 12,1 mm haelt beide Achsen
- *   darunter.
+ * - Remove stitches below 0.3 mm, except lock stitches (those ARE short).
+ * - Split stitches and jumps above 12.1 mm — the DST limit is 121 units of
+ *   0.1 mm per axis, and a Euclidean length of 12.1 mm keeps both axes below it.
  */
 import type { Stitch, StitchBlock } from "./types.js";
 
 export const MIN_STITCH_MM = 0.3;
 export const MAX_STITCH_MM = 12.1;
 
-const istBewegung = (s: Stitch): boolean => s.cmd === "stitch" || s.cmd === "jump";
+const isMovement = (s: Stitch): boolean => s.cmd === "stitch" || s.cmd === "jump";
 
 export function postProcess(
   blocks: StitchBlock[],
@@ -19,45 +18,45 @@ export function postProcess(
   minStitchMm = MIN_STITCH_MM,
 ): StitchBlock[] {
   const out: StitchBlock[] = [];
-  // Die Nadelposition laeuft ueber Blockgrenzen hinweg weiter.
-  let letzteX: number | undefined;
-  let letzteY: number | undefined;
+  // The needle position carries on across block boundaries.
+  let lastX: number | undefined;
+  let lastY: number | undefined;
 
   for (const block of blocks) {
     const stitches: Stitch[] = [];
     for (const s of block.stitches) {
-      if (!istBewegung(s)) {
+      if (!isMovement(s)) {
         stitches.push({ ...s });
-        // Kommandos bewegen nicht, setzen aber die Bezugsposition.
-        letzteX = s.x;
-        letzteY = s.y;
+        // Commands do not move, but they do set the reference position.
+        lastX = s.x;
+        lastY = s.y;
         continue;
       }
-      if (letzteX === undefined || letzteY === undefined) {
+      if (lastX === undefined || lastY === undefined) {
         stitches.push({ ...s });
-        letzteX = s.x;
-        letzteY = s.y;
+        lastX = s.x;
+        lastY = s.y;
         continue;
       }
-      const dx = s.x - letzteX;
-      const dy = s.y - letzteY;
+      const dx = s.x - lastX;
+      const dy = s.y - lastY;
       const d = Math.hypot(dx, dy);
 
-      if (d < minStitchMm && s.tie !== true) continue; // Ministich
+      if (d < minStitchMm && s.tie !== true) continue; // tiny stitch
 
       if (d > maxStitchMm) {
-        const teile = Math.ceil(d / maxStitchMm);
-        for (let k = 1; k < teile; k++) {
+        const parts = Math.ceil(d / maxStitchMm);
+        for (let k = 1; k < parts; k++) {
           stitches.push({
-            x: letzteX + (dx * k) / teile,
-            y: letzteY + (dy * k) / teile,
+            x: lastX + (dx * k) / parts,
+            y: lastY + (dy * k) / parts,
             cmd: s.cmd,
           });
         }
       }
       stitches.push({ ...s });
-      letzteX = s.x;
-      letzteY = s.y;
+      lastX = s.x;
+      lastY = s.y;
     }
     if (stitches.length > 0) {
       out.push({ objectId: block.objectId, threadIndex: block.threadIndex, stitches });

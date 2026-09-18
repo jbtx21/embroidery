@@ -1,29 +1,36 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { initEngine, planDesign, design, fillObjekt, satinObjekt, runningObjekt } from "@texma-stitch/engine";
+import { initEngine, planDesign } from "@texma-stitch/engine";
 import type { StitchPlan, Thread } from "@texma-stitch/engine";
-import { polygonOf, pt, rect } from "@texma-stitch/geometry";
+import { polygonOf, pt, rect } from "../../engine/test/fixtures/shapes.js";
+import {
+  design,
+  fillObject,
+  runningObject,
+  satinObject,
+} from "../../engine/test/fixtures/designs.js";
 import { fitView } from "./context.js";
 import type { Ctx2D } from "./context.js";
-import { abdunkeln, parseHex, toHex } from "./farbe.js";
-import { planBbox, planZerlegen, renderPlan } from "./render.js";
+import { darken, FALLBACK_COLOR, parseHex, toHex } from "./color.js";
+import { decomposePlan, planBbox, renderPlan } from "./render.js";
 import { renderPlanSvg } from "./svg.js";
+import { renderPlanPng } from "./node.js";
 
-/** Attrappe: zaehlt Aufrufe, statt zu zeichnen. */
-function attrappe(): Ctx2D & { aufrufe: string[] } {
-  const aufrufe: string[] = [];
-  const ctx = {
-    aufrufe,
-    save: () => aufrufe.push("save"),
-    restore: () => aufrufe.push("restore"),
-    setTransform: () => aufrufe.push("setTransform"),
-    clearRect: () => aufrufe.push("clearRect"),
-    beginPath: () => aufrufe.push("beginPath"),
-    moveTo: () => aufrufe.push("moveTo"),
-    lineTo: () => aufrufe.push("lineTo"),
-    stroke: () => aufrufe.push("stroke"),
-    fill: () => aufrufe.push("fill"),
-    arc: () => aufrufe.push("arc"),
-    setLineDash: () => aufrufe.push("setLineDash"),
+/** Stub: counts calls instead of drawing. */
+function stubContext(): Ctx2D & { calls: string[] } {
+  const calls: string[] = [];
+  return {
+    calls,
+    save: () => calls.push("save"),
+    restore: () => calls.push("restore"),
+    setTransform: () => calls.push("setTransform"),
+    clearRect: () => calls.push("clearRect"),
+    beginPath: () => calls.push("beginPath"),
+    moveTo: () => calls.push("moveTo"),
+    lineTo: () => calls.push("lineTo"),
+    stroke: () => calls.push("stroke"),
+    fill: () => calls.push("fill"),
+    arc: () => calls.push("arc"),
+    setLineDash: () => calls.push("setLineDash"),
     lineWidth: 1,
     lineCap: "butt",
     lineJoin: "miter",
@@ -31,10 +38,9 @@ function attrappe(): Ctx2D & { aufrufe: string[] } {
     fillStyle: "#000",
     globalAlpha: 1,
   };
-  return ctx;
 }
 
-const GARNE: Thread[] = [
+const THREADS: Thread[] = [
   { brand: "madeira", number: "1000", hex: "#101010", name: "Schwarz" },
   { brand: "madeira", number: "1147", hex: "#c8102e", name: "Rot" },
 ];
@@ -45,155 +51,183 @@ beforeAll(async () => {
   await initEngine();
   plan = planDesign(
     design([
-      fillObjekt("f", polygonOf(rect(0, 0, 20, 12))),
-      satinObjekt("s", [pt(30, 0), pt(30, 12)], [pt(34, 0), pt(34, 12)], { threadIndex: 1 }),
-      runningObjekt("r", [pt(0, 20), pt(40, 20)], { threadIndex: 1 }),
+      fillObject("f", polygonOf(rect(0, 0, 20, 12))),
+      satinObject("s", [pt(30, 0), pt(30, 12)], [pt(34, 0), pt(34, 12)], { threadIndex: 1 }),
+      runningObject("r", [pt(0, 20), pt(40, 20)], { threadIndex: 1 }),
     ]),
   );
 });
 
-describe("Farbe", () => {
-  it("liest kurze und lange Hexwerte", () => {
+describe("colour", () => {
+  it("reads short and long hex values", () => {
     expect(parseHex("#fff")).toEqual({ r: 255, g: 255, b: 255 });
     expect(parseHex("c8102e")).toEqual({ r: 200, g: 16, b: 46 });
+    expect(parseHex("nonsense")).toEqual({ r: 0, g: 0, b: 0 });
   });
 
-  it("dunkelt fuer den Schatten ab", () => {
-    expect(abdunkeln("#c8102e", 0.5)).toBe("#640817");
+  it("darkens for the shadow and clamps", () => {
+    expect(darken("#c8102e", 0.5)).toBe("#640817");
     expect(toHex({ r: 300, g: -5, b: 16 })).toBe("#ff0010");
   });
 });
 
-describe("Ansicht", () => {
-  it("legt die Box mittig ins Fenster", () => {
+describe("view", () => {
+  it("centres the box in the window", () => {
     const v = fitView({ minX: 0, minY: 0, maxX: 100, maxY: 50 }, 400, 300, 20);
-    const mitteX = 50 * v.scale + v.offsetX;
-    const mitteY = 25 * v.scale + v.offsetY;
-    expect(mitteX).toBeCloseTo(200, 6);
-    expect(mitteY).toBeCloseTo(150, 6);
+    expect(50 * v.scale + v.offsetX).toBeCloseTo(200, 6);
+    expect(25 * v.scale + v.offsetY).toBeCloseTo(150, 6);
     expect(100 * v.scale).toBeLessThanOrEqual(400 - 40 + 1e-6);
   });
+
+  it("survives a degenerate box", () => {
+    expect(Number.isFinite(fitView({ minX: 0, minY: 0, maxX: 0, maxY: 0 }, 100, 100).scale)).toBe(
+      true,
+    );
+  });
 });
 
-describe("Zerlegung", () => {
-  it("fasst Stiche einer Farbe zu Zuegen zusammen und trennt am Sprung", () => {
-    const z = planZerlegen(
+describe("decomposition", () => {
+  const madePlan = (
+    stitches: StitchPlan["blocks"][number]["stitches"],
+    threadIndex = 0,
+  ): StitchPlan => ({
+    blocks: [{ objectId: "a", threadIndex, stitches }],
+    stats: plan.stats,
+    warnings: [],
+  });
+
+  it("groups stitches of one colour into runs and breaks at a jump", () => {
+    const d = decomposePlan(
+      madePlan([
+        { x: 0, y: 0, cmd: "stitch" },
+        { x: 1, y: 0, cmd: "stitch" },
+        { x: 9, y: 0, cmd: "jump" },
+        { x: 10, y: 0, cmd: "stitch" },
+        { x: 10, y: 0, cmd: "trim" },
+        { x: 10, y: 0, cmd: "color" },
+      ]),
+      THREADS,
+    );
+    expect(d.runs).toHaveLength(2);
+    expect(d.jumps).toHaveLength(1);
+    expect(d.trims).toHaveLength(1);
+    expect(d.colorChanges).toHaveLength(1);
+    // The second run starts at the jump target so no stitch is lost.
+    expect(d.runs[1]!.points[0]!.x).toBe(9);
+  });
+
+  it("watches the block colour", () => {
+    const d = decomposePlan(
       {
         blocks: [
-          { objectId: "a", threadIndex: 0, stitches: [
-            { x: 0, y: 0, cmd: "stitch" },
-            { x: 1, y: 0, cmd: "stitch" },
-            { x: 9, y: 0, cmd: "jump" },
-            { x: 10, y: 0, cmd: "stitch" },
-            { x: 10, y: 0, cmd: "trim" },
-            { x: 10, y: 0, cmd: "color" },
-          ] },
+          {
+            objectId: "a",
+            threadIndex: 0,
+            stitches: [
+              { x: 0, y: 0, cmd: "stitch" },
+              { x: 1, y: 0, cmd: "stitch" },
+            ],
+          },
+          {
+            objectId: "b",
+            threadIndex: 1,
+            stitches: [
+              { x: 2, y: 0, cmd: "stitch" },
+              { x: 3, y: 0, cmd: "stitch" },
+            ],
+          },
         ],
         stats: plan.stats,
         warnings: [],
       },
-      GARNE,
+      THREADS,
     );
-    expect(z.zuege).toHaveLength(2);
-    expect(z.spruenge).toHaveLength(1);
-    expect(z.trims).toHaveLength(1);
-    expect(z.farbwechsel).toHaveLength(1);
-    // Der zweite Zug setzt am Sprungziel an, damit kein Stich verloren geht.
-    expect(z.zuege[1]!.punkte[0]!.x).toBe(9);
+    expect(d.runs).toHaveLength(2);
+    expect(d.runs[0]!.color).toBe("#101010");
+    expect(d.runs[1]!.color).toBe("#c8102e");
   });
 
-  it("achtet auf die Farbe des Blocks", () => {
-    const z = planZerlegen(
-      {
-        blocks: [
-          { objectId: "a", threadIndex: 0, stitches: [
-            { x: 0, y: 0, cmd: "stitch" },
-            { x: 1, y: 0, cmd: "stitch" },
-          ] },
-          { objectId: "b", threadIndex: 1, stitches: [
-            { x: 2, y: 0, cmd: "stitch" },
-            { x: 3, y: 0, cmd: "stitch" },
-          ] },
-        ],
-        stats: plan.stats,
-        warnings: [],
-      },
-      GARNE,
-    );
-    expect(z.zuege).toHaveLength(2);
-    expect(z.zuege[0]!.farbe).toBe("#101010");
-    expect(z.zuege[1]!.farbe).toBe("#c8102e");
+  it("stops at the sequence slider", () => {
+    expect(decomposePlan(plan, THREADS, 50).drawn).toBe(50);
+    expect(decomposePlan(plan, THREADS).drawn).toBeGreaterThan(50);
   });
 
-  it("haelt beim Sequenz-Regler an", () => {
-    const voll = planZerlegen(plan, GARNE);
-    const kurz = planZerlegen(plan, GARNE, 50);
-    expect(kurz.gezeichnet).toBe(50);
-    expect(voll.gezeichnet).toBeGreaterThan(kurz.gezeichnet);
+  it("uses a fallback colour when no thread is declared", () => {
+    expect(decomposePlan(plan, undefined).runs[0]!.color).toBe(FALLBACK_COLOR);
+  });
+
+  it("gives the bounding box of the stitches", () => {
+    const b = planBbox(plan);
+    expect(b.maxX).toBeGreaterThan(b.minX);
+    expect(planBbox({ blocks: [], stats: plan.stats, warnings: [] })).toEqual({
+      minX: 0,
+      minY: 0,
+      maxX: 0,
+      maxY: 0,
+    });
   });
 });
 
-describe("Zeichnen", () => {
-  it("zieht je Zug zwei Striche (Schatten + Faden), nicht je Stich", () => {
-    const ctx = attrappe();
-    const stats = renderPlan(ctx, plan, { view: fitView(planBbox(plan), 800, 600), threads: GARNE });
+describe("drawing (spec §12)", () => {
+  const view = () => fitView(planBbox(plan), 800, 600);
+
+  it("strokes twice per run (shadow and thread), not twice per stitch", () => {
+    const ctx = stubContext();
+    const stats = renderPlan(ctx, plan, { view: view(), threads: THREADS });
     expect(stats.stitches).toBeGreaterThan(400);
-    // Batching: deutlich weniger stroke-Aufrufe als Stiche
     expect(stats.strokes).toBeLessThan(stats.stitches / 20);
-    expect(ctx.aufrufe.filter((a) => a === "stroke").length).toBe(stats.strokes);
+    expect(ctx.calls.filter((c) => c === "stroke").length).toBe(stats.strokes);
   });
 
-  it("zeichnet im Linienmodus ohne Schatten", () => {
-    const faden = renderPlan(attrappe(), plan, {
-      view: fitView(planBbox(plan), 800, 600),
-      threads: GARNE,
-      mode: "faden",
+  it("draws the line mode without a shadow", () => {
+    const thread = renderPlan(stubContext(), plan, {
+      view: view(),
+      threads: THREADS,
+      mode: "thread",
     });
-    const linien = renderPlan(attrappe(), plan, {
-      view: fitView(planBbox(plan), 800, 600),
-      threads: GARNE,
-      mode: "linien",
+    const lines = renderPlan(stubContext(), plan, {
+      view: view(),
+      threads: THREADS,
+      mode: "lines",
     });
-    expect(linien.strokes).toBeLessThan(faden.strokes);
+    expect(lines.strokes).toBeLessThan(thread.strokes);
   });
 
-  it("zeichnet im Punktmodus mit fill statt stroke", () => {
-    const ctx = attrappe();
+  it("draws the point mode with fill instead of stroke", () => {
+    const ctx = stubContext();
     renderPlan(ctx, plan, {
-      view: fitView(planBbox(plan), 800, 600),
-      threads: GARNE,
-      mode: "punkte",
-      zeigeSpruenge: false,
-      zeigeTrims: false,
-      zeigeFarbwechsel: false,
+      view: view(),
+      threads: THREADS,
+      mode: "points",
+      showJumps: false,
+      showTrims: false,
+      showColorChanges: false,
     });
-    expect(ctx.aufrufe.filter((a) => a === "fill").length).toBeGreaterThan(0);
-    expect(ctx.aufrufe.filter((a) => a === "stroke").length).toBe(0);
+    expect(ctx.calls.filter((c) => c === "fill").length).toBeGreaterThan(0);
+    expect(ctx.calls.filter((c) => c === "stroke").length).toBe(0);
   });
 
-  it("laesst sich Spruenge, Trims und Farbwechsel abschalten", () => {
-    const mit = renderPlan(attrappe(), plan, {
-      view: fitView(planBbox(plan), 800, 600),
-      threads: GARNE,
+  it("lets jumps, trims and colour changes be switched off", () => {
+    const on = renderPlan(stubContext(), plan, { view: view(), threads: THREADS });
+    const off = renderPlan(stubContext(), plan, {
+      view: view(),
+      threads: THREADS,
+      showJumps: false,
+      showTrims: false,
     });
-    const ohne = renderPlan(attrappe(), plan, {
-      view: fitView(planBbox(plan), 800, 600),
-      threads: GARNE,
-      zeigeSpruenge: false,
-      zeigeTrims: false,
-    });
-    expect(ohne.strokes).toBeLessThanOrEqual(mit.strokes);
+    expect(off.strokes).toBeLessThanOrEqual(on.strokes);
   });
 
-  it("nutzt eine Ersatzfarbe, wenn kein Garn hinterlegt ist", () => {
-    const z = planZerlegen(plan, undefined);
-    expect(z.zuege[0]!.farbe).toBe("#7a7a7a");
+  it("clears the canvas when asked", () => {
+    const ctx = stubContext();
+    renderPlan(ctx, plan, { view: view(), threads: THREADS, clear: { w: 800, h: 600 } });
+    expect(ctx.calls).toContain("clearRect");
   });
 });
 
-describe("SVG-Vorschau", () => {
-  it("schreibt ein SVG, das das Motiv umfasst", () => {
-    const svg = renderPlanSvg(plan, { threads: GARNE, randMm: 4 });
+describe("SVG preview", () => {
+  it("writes an SVG that spans the design", () => {
+    const svg = renderPlanSvg(plan, { threads: THREADS, paddingMm: 4 });
     expect(svg.startsWith("<svg")).toBe(true);
     expect(svg.trimEnd().endsWith("</svg>")).toBe(true);
 
@@ -204,44 +238,48 @@ describe("SVG-Vorschau", () => {
     expect(viewBox![2]!).toBeCloseTo(b.maxX - b.minX + 8, 3);
   });
 
-  it("zeichnet jeden Zug zweimal — Schatten und Faden", () => {
-    const zuege = planZerlegen(plan, GARNE).zuege.filter((z) => z.punkte.length >= 2).length;
-    const svg = renderPlanSvg(plan, { threads: GARNE });
-    const pfade = svg.match(/<path /g)?.length ?? 0;
-    // Zuege doppelt, dazu je ein Pfad fuer Spruenge und Trims
-    expect(pfade).toBeGreaterThanOrEqual(zuege * 2);
-    expect(pfade).toBeLessThanOrEqual(zuege * 2 + 2);
+  it("draws every run twice — shadow and thread", () => {
+    const runs = decomposePlan(plan, THREADS).runs.filter((r) => r.points.length >= 2).length;
+    const paths = renderPlanSvg(plan, { threads: THREADS }).match(/<path /g)?.length ?? 0;
+    expect(paths).toBeGreaterThanOrEqual(runs * 2);
+    expect(paths).toBeLessThanOrEqual(runs * 2 + 2);
   });
 
-  it("nimmt den Sequenz-Regler ernst", () => {
-    const kurz = renderPlanSvg(plan, { threads: GARNE, bisStich: 20 });
-    const voll = renderPlanSvg(plan, { threads: GARNE });
-    expect(kurz.length).toBeLessThan(voll.length);
+  it("takes the sequence slider seriously", () => {
+    expect(renderPlanSvg(plan, { threads: THREADS, upToStitch: 20 }).length).toBeLessThan(
+      renderPlanSvg(plan, { threads: THREADS }).length,
+    );
   });
 });
 
-describe("Benchmark (Kap. 12)", () => {
-  it("zeichnet 50.000 Stiche schnell genug fuer eine fluessige Ansicht", () => {
-    // 120 x 120 mm, dichte Reihen und kurze Stiche — das ergibt die
-    // Groessenordnung, die Kap. 12 nennt.
-    const gross = planDesign(
-      design([
-        fillObjekt("f", polygonOf(rect(0, 0, 130, 130)), { stitchLengthMm: 1.2 }),
-      ]),
-    );
-    const anzahl = gross.blocks.reduce((n, b) => n + b.stitches.length, 0);
-    expect(anzahl).toBeGreaterThan(50_000);
+describe("PNG output", () => {
+  it("renders a PNG in Node", async () => {
+    const png = await renderPlanPng(plan, { threads: THREADS, pxPerMm: 4 });
+    expect(png.length).toBeGreaterThan(1000);
+    // PNG magic number
+    expect([...png.subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+  });
+});
 
-    const ctx = attrappe();
-    const view = fitView(planBbox(gross), 1200, 900);
-    renderPlan(ctx, gross, { view, threads: GARNE }); // aufwaermen
+describe("benchmark (spec §12)", () => {
+  it("draws 50,000 stitches fast enough for a fluid view", () => {
+    // 130 x 130 mm, dense rows and short stitches — the order of magnitude
+    // spec §12 names.
+    const big = planDesign(
+      design([fillObject("f", polygonOf(rect(0, 0, 130, 130)), { stitchLengthMm: 1.2 })]),
+    );
+    expect(big.blocks.reduce((n, b) => n + b.stitches.length, 0)).toBeGreaterThan(50_000);
+
+    const ctx = stubContext();
+    const v = fitView(planBbox(big), 1200, 900);
+    renderPlan(ctx, big, { view: v, threads: THREADS }); // warm up
 
     const start = performance.now();
-    renderPlan(ctx, gross, { view, threads: GARNE });
-    const dauer = performance.now() - start;
-    // Das Ziel aus Kap. 12 sind 16 ms fuer 50.000 Stiche AUF ECHTEM CANVAS.
-    // Hier faellt nur unser Anteil an — Zerlegung und Aufrufe. Bleibt der unter
-    // 50 ms, liegt der Engpass sicher beim Canvas und nicht bei uns.
-    expect(dauer).toBeLessThan(50);
+    renderPlan(ctx, big, { view: v, threads: THREADS });
+    const elapsed = performance.now() - start;
+    // Spec §12 asks for 16 ms per 50,000 stitches ON A REAL CANVAS. Only our own
+    // share — decomposition and draw calls — is measured here. Below 50 ms the
+    // bottleneck is safely the canvas, not us.
+    expect(elapsed).toBeLessThan(50);
   });
 });

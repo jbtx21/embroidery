@@ -1,11 +1,11 @@
-/** Vektor-Kleinkram. Alles rein, alles ohne Allokationsdruck-Optimierung. */
+/** Vector helpers. Plain and allocation-friendly enough for our volumes. */
 import type { Point } from "./types.js";
 
 export const add = (a: Point, b: Point): Point => ({ x: a.x + b.x, y: a.y + b.y });
 export const sub = (a: Point, b: Point): Point => ({ x: a.x - b.x, y: a.y - b.y });
 export const scale = (a: Point, f: number): Point => ({ x: a.x * f, y: a.y * f });
 export const dot = (a: Point, b: Point): number => a.x * b.x + a.y * b.y;
-/** z-Komponente des Kreuzprodukts — Vorzeichen = Drehrichtung. */
+/** z component of the cross product — its sign gives the turn direction. */
 export const cross = (a: Point, b: Point): number => a.x * b.y - a.y * b.x;
 export const len = (a: Point): number => Math.hypot(a.x, a.y);
 export const dist = (a: Point, b: Point): number => Math.hypot(b.x - a.x, b.y - a.y);
@@ -24,13 +24,13 @@ export function normalize(a: Point): Point {
   return l === 0 ? { x: 0, y: 0 } : { x: a.x / l, y: a.y / l };
 }
 
-/** Linke Normale (90 Grad gegen den Uhrzeigersinn im SVG-System). */
+/** Left-hand normal (90 degrees counter-clockwise in the SVG system). */
 export const normal = (a: Point): Point => ({ x: a.y, y: -a.x });
 
 export const equals = (a: Point, b: Point, eps = 1e-9): boolean =>
   Math.abs(a.x - b.x) <= eps && Math.abs(a.y - b.y) <= eps;
 
-/** Winkel zwischen zwei Richtungsvektoren in Grad, 0 bis 180. */
+/** Angle between two direction vectors in degrees, 0 to 180. */
 export function angleBetweenDeg(a: Point, b: Point): number {
   const la = len(a);
   const lb = len(b);

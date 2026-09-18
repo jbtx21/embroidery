@@ -1,4 +1,4 @@
-/** TEXMA Stitch — Engine (Kap. 4 bis 11). */
+/** TEXMA Stitch — engine (spec §4 to §11). */
 export * from "./types.js";
 export * from "./presets.js";
 export * from "./warnings.js";
@@ -6,24 +6,21 @@ export * from "./running.js";
 export * from "./satin.js";
 export * from "./fill.js";
 export * from "./order.js";
-export * from "./objekt.js";
+export * from "./object.js";
 export * from "./connect.js";
 export * from "./tie.js";
 export * from "./post.js";
 export * from "./analyze.js";
 export * from "./validate.js";
 export * from "./expand.js";
-export * from "./font.js";
 export * from "./hash.js";
 export * from "./pipeline.js";
-// Bausteine fuer Tests und Probelaeufe (Kap. 15) — mit ausgeliefert, damit
-// Formate, Renderer und CI dieselben Designs benutzen wie die Engine-Tests.
-export * from "./testdesign.js";
+export * from "./import/svg.js";
 
 import { initGeometry } from "@texma-stitch/geometry";
 
 /**
- * Laedt, was die Engine an WASM braucht. Muss einmal vor dem ersten `planDesign`
- * laufen — danach ist alles synchron.
+ * Loads what the engine needs in WASM. Must run once before the first
+ * `planDesign` — everything is synchronous afterwards.
  */
 export const initEngine = (): Promise<void> => initGeometry();

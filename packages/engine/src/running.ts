@@ -1,18 +1,17 @@
 /**
- * Laufstich (Kap. 6).
+ * Running stitch (spec §6).
  *
- * 1. Pfad mit `resample(step = stitchLengthMm, keepCorners = true)`.
- * 2. Gleichmaessige Aufteilung je Abschnitt — dadurch entsteht kein Reststich
- *    unter 0,5 mm (die Schrittweite wird angepasst, statt einen Stummel
- *    anzuhaengen; siehe `resample`).
- * 3. Bean Stitch: je Segment vor, zurueck, vor (3) bzw. 5 Durchgaenge.
- * 4. Geschlossen: letzter Stich = erster Stich.
+ * 1. Resample the path with `step = stitchLengthMm`, `keepCorners = true`.
+ * 2. Every piece is divided evenly, so no remnant stitch below 0.5 mm appears
+ *    (the step is adjusted instead of a stub being appended; see `resample`).
+ * 3. Bean stitch: each segment forward, back, forward (3) or 5 passes.
+ * 4. Closed: last stitch equals the first stitch.
  */
 import type { Point, Polyline } from "@texma-stitch/geometry";
 import { dedupe, resample } from "@texma-stitch/geometry";
 import type { RunningObject } from "./types.js";
 
-export const MIN_RESTSTICH_MM = 0.5;
+export const MIN_REMNANT_MM = 0.5;
 
 export type RunningOptions = {
   stitchLengthMm: number;
@@ -21,8 +20,8 @@ export type RunningOptions = {
 };
 
 /**
- * Bean Stitch: jedes Segment `repeats` mal ablaufen, beginnend und endend
- * vorwaerts. `repeats` ist ungerade, damit der Pfad vorne heraus kommt.
+ * Bean stitch: walk each segment `repeats` times, starting and ending forwards.
+ * `repeats` is odd so the path comes out at the far end.
  */
 function bean(points: Polyline, repeats: number): Polyline {
   if (repeats <= 1 || points.length < 2) return points;

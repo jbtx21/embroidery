@@ -1,44 +1,44 @@
 /**
- * Reihenfolge (Kap. 10.1).
+ * Stitching order (spec §10.1).
  *
- * Standard ist die Objektliste des Designs. `autoOrder` ist ein VORSCHLAG: nach
- * Farbe gruppieren (Farbwechsel minimieren), innerhalb einer Farbe Flaechen vor
- * Konturen und dann nach Distanz. Der Nutzer nimmt ihn an oder nicht — die
- * Engine ordnet nie von sich aus um.
+ * The default is the object list of the design. `autoOrder` is a SUGGESTION:
+ * group by colour (minimising colour changes), and within one colour put areas
+ * before outlines, then sort by distance. The user accepts it or not — the
+ * engine never reorders on its own.
  */
 import { dist } from "@texma-stitch/geometry";
-import { objektStart, ordnungsRang } from "./objekt.js";
+import { objectStart, orderRank } from "./object.js";
 import type { StitchObject } from "./types.js";
 
 export function autoOrder(objects: StitchObject[]): StitchObject[] {
-  // Farbgruppen in der Reihenfolge ihres ersten Auftretens — das haelt den
-  // Vorschlag nah an dem, was der Nutzer schon sieht.
-  const gruppen = new Map<number, StitchObject[]>();
+  // Colour groups in order of first appearance — that keeps the suggestion close
+  // to what the user already sees.
+  const groups = new Map<number, StitchObject[]>();
   for (const obj of objects) {
-    const liste = gruppen.get(obj.threadIndex);
-    if (liste) liste.push(obj);
-    else gruppen.set(obj.threadIndex, [obj]);
+    const list = groups.get(obj.threadIndex);
+    if (list) list.push(obj);
+    else groups.set(obj.threadIndex, [obj]);
   }
 
   const out: StitchObject[] = [];
-  let cursor = objects.length > 0 ? objektStart(objects[0]!) : { x: 0, y: 0 };
-  for (const [, liste] of gruppen) {
-    const offen = [...liste];
-    while (offen.length > 0) {
-      let besterIndex = 0;
-      let besterWert = Infinity;
-      for (let i = 0; i < offen.length; i++) {
-        const o = offen[i]!;
-        // Rang schlaegt Distanz: Unterlagen und Flaechen zuerst, Konturen zuletzt.
-        const wert = ordnungsRang(o) * 1e6 + dist(cursor, objektStart(o));
-        if (wert < besterWert) {
-          besterWert = wert;
-          besterIndex = i;
+  let cursor = objects.length > 0 ? objectStart(objects[0]!) : { x: 0, y: 0 };
+  for (const [, list] of groups) {
+    const open = [...list];
+    while (open.length > 0) {
+      let bestIndex = 0;
+      let bestScore = Infinity;
+      for (let i = 0; i < open.length; i++) {
+        const o = open[i]!;
+        // Rank beats distance: underlays and areas first, outlines last.
+        const score = orderRank(o) * 1e6 + dist(cursor, objectStart(o));
+        if (score < bestScore) {
+          bestScore = score;
+          bestIndex = i;
         }
       }
-      const gewaehlt = offen.splice(besterIndex, 1)[0]!;
-      out.push(gewaehlt);
-      cursor = objektStart(gewaehlt);
+      const chosen = open.splice(bestIndex, 1)[0]!;
+      out.push(chosen);
+      cursor = objectStart(chosen);
     }
   }
   return out;

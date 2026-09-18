@@ -1,31 +1,35 @@
 /**
- * Geometrie pruefen, reparieren oder markieren (Kap. 4, erste Stufe).
+ * Check, repair or flag the geometry (spec §4, first stage).
  *
- * Reparieren heisst hier: Selbstschnitte per Clipper aufloesen und Orientierung
- * normieren. Was sich nicht reparieren laesst, wird markiert statt geraten.
+ * Repair here means exactly what spec §5 allows: resolve self-intersections via
+ * a Clipper union and normalise the winding. Anything that cannot be repaired is
+ * flagged rather than guessed at (CLAUDE.md, rule 8) — in particular nothing is
+ * silently dropped: a shape that normalises into several areas becomes several
+ * fill objects, not "the largest one".
  */
 import type { Polyline } from "@texma-stitch/geometry";
-import { dedupe, normalizePolygon, polygonArea } from "@texma-stitch/geometry";
+import { dedupe, normalizePolygon } from "@texma-stitch/geometry";
 import type { Design, StitchObject, Warning } from "./types.js";
-import { warne, WARNUNG } from "./warnings.js";
+import { warn, WARNING } from "./warnings.js";
 
-/** Schneidet sich die Polyline selbst? Nicht benachbarte Segmente, echte Kreuzung. */
-export function selbstschnitt(line: Polyline): boolean {
+/** Does the polyline cross itself? Non-adjacent segments, proper crossing. */
+export function selfIntersects(line: Polyline): boolean {
   const eps = 1e-9;
-  const ersterPunkt = line[0];
-  const letzterPunkt = line[line.length - 1];
-  // Nur bei einer TATSAECHLICH geschlossenen Polyline duerfen sich erstes und
-  // letztes Segment beruehren — sonst ist genau das der Selbstschnitt.
-  const geschlossen =
+  const first = line[0];
+  const last = line[line.length - 1];
+  // Only for a GENUINELY closed polyline may the first and last segment touch —
+  // otherwise that touch is exactly the self-intersection we are looking for.
+  const closed =
     line.length > 2 &&
-    ersterPunkt !== undefined &&
-    letzterPunkt !== undefined &&
-    Math.hypot(letzterPunkt.x - ersterPunkt.x, letzterPunkt.y - ersterPunkt.y) < 1e-9;
+    first !== undefined &&
+    last !== undefined &&
+    Math.hypot(last.x - first.x, last.y - first.y) < 1e-9;
+
   for (let i = 0; i + 1 < line.length; i++) {
     const a = line[i]!;
     const b = line[i + 1]!;
     for (let j = i + 2; j + 1 < line.length; j++) {
-      if (geschlossen && i === 0 && j + 2 === line.length) continue;
+      if (closed && i === 0 && j + 2 === line.length) continue;
       const c = line[j]!;
       const d = line[j + 1]!;
       const r = { x: b.x - a.x, y: b.y - a.y };
@@ -40,9 +44,9 @@ export function selbstschnitt(line: Polyline): boolean {
   return false;
 }
 
-export type ValidateErgebnis = { objects: StitchObject[]; warnings: Warning[] };
+export type ValidateResult = { objects: StitchObject[]; warnings: Warning[] };
 
-export function validate(design: Design): ValidateErgebnis {
+export function validate(design: Design): ValidateResult {
   const warnings: Warning[] = [];
   const objects: StitchObject[] = [];
 
@@ -51,9 +55,9 @@ export function validate(design: Design): ValidateErgebnis {
 
     if (obj.threadIndex < 0 || obj.threadIndex >= design.threads.length) {
       warnings.push(
-        warne(
-          WARNUNG.THREAD_MISSING,
-          `Garn ${obj.threadIndex} ist im Design nicht hinterlegt.`,
+        warn(
+          WARNING.THREAD_MISSING,
+          `Thread ${obj.threadIndex} is not declared in the design.`,
           "error",
           obj.id,
         ),
@@ -63,41 +67,44 @@ export function validate(design: Design): ValidateErgebnis {
 
     switch (obj.type) {
       case "fill": {
-        const teile = normalizePolygon(obj.shape);
-        if (teile.length === 0) {
+        const parts = normalizePolygon(obj.shape);
+        if (parts.length === 0) {
           warnings.push(
-            warne(WARNUNG.INVALID_GEOMETRY, "Flaeche ist leer oder entartet.", "error", obj.id),
+            warn(WARNING.INVALID_GEOMETRY, "Area is empty or degenerate.", "error", obj.id),
           );
           continue;
         }
-        if (teile.length > 1) {
-          warnings.push(
-            warne(
-              WARNUNG.INVALID_GEOMETRY,
-              `Flaeche zerfaellt in ${teile.length} Teile — nur das groesste wird gestickt.`,
-              "warn",
-              obj.id,
-            ),
-          );
+        if (parts.length === 1) {
+          objects.push({ ...obj, shape: parts[0]! });
+          break;
         }
-        const groesstes = teile.reduce((a, b) => (polygonArea(b) > polygonArea(a) ? b : a));
-        objects.push({ ...obj, shape: groesstes });
+        // Several areas: stitch all of them. Picking one would be a guess, and
+        // dropping the rest would lose the user's geometry.
+        warnings.push(
+          warn(
+            WARNING.INVALID_GEOMETRY,
+            `Area falls into ${parts.length} pieces; each one is stitched separately.`,
+            "info",
+            obj.id,
+          ),
+        );
+        parts.forEach((shape, i) => {
+          objects.push({ ...obj, id: `${obj.id}#${i}`, shape });
+        });
         break;
       }
       case "satin": {
         const railA = dedupe(obj.railA, 1e-6);
         const railB = dedupe(obj.railB, 1e-6);
         if (railA.length < 2 || railB.length < 2) {
-          warnings.push(
-            warne(WARNUNG.EMPTY_OBJECT, "Satin braucht zwei Rails.", "error", obj.id),
-          );
+          warnings.push(warn(WARNING.EMPTY_OBJECT, "Satin needs two rails.", "error", obj.id));
           continue;
         }
-        if (selbstschnitt(railA) || selbstschnitt(railB)) {
+        if (selfIntersects(railA) || selfIntersects(railB)) {
           warnings.push(
-            warne(
-              WARNUNG.SELF_INTERSECTING_RAILS,
-              "Rail schneidet sich selbst — Sprossen setzen oder Pfad teilen.",
+            warn(
+              WARNING.SELF_INTERSECTING_RAILS,
+              "A rail crosses itself — add rungs or split the path.",
               "warn",
               obj.id,
             ),
@@ -110,7 +117,7 @@ export function validate(design: Design): ValidateErgebnis {
         const path = dedupe(obj.path, 1e-6);
         if (path.length < 2) {
           warnings.push(
-            warne(WARNUNG.EMPTY_OBJECT, "Laufstich ohne Pfad.", "error", obj.id),
+            warn(WARNING.EMPTY_OBJECT, "Running stitch without a path.", "error", obj.id),
           );
           continue;
         }
@@ -119,7 +126,7 @@ export function validate(design: Design): ValidateErgebnis {
       }
       case "text": {
         if (obj.text.trim().length === 0) {
-          warnings.push(warne(WARNUNG.EMPTY_OBJECT, "Text ist leer.", "warn", obj.id));
+          warnings.push(warn(WARNING.EMPTY_OBJECT, "Text is empty.", "warn", obj.id));
           continue;
         }
         objects.push(obj);

@@ -1,9 +1,9 @@
 /**
- * Lokale Typdeklaration fuer clipper2-wasm.
+ * Local type declaration for clipper2-wasm.
  *
- * Das Paket zeigt mit "types" auf dist/es/clipper2z.d.ts — diese Datei liefert es
- * aber nicht aus (sie liegt eine Ebene hoeher). Statt den Import auf `any` fallen
- * zu lassen, deklarieren wir hier genau die Oberflaeche, die wir benutzen.
+ * The package points "types" at dist/es/clipper2z.d.ts, but does not ship that
+ * file (it sits one level up). Rather than let the import degrade to `any`, we
+ * declare exactly the surface we use.
  */
 declare module "clipper2-wasm/dist/es/clipper2z.js" {
   export interface Point64 {

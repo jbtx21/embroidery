@@ -1,15 +1,15 @@
 /**
- * Adaptive Flachung von Bezierkurven zu Polylines (Kap. 5, Toleranz 0,05 mm).
+ * Adaptive flattening of Bezier curves to polylines (spec §5, tolerance 0.05 mm).
  *
- * Rekursive Unterteilung mit Flachheitstest ueber den Abstand der Kontrollpunkte
- * zur Sehne. Deterministisch: gleiche Eingabe, gleiche Punktfolge.
+ * Recursive subdivision with a flatness test on the distance of the control
+ * points from the chord. Deterministic: same input, same sequence of points.
  */
 import type { Point, Polyline } from "./types.js";
 import { lerp } from "./vec.js";
 
 export const FLATTEN_TOLERANCE_MM = 0.05;
 
-/** Abstand von p zur Geraden durch a und b (nicht zum Segment). */
+/** Distance from p to the line through a and b (not to the segment). */
 function distToLine(p: Point, a: Point, b: Point): number {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
@@ -19,9 +19,8 @@ function distToLine(p: Point, a: Point, b: Point): number {
 }
 
 /**
- * Kubische Bezier zu Polyline. Der Startpunkt p0 ist enthalten, der Endpunkt p3
- * ebenfalls — beim Aneinanderhaengen mehrerer Segmente also den ersten Punkt des
- * Folgesegments verwerfen (siehe flattenPath).
+ * Cubic Bezier to polyline. Both p0 and p3 are included, so when chaining
+ * segments drop the first point of each follow-up piece (see flattenPath).
  */
 export function flattenCubic(
   p0: Point,
@@ -48,9 +47,9 @@ function subdivideCubic(
   out: Polyline,
 ): void {
   if (depth >= MAX_DEPTH || (distToLine(p1, p0, p3) <= tol && distToLine(p2, p0, p3) <= tol)) {
-    return; // flach genug — die Sehne p0->p3 genuegt, p3 haengt der Aufrufer an
+    return; // flat enough — the chord p0->p3 will do, the caller appends p3
   }
-  // de Casteljau bei t = 0,5
+  // de Casteljau at t = 0.5
   const p01 = lerp(p0, p1, 0.5);
   const p12 = lerp(p1, p2, 0.5);
   const p23 = lerp(p2, p3, 0.5);
@@ -63,7 +62,7 @@ function subdivideCubic(
   subdivideCubic(mid, p123, p23, p3, tol, depth + 1, out);
 }
 
-/** Quadratische Bezier — als kubische mit angehobenem Grad. */
+/** Quadratic Bezier — degree-elevated to a cubic. */
 export function flattenQuadratic(
   p0: Point,
   p1: Point,
@@ -81,8 +80,8 @@ export type PathSegment =
   | { kind: "quadratic"; c: Point; to: Point };
 
 /**
- * Ganzen Pfad flachen: Startpunkt plus Segmentfolge. Aufeinanderfolgende
- * Duplikate werden verworfen, damit spaetere Stufen keine Nullsegmente sehen.
+ * Flatten a whole path: start point plus a sequence of segments. Consecutive
+ * duplicates are dropped so that later stages never see zero-length segments.
  */
 export function flattenPath(
   start: Point,

@@ -1,8 +1,8 @@
 /**
- * Satin (Kap. 7).
+ * Satin (spec §7).
  *
- * Reihenfolge der Stufen: Rails normieren → Zugausgleich → Paarung (mit oder ohne
- * Sprossen) → Kurzstiche → Zickzack (mit Split) → Unterlage davor.
+ * Order of the stages: normalise rails -> pull compensation -> pairing (with or
+ * without rungs) -> short stitches -> zigzag (with split) -> underlay in front.
  */
 import type { Point, Polygon, Polyline } from "@texma-stitch/geometry";
 import {
@@ -17,28 +17,28 @@ import {
   resample,
 } from "@texma-stitch/geometry";
 import type { SatinObject, Warning } from "./types.js";
-import { warne, WARNUNG } from "./warnings.js";
+import { warn, WARNING } from "./warnings.js";
 
-/** Eine Sprosse: gepaarte Punkte auf Rail A und Rail B. */
+/** One rung: paired points on rail A and rail B. */
 export type SatinRung = { a: Point; b: Point };
 
 export const SATIN_MIN_WIDTH_MM = 1.0;
 export const SATIN_RUNNING_HINT_MM = 0.6;
 export const SATIN_MAX_WIDTH_MM = 12.0;
-/** Innenradius, unter dem Kurzstiche greifen (Kap. 7.5). */
+/** Inner radius below which short stitches kick in (spec §7.5). */
 export const SHORT_STITCH_RADIUS_MM = 1.0;
 export const SHORT_STITCH_FACTOR = 0.7;
 export const CENTER_UNDERLAY_STITCH_MM = 2.5;
 
 // ---------------------------------------------------------------------------
-// Sprossen und Paarung (Kap. 7.1)
+// Rungs and pairing (spec §7.1)
 // ---------------------------------------------------------------------------
 
 /**
- * Bogenlaenge, bei der die Sprosse `seg` die Rail schneidet. Ohne echten
- * Schnittpunkt (die Sprosse endet kurz vor der Rail) faellt die Funktion auf die
- * Projektion des Sprossen-Mittelpunkts zurueck — der Editor zeichnet Sprossen mit
- * der Hand, da darf ein halber Millimeter fehlen.
+ * Arc length at which the rung `seg` crosses the rail. Without a real
+ * intersection (the rung stops just short of the rail) the function falls back
+ * to projecting the rung midpoint — rungs are drawn by hand in the editor, so
+ * half a millimetre may be missing.
  */
 export function rungCutLength(rail: Polyline, seg: [Point, Point]): number {
   const cum = cumulativeLengths(rail);
@@ -62,14 +62,15 @@ export function rungCutLength(rail: Polyline, seg: [Point, Point]): number {
   return nearestPoint(rail, mid, cum).length;
 }
 
-type Abschnitt = { a0: number; a1: number; b0: number; b1: number };
+/** A stretch of both rails between two consecutive rungs. */
+type RailSection = { a0: number; a1: number; b0: number; b1: number };
 
-/** Rails anhand der Sprossen in Abschnitte teilen (Kap. 7.1). */
-export function abschnitte(
+/** Split the rails into sections along the rungs (spec §7.1). */
+export function railSections(
   railA: Polyline,
   railB: Polyline,
   rungs: [Point, Point][],
-): Abschnitt[] {
+): RailSection[] {
   const lenA = arcLength(railA);
   const lenB = arcLength(railB);
   if (rungs.length === 0) return [{ a0: 0, a1: lenA, b0: 0, b1: lenB }];
@@ -78,14 +79,13 @@ export function abschnitte(
     .map((r) => ({ a: rungCutLength(railA, r), b: rungCutLength(railB, r) }))
     .sort((x, y) => x.a - y.a);
 
-  const out: Abschnitt[] = [];
+  const out: RailSection[] = [];
   let prevA = 0;
   let prevB = 0;
   for (const c of cuts) {
-    // Sprossen genau am Rand oder solche, die die Reihenfolge auf Rail B
-    // umkehren wuerden, ueberspringen — sonst entstehen Abschnitte mit
-    // negativer Laenge und die Spalte verdreht sich genau dort, wo die Sprosse
-    // das verhindern sollte.
+    // Skip rungs sitting exactly on a boundary, and ones that would reverse the
+    // order on rail B — otherwise we get sections of negative length and the
+    // column twists at exactly the place the rung was meant to hold straight.
     if (c.a - prevA < 1e-6 || c.b - prevB < 1e-6) continue;
     out.push({ a0: prevA, a1: c.a, b0: prevB, b1: c.b });
     prevA = c.a;
@@ -98,9 +98,8 @@ export function abschnitte(
 }
 
 /**
- * Paarung: innerhalb eines Abschnitts nach Bogenlaengen-Anteil. Die Zahl der
- * Sprossen richtet sich nach der LAENGEREN Seite, damit die Aussenkurve keine
- * Luecken bekommt (Kap. 7.3).
+ * Pairing: within a section by arc-length fraction. The number of rungs follows
+ * the LONGER side so the outer curve gets no gaps (spec §7.3).
  */
 export function pairRails(
   railA: Polyline,
@@ -114,9 +113,9 @@ export function pairRails(
   const spacing = Math.max(spacingMm, 0.05);
 
   const out: SatinRung[] = [];
-  const parts = abschnitte(railA, railB, rungs);
-  for (let s = 0; s < parts.length; s++) {
-    const p = parts[s]!;
+  const sections = railSections(railA, railB, rungs);
+  for (let s = 0; s < sections.length; s++) {
+    const p = sections[s]!;
     const lenA = p.a1 - p.a0;
     const lenB = p.b1 - p.b0;
     const n = Math.max(1, Math.ceil(Math.max(lenA, lenB) / spacing));
@@ -132,13 +131,13 @@ export function pairRails(
 }
 
 // ---------------------------------------------------------------------------
-// Zugausgleich (Kap. 7.2)
+// Pull compensation (spec §7.2)
 // ---------------------------------------------------------------------------
 
 /**
- * Beide Rails um `pullCompMm` senkrecht nach aussen versetzen. "Aussen" heisst:
- * weg von der anderen Rail — das Vorzeichen leitet sich aus der Lage der Spalte
- * ab, nicht aus der Zeichenrichtung.
+ * Shift both rails outwards by `pullCompMm`, perpendicular to the rail.
+ * "Outwards" means away from the other rail — the sign comes from where the
+ * column actually lies, not from the drawing direction.
  */
 export function applyPullComp(
   railA: Polyline,
@@ -147,13 +146,13 @@ export function applyPullComp(
 ): [Polyline, Polyline] {
   if (pullCompMm === 0) return [railA, railB];
   return [
-    offsetPolyline(railA, pullCompMm * aussenVorzeichen(railA, railB)),
-    offsetPolyline(railB, pullCompMm * aussenVorzeichen(railB, railA)),
+    offsetPolyline(railA, pullCompMm * outwardSign(railA, railB)),
+    offsetPolyline(railB, pullCompMm * outwardSign(railB, railA)),
   ];
 }
 
-/** +1, wenn die linke Normale von `self` von `other` weg zeigt, sonst -1. */
-function aussenVorzeichen(self: Polyline, other: Polyline): number {
+/** +1 when the left normal of `self` points away from `other`, -1 otherwise. */
+function outwardSign(self: Polyline, other: Polyline): number {
   const i = Math.floor(self.length / 2);
   const a = self[Math.max(0, i - 1)]!;
   const b = self[Math.min(self.length - 1, i + 1)]!;
@@ -162,38 +161,38 @@ function aussenVorzeichen(self: Polyline, other: Polyline): number {
   const l = Math.hypot(dx, dy);
   if (l < 1e-12) return 1;
   const nLeft = { x: dy / l, y: -dx / l };
-  const self0 = self[i]!;
-  const gegen = nearestPoint(other, self0).point;
-  const zuAnderer = { x: gegen.x - self0.x, y: gegen.y - self0.y };
-  return nLeft.x * zuAnderer.x + nLeft.y * zuAnderer.y > 0 ? -1 : 1;
+  const here = self[i]!;
+  const opposite = nearestPoint(other, here).point;
+  const toOther = { x: opposite.x - here.x, y: opposite.y - here.y };
+  return nLeft.x * toOther.x + nLeft.y * toOther.y > 0 ? -1 : 1;
 }
 
 // ---------------------------------------------------------------------------
-// Kurzstiche (Kap. 7.5)
+// Short stitches (spec §7.5)
 // ---------------------------------------------------------------------------
 
 /**
- * In engen Kurven jeden zweiten Stich auf der Innenseite auf 70 % kuerzen.
+ * In tight curves shorten every second stitch on the inside to 70 %.
  *
- * Der Innenradius wird ueber den Strahlensatz geschaetzt: laufen Aussen- und
- * Innenrail im selben Winkelschritt, verhalten sich ihre Schrittweiten wie
- * (r + w) zu r, also r = w * dInnen / (dAussen - dInnen).
+ * The inner radius is estimated with similar triangles: if outer and inner rail
+ * advance through the same angle, their step lengths relate as (r + w) to r,
+ * hence r = w * dInner / (dOuter - dInner).
  */
 export function applyShortStitches(rungs: SatinRung[]): SatinRung[] {
   if (rungs.length < 2) return rungs;
   const out = rungs.map((r) => ({ a: { ...r.a }, b: { ...r.b } }));
   for (let i = 1; i < out.length; i++) {
-    if (i % 2 === 0) continue; // nur jeder zweite Stich
+    if (i % 2 === 0) continue; // only every second stitch
     const cur = out[i]!;
     const prev = rungs[i - 1]!;
     const dA = dist(rungs[i]!.a, prev.a);
     const dB = dist(rungs[i]!.b, prev.b);
     const w = dist(cur.a, cur.b);
     if (w < 1e-9) continue;
-    const dInnen = Math.min(dA, dB);
-    const dAussen = Math.max(dA, dB);
-    if (dAussen - dInnen < 1e-9) continue;
-    const r = (w * dInnen) / (dAussen - dInnen);
+    const dInner = Math.min(dA, dB);
+    const dOuter = Math.max(dA, dB);
+    if (dOuter - dInner < 1e-9) continue;
+    const r = (w * dInner) / (dOuter - dInner);
     if (r >= SHORT_STITCH_RADIUS_MM) continue;
     if (dA < dB) cur.a = lerp(cur.a, cur.b, 1 - SHORT_STITCH_FACTOR);
     else cur.b = lerp(cur.b, cur.a, 1 - SHORT_STITCH_FACTOR);
@@ -202,12 +201,12 @@ export function applyShortStitches(rungs: SatinRung[]): SatinRung[] {
 }
 
 // ---------------------------------------------------------------------------
-// Zickzack und Split-Satin (Kap. 7.3, 7.4)
+// Zigzag and split satin (spec §7.3, §7.4)
 // ---------------------------------------------------------------------------
 
 /**
- * Punktfolge des Zickzacks: A, B, A, B … Jeder Schritt quert die Spalte, die
- * Einstiche auf derselben Rail liegen `spacingMm` auseinander.
+ * Point sequence of the zigzag: A, B, A, B … Every step crosses the column, and
+ * penetrations on the same rail sit `spacingMm` apart.
  */
 export function zigzagSequence(rungs: SatinRung[]): Point[] {
   const out: Point[] = [];
@@ -218,10 +217,9 @@ export function zigzagSequence(rungs: SatinRung[]): Point[] {
 }
 
 /**
- * Split-Satin (Kap. 7.4): Querungen breiter als `maxWidthMm` in
- * `ceil(b / maxWidthMm)` Teilstiche zerlegen. Die Zwischenpunkte wandern je
- * Querung um ein Viertel weiter, damit keine Linie quer durch die Spalte
- * entsteht.
+ * Split satin (spec §7.4): crossings wider than `maxWidthMm` are broken into
+ * `ceil(b / maxWidthMm)` partial stitches. The intermediate points move on by a
+ * quarter per crossing so that no line forms across the column.
  */
 export function splitWideStitches(seq: Point[], maxWidthMm: number, staggerRows = 4): Point[] {
   if (seq.length < 2 || maxWidthMm <= 0) return seq;
@@ -232,9 +230,9 @@ export function splitWideStitches(seq: Point[], maxWidthMm: number, staggerRows 
     const w = dist(from, to);
     const k = Math.ceil(w / maxWidthMm);
     if (k > 1) {
-      const versatz = (i % staggerRows) / staggerRows / k;
+      const stagger = (i % staggerRows) / staggerRows / k;
       for (let j = 1; j < k; j++) {
-        const f = Math.min(0.999, Math.max(0.001, j / k + versatz));
+        const f = Math.min(0.999, Math.max(0.001, j / k + stagger));
         out.push(lerp(from, to, f));
       }
     }
@@ -244,51 +242,53 @@ export function splitWideStitches(seq: Point[], maxWidthMm: number, staggerRows 
 }
 
 // ---------------------------------------------------------------------------
-// Unterlage (Kap. 7.6)
+// Underlay (spec §7.6)
 // ---------------------------------------------------------------------------
 
-/** Mittellinie der Spalte: die Mittelpunkte der Sprossen. */
-export const centerLine = (rungs: SatinRung[]): Polyline =>
-  rungs.map((r) => lerp(r.a, r.b, 0.5));
+/** Centre line of the column: the midpoints of the rungs. */
+export const centerLine = (rungs: SatinRung[]): Polyline => rungs.map((r) => lerp(r.a, r.b, 0.5));
 
-/** Rail um `insetMm` nach innen (zur anderen Rail hin) versetzen. */
+/** Shift a rail inwards (towards the other rail) by `insetMm`. */
 function inset(rail: Polyline, other: Polyline, insetMm: number): Polyline {
   if (insetMm === 0) return rail;
-  return offsetPolyline(rail, -insetMm * aussenVorzeichen(rail, other));
+  return offsetPolyline(rail, -insetMm * outwardSign(rail, other));
 }
 
-/** Haengt `next` an `out` an — in der Richtung, die den kuerzeren Weg ergibt. */
-function anhaengen(out: Point[], next: Point[]): void {
+/** Append `next` to `out` in whichever direction gives the shorter connection. */
+function appendPath(out: Point[], next: Point[]): void {
   if (next.length === 0) return;
   if (out.length === 0) {
     out.push(...next.map((p) => ({ ...p })));
     return;
   }
   const end = out[out.length - 1]!;
-  const vorwaerts = dist(end, next[0]!) <= dist(end, next[next.length - 1]!);
-  const folge = vorwaerts ? next : [...next].reverse();
-  for (const p of folge) out.push({ ...p });
+  const forward = dist(end, next[0]!) <= dist(end, next[next.length - 1]!);
+  const ordered = forward ? next : [...next].reverse();
+  for (const p of ordered) out.push({ ...p });
 }
 
 // ---------------------------------------------------------------------------
-// Erzeugung
+// Generation
 // ---------------------------------------------------------------------------
 
-/** Umriss der Spalte — gebraucht fuer Verbindungen (Kap. 10.2) und Anzeige. */
+/** Outline of the column — needed for connections (spec §10.2) and display. */
 export function satinOutline(railA: Polyline, railB: Polyline): Polygon {
-  return { outer: [...railA.map((p) => ({ ...p })), ...[...railB].reverse().map((p) => ({ ...p }))], holes: [] };
+  return {
+    outer: [...railA.map((p) => ({ ...p })), ...[...railB].reverse().map((p) => ({ ...p }))],
+    holes: [],
+  };
 }
 
-export type SatinErgebnis = { stitches: Point[]; rungs: SatinRung[]; warnings: Warning[] };
+export type SatinResult = { stitches: Point[]; rungs: SatinRung[]; warnings: Warning[] };
 
-export function generateSatin(obj: SatinObject): SatinErgebnis {
+export function generateSatin(obj: SatinObject): SatinResult {
   const warnings: Warning[] = [];
   let railA = dedupe(obj.railA, 1e-6);
   let railB = dedupe(obj.railB, 1e-6);
   let rungs = obj.rungs;
 
   if (railA.length < 2 || railB.length < 2) {
-    warnings.push(warne(WARNUNG.EMPTY_OBJECT, "Satin ohne zwei Rails.", "error", obj.id));
+    warnings.push(warn(WARNING.EMPTY_OBJECT, "Satin without two rails.", "error", obj.id));
     return { stitches: [], rungs: [], warnings };
   }
 
@@ -299,70 +299,63 @@ export function generateSatin(obj: SatinObject): SatinErgebnis {
   }
 
   const [compA, compB] = applyPullComp(railA, railB, obj.pullCompMm);
-  let paare = pairRails(compA, compB, rungs, obj.spacingMm);
-  if (paare.length === 0) {
-    warnings.push(warne(WARNUNG.EMPTY_OBJECT, "Satin ergibt keine Sprossen.", "error", obj.id));
+  let pairs = pairRails(compA, compB, rungs, obj.spacingMm);
+  if (pairs.length === 0) {
+    warnings.push(warn(WARNING.EMPTY_OBJECT, "Satin yields no rungs.", "error", obj.id));
     return { stitches: [], rungs: [], warnings };
   }
 
-  const breiten = paare.map((r) => dist(r.a, r.b));
-  const minBreite = Math.min(...breiten);
-  const maxBreite = Math.max(...breiten);
-  if (minBreite < SATIN_RUNNING_HINT_MM) {
+  const widths = pairs.map((r) => dist(r.a, r.b));
+  const minWidth = Math.min(...widths);
+  const maxWidth = Math.max(...widths);
+  if (minWidth < SATIN_RUNNING_HINT_MM) {
     warnings.push(
-      warne(
-        WARNUNG.SATIN_TOO_NARROW,
-        `Spalte nur ${minBreite.toFixed(2)} mm breit — als Laufstich stricken.`,
+      warn(
+        WARNING.SATIN_TOO_NARROW,
+        `Column only ${minWidth.toFixed(2)} mm wide — use a running stitch.`,
         "warn",
         obj.id,
       ),
     );
-  } else if (minBreite < SATIN_MIN_WIDTH_MM) {
+  } else if (minWidth < SATIN_MIN_WIDTH_MM) {
     warnings.push(
-      warne(
-        WARNUNG.SATIN_TOO_NARROW,
-        `Spalte nur ${minBreite.toFixed(2)} mm breit.`,
-        "warn",
-        obj.id,
-      ),
+      warn(WARNING.SATIN_TOO_NARROW, `Column only ${minWidth.toFixed(2)} mm wide.`, "warn", obj.id),
     );
   }
-  if (maxBreite > SATIN_MAX_WIDTH_MM) {
+  if (maxWidth > SATIN_MAX_WIDTH_MM) {
     warnings.push(
-      warne(
-        WARNUNG.SATIN_TOO_WIDE,
-        `Spalte bis ${maxBreite.toFixed(1)} mm breit — als Flaeche stricken.`,
+      warn(
+        WARNING.SATIN_TOO_WIDE,
+        `Column up to ${maxWidth.toFixed(1)} mm wide — use a fill.`,
         "warn",
         obj.id,
       ),
     );
   }
 
-  if (obj.shortStitches) paare = applyShortStitches(paare);
+  if (obj.shortStitches) pairs = applyShortStitches(pairs);
 
   const stitches: Point[] = [];
 
-  // Unterlage: center → contour → zigzag (Kap. 7.6)
+  // Underlay: center -> contour -> zigzag (spec §7.6)
   if (obj.underlay.center) {
-    const mitte = centerLine(paare);
-    anhaengen(stitches, resample(mitte, CENTER_UNDERLAY_STITCH_MM, true));
+    appendPath(stitches, resample(centerLine(pairs), CENTER_UNDERLAY_STITCH_MM, true));
   }
   if (obj.underlay.contour) {
-    const innenA = inset(compA, compB, obj.underlay.insetMm);
-    const innenB = inset(compB, compA, obj.underlay.insetMm);
-    anhaengen(stitches, resample(innenA, CENTER_UNDERLAY_STITCH_MM, true));
-    anhaengen(stitches, resample(innenB, CENTER_UNDERLAY_STITCH_MM, true));
+    const insetA = inset(compA, compB, obj.underlay.insetMm);
+    const insetB = inset(compB, compA, obj.underlay.insetMm);
+    appendPath(stitches, resample(insetA, CENTER_UNDERLAY_STITCH_MM, true));
+    appendPath(stitches, resample(insetB, CENTER_UNDERLAY_STITCH_MM, true));
   }
   if (obj.underlay.zigzag) {
-    const innenA = inset(compA, compB, obj.underlay.insetMm);
-    const innenB = inset(compB, compA, obj.underlay.insetMm);
-    const grob = pairRails(innenA, innenB, rungs, obj.underlay.zigzagSpacingMm);
-    anhaengen(stitches, splitWideStitches(zigzagSequence(grob), obj.maxWidthMm));
+    const insetA = inset(compA, compB, obj.underlay.insetMm);
+    const insetB = inset(compB, compA, obj.underlay.insetMm);
+    const coarse = pairRails(insetA, insetB, rungs, obj.underlay.zigzagSpacingMm);
+    appendPath(stitches, splitWideStitches(zigzagSequence(coarse), obj.maxWidthMm));
   }
 
-  // Deckstiche
-  const deck = splitWideStitches(zigzagSequence(paare), obj.maxWidthMm);
-  anhaengen(stitches, deck);
+  // Top stitches
+  appendPath(stitches, splitWideStitches(zigzagSequence(pairs), obj.maxWidthMm));
 
-  return { stitches: dedupe(stitches, 1e-6), rungs: paare, warnings };
+  return { stitches: dedupe(stitches, 1e-6), rungs: pairs, warnings };
 }

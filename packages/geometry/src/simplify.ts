@@ -1,9 +1,9 @@
-/** Douglas-Peucker (Kap. 5, Toleranz 0,02 mm). */
+/** Douglas-Peucker (spec §5, tolerance 0.02 mm). */
 import type { Point, Polyline } from "./types.js";
 
 export const SIMPLIFY_TOLERANCE_MM = 0.02;
 
-/** Quadrierter Abstand von p zum Segment a-b. */
+/** Squared distance from p to the segment a-b. */
 function segDistSq(p: Point, a: Point, b: Point): number {
   let x = a.x;
   let y = a.y;
@@ -31,7 +31,7 @@ export function simplify(points: Polyline, tolerance = SIMPLIFY_TOLERANCE_MM): P
   keep[0] = true;
   keep[points.length - 1] = true;
 
-  // Iterativ statt rekursiv — lange Pfade sprengen sonst den Stack.
+  // Iterative rather than recursive — long paths would blow the stack.
   const stack: [number, number][] = [[0, points.length - 1]];
   while (stack.length > 0) {
     const [first, last] = stack.pop()!;

@@ -1,11 +1,11 @@
-/** Gemeinsame Fragen an ein Stickobjekt: wo faengt es an, was deckt es ab. */
+/** Common questions about a stitch object: where it starts, what it covers. */
 import type { Point, Polygon } from "@texma-stitch/geometry";
 import { polygonBbox } from "@texma-stitch/geometry";
 import { satinOutline } from "./satin.js";
 import type { StitchObject } from "./types.js";
 
-/** Grober Startpunkt — fuer Reihenfolge und Distanzen, nicht fuer Stiche. */
-export function objektStart(obj: StitchObject): Point {
+/** Rough start point — for ordering and distances, not for stitches. */
+export function objectStart(obj: StitchObject): Point {
   switch (obj.type) {
     case "fill": {
       const b = polygonBbox(obj.shape);
@@ -21,10 +21,10 @@ export function objektStart(obj: StitchObject): Point {
 }
 
 /**
- * Flaeche, die dieses Objekt spaeter ueberdeckt. Laufstiche und Text decken
- * nichts ab — fuer sie gibt es kein Polygon.
+ * The area this object covers later on. Running stitches and text cover nothing,
+ * so they have no polygon.
  */
-export function deckPolygon(obj: StitchObject): Polygon | undefined {
+export function coverPolygon(obj: StitchObject): Polygon | undefined {
   switch (obj.type) {
     case "fill":
       return obj.shape;
@@ -36,8 +36,8 @@ export function deckPolygon(obj: StitchObject): Polygon | undefined {
   }
 }
 
-/** Rang fuer die Reihenfolge: Flaechen zuerst, Konturen zuletzt (Kap. 10.1). */
-export function ordnungsRang(obj: StitchObject): number {
+/** Ordering rank: areas first, outlines last (spec §10.1). */
+export function orderRank(obj: StitchObject): number {
   switch (obj.type) {
     case "fill":
       return 0;

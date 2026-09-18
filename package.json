@@ -2,29 +2,39 @@
   "name": "texma-stitch",
   "version": "0.1.0",
   "private": true,
-  "description": "TEXMA Stitch \u2014 Stickerei-Engine: Stickobjekte (Pfade + Parameter) deterministisch zu Stichen. Siehe docs/engine-spezifikation.md.",
+  "description": "TEXMA Stitch — Stickerei-Engine: Stickobjekte (Pfade + Parameter) deterministisch zu Stichen. Siehe docs/engine-spezifikation.md.",
   "packageManager": "pnpm@10.33.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=20"
   },
   "scripts": {
     "build": "pnpm -r --filter \"./packages/*\" run build",
     "typecheck": "pnpm run build && pnpm -r --filter \"./packages/*\" run typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "vorschau": "node tools/vorschau.mjs"
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "bench": "pnpm run build && node packages/engine/bench/run.mjs",
+    "demo": "pnpm run build && node tools/demo.mjs"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
-    "typescript": "^5.7.0",
-    "vitest": "^2.1.0",
+    "@eslint/js": "^9.39.5",
     "@texma-stitch/engine": "workspace:*",
+    "@texma-stitch/formats": "workspace:*",
+    "@texma-stitch/geometry": "workspace:*",
     "@texma-stitch/render": "workspace:*",
-    "@texma-stitch/geometry": "workspace:*"
+    "@types/node": "^22.10.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^9.1.2",
+    "prettier": "^3.9.8",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^2.1.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "esbuild"
+      "esbuild",
+      "canvas"
     ]
   }
 }

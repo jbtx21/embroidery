@@ -1,36 +1,36 @@
 /**
- * Die Pipeline (Kap. 4):
+ * The pipeline (spec §4):
  *
- *   Design → validate → expand → order → generate → connect → tie → post
- *          → analyze → StitchPlan
+ *   Design -> validate -> expand -> order -> generate -> connect -> tie -> post
+ *          -> analyze -> StitchPlan
  *
- * `generate` ist die einzige teure Stufe und deshalb die einzige gecachte:
- * `hash(objekt.params + objekt.geometrie + preset)` → Stichblock. Alles ab
- * `connect` laeuft immer, weil es billig ist und von der Nachbarschaft der
- * Objekte abhaengt.
+ * `generate` is the only expensive stage and therefore the only cached one:
+ * `hash(object params + object geometry + preset)` -> stitch block. Everything
+ * from `connect` onwards runs every time, because it is cheap and depends on how
+ * the objects sit next to each other.
  */
 import type { Point } from "@texma-stitch/geometry";
 import { isGeometryReady } from "@texma-stitch/geometry";
+import type { FontRegistry } from "@texma-stitch/fonts";
 import { analyze } from "./analyze.js";
-import type { ConnectOptions, RohBlock } from "./connect.js";
-import { CONNECT_STANDARD, connectBlocks } from "./connect.js";
+import type { ConnectOptions, RawBlock } from "./connect.js";
+import { CONNECT_DEFAULTS, connectBlocks } from "./connect.js";
 import { expand } from "./expand.js";
-import type { FontRegistry } from "./font.js";
 import { generateFill } from "./fill.js";
 import { stableHash } from "./hash.js";
-import { deckPolygon } from "./objekt.js";
+import { coverPolygon } from "./object.js";
 import { autoOrder } from "./order.js";
 import { postProcess } from "./post.js";
 import type { MachineProfile } from "./presets.js";
-import { MASCHINE_STANDARD, preset as presetOf } from "./presets.js";
+import { MACHINE_DEFAULT, preset as presetOf } from "./presets.js";
 import { generateRunning } from "./running.js";
 import { generateSatin } from "./satin.js";
 import { tieBlocks } from "./tie.js";
 import type { Design, StitchObject, StitchPlan, Warning } from "./types.js";
 import { validate } from "./validate.js";
-import { warne, WARNUNG } from "./warnings.js";
+import { warn, WARNING } from "./warnings.js";
 
-/** Cache fuer Stichbloecke je Objekt (Kap. 4). */
+/** Cache for the stitch block of a single object (spec §4). */
 export interface StitchCache {
   get(key: string): Point[] | undefined;
   set(key: string, value: Point[]): void;
@@ -47,36 +47,36 @@ export function createCache(): StitchCache {
 }
 
 export type PlanOptions = {
-  maschine?: MachineProfile;
+  machine?: MachineProfile;
   connect?: ConnectOptions;
   cache?: StitchCache;
   fonts?: FontRegistry;
-  /** "design" (Standard) nimmt die Objektliste, "auto" den Vorschlag (Kap. 10.1). */
+  /** "design" (default) keeps the object list, "auto" takes the suggestion (spec §10.1). */
   order?: "design" | "auto";
 };
 
-/** Stiche eines einzelnen Objekts — ohne Verbindungen, ohne Verriegelung. */
-export function generateObject(obj: StitchObject): { punkte: Point[]; warnings: Warning[] } {
+/** Stitches of a single object — no connections, no lock stitches. */
+export function generateObject(obj: StitchObject): { points: Point[]; warnings: Warning[] } {
   switch (obj.type) {
     case "running":
-      return { punkte: generateRunning(obj), warnings: [] };
+      return { points: generateRunning(obj), warnings: [] };
     case "satin": {
       const r = generateSatin(obj);
-      return { punkte: r.stitches, warnings: r.warnings };
+      return { points: r.stitches, warnings: r.warnings };
     }
     case "fill": {
       const r = generateFill(obj);
-      return { punkte: r.stitches, warnings: r.warnings };
+      return { points: r.stitches, warnings: r.warnings };
     }
     case "text":
-      // Text ist nach `expand` keiner mehr; kommt trotzdem einer an, ist das ein
-      // Fehler in der Reihenfolge und kein stiller Ausfall.
+      // After `expand` there is no text object left; if one still arrives, that
+      // is a bug in the ordering of the stages, not a silent no-op.
       return {
-        punkte: [],
+        points: [],
         warnings: [
-          warne(
-            WARNUNG.UNSUPPORTED_OBJECT,
-            "Text wurde nicht aufgeloest — `expand` lief nicht.",
+          warn(
+            WARNING.NOT_IMPLEMENTED,
+            "Text was not expanded — `expand` did not run.",
             "error",
             obj.id,
           ),
@@ -85,66 +85,61 @@ export function generateObject(obj: StitchObject): { punkte: Point[]; warnings: 
   }
 }
 
+const EMPTY_STATS = {
+  stitches: 0,
+  jumps: 0,
+  trims: 0,
+  colorChanges: 0,
+  bboxMm: { w: 0, h: 0 },
+  runtimeSec: 0,
+  densityMax: 0,
+};
+
 export function planDesign(design: Design, opts: PlanOptions = {}): StitchPlan {
   if (!isGeometryReady()) {
-    throw new Error("Engine nicht initialisiert — vor dem Planen `await initEngine()` aufrufen.");
+    throw new Error("Engine not initialised — call `await initEngine()` before planning.");
   }
-  const maschine = opts.maschine ?? MASCHINE_STANDARD;
+  const machine = opts.machine ?? MACHINE_DEFAULT;
   const preset = presetOf(design.preset);
   const warnings: Warning[] = [];
 
-  const geprueft = validate(design);
-  warnings.push(...geprueft.warnings);
+  const validated = validate(design);
+  warnings.push(...validated.warnings);
 
-  const aufgeloest = expand(geprueft.objects, { preset, fonts: opts.fonts });
-  warnings.push(...aufgeloest.warnings);
+  const expanded = expand(validated.objects, { preset, fonts: opts.fonts });
+  warnings.push(...expanded.warnings);
 
-  const geordnet =
-    opts.order === "auto" ? autoOrder(aufgeloest.objects) : aufgeloest.objects;
+  const ordered = opts.order === "auto" ? autoOrder(expanded.objects) : expanded.objects;
 
-  const rohe: RohBlock[] = [];
-  for (const obj of geordnet) {
+  const raw: RawBlock[] = [];
+  for (const obj of ordered) {
     const key = stableHash(obj, design.preset);
-    let punkte = opts.cache?.get(key);
-    if (!punkte) {
-      const erzeugt = generateObject(obj);
-      warnings.push(...erzeugt.warnings);
-      punkte = erzeugt.punkte;
-      opts.cache?.set(key, punkte);
+    let points = opts.cache?.get(key);
+    if (!points) {
+      const generated = generateObject(obj);
+      warnings.push(...generated.warnings);
+      points = generated.points;
+      opts.cache?.set(key, points);
     }
-    if (punkte.length === 0) continue;
-    const deckung = deckPolygon(obj);
-    rohe.push({
+    if (points.length === 0) continue;
+    const cover = coverPolygon(obj);
+    raw.push({
       objectId: obj.id,
       threadIndex: obj.threadIndex,
-      punkte,
+      points,
       trimAfter: obj.trimAfter,
-      ...(deckung ? { deckung } : {}),
+      ...(cover ? { cover } : {}),
     });
   }
 
-  if (rohe.length === 0) {
-    return {
-      blocks: [],
-      stats: {
-        stitches: 0,
-        jumps: 0,
-        trims: 0,
-        colorChanges: 0,
-        bboxMm: { w: 0, h: 0 },
-        runtimeSec: 0,
-        densityMax: 0,
-      },
-      warnings,
-    };
-  }
+  if (raw.length === 0) return { blocks: [], stats: { ...EMPTY_STATS }, warnings };
 
-  const verbunden = connectBlocks(rohe, opts.connect ?? CONNECT_STANDARD);
-  const verriegelt = tieBlocks(verbunden);
-  const fertig = postProcess(verriegelt, maschine.maxJumpMm);
+  const connected = connectBlocks(raw, opts.connect ?? CONNECT_DEFAULTS);
+  const tied = tieBlocks(connected);
+  const finished = postProcess(tied, machine.maxJumpMm);
 
-  const { stats, warnings: analyseWarnungen } = analyze(fertig, maschine);
-  warnings.push(...analyseWarnungen);
+  const { stats, warnings: analysisWarnings } = analyze(finished, machine);
+  warnings.push(...analysisWarnings);
 
-  return { blocks: fertig, stats, warnings };
+  return { blocks: finished, stats, warnings };
 }

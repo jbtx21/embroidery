@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  pruefen:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,19 +17,21 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: pnpm
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # Kap. 13.2: die Kreuzpruefung vergleicht unsere DST byte-identisch gegen
-      # pyembroidery. Fehlt das Paket, ueberspringt die Suite den Block — hier
-      # darf sie das nicht.
+      # Spec §13.2: the cross-check compares our DST byte for byte against
+      # pyembroidery. Without the package the suite skips that block — here it
+      # must not.
       - run: pip install pyembroidery
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm typecheck
+      - run: pnpm lint
       - run: pnpm test
+      - run: pnpm bench

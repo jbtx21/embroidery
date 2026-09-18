@@ -1,91 +1,89 @@
 /**
- * SVG-Vorschau des Stichplans.
+ * SVG preview of the stitch plan.
  *
- * Nicht Teil von Kap. 12 — dort steht Canvas. Diese Ausgabe ist der Weg, den
- * Plan OHNE Browser anzusehen: fuer Sichtpruefungen, fuer den Stichbericht
- * (Kap. 13.3) und fuer Bilddiffs in der CI. Sie benutzt dieselbe Zerlegung wie
- * der Canvas-Renderer, zeigt also dasselbe.
+ * Not part of spec §12, which says Canvas. This output is the way to look at a
+ * plan WITHOUT a browser: for visual checks, for the stitch report (spec §13.3)
+ * and for image diffs in CI. It uses the same decomposition as the canvas
+ * renderer, so it shows the same thing.
  */
 import type { StitchPlan, Thread } from "@texma-stitch/engine";
-import { abdunkeln } from "./farbe.js";
-import { planBbox, planZerlegen } from "./render.js";
+import { darken } from "./color.js";
+import { decomposePlan, planBbox } from "./render.js";
 
 export type SvgOptions = {
   threads?: Thread[];
   stitchWidthMm?: number;
-  bisStich?: number;
-  zeigeSpruenge?: boolean;
-  zeigeTrims?: boolean;
-  /** Rand um das Motiv in Millimetern. */
-  randMm?: number;
-  /** Bildpunkte je Millimeter. */
-  pxProMm?: number;
-  hintergrund?: string;
+  upToStitch?: number;
+  showJumps?: boolean;
+  showTrims?: boolean;
+  /** Padding around the design in millimetres. */
+  paddingMm?: number;
+  /** Pixels per millimetre. */
+  pxPerMm?: number;
+  background?: string;
 };
 
-const zahl = (v: number): string => (Math.round(v * 1000) / 1000).toString();
+const num = (v: number): string => (Math.round(v * 1000) / 1000).toString();
 
-const pfad = (punkte: { x: number; y: number }[]): string =>
-  punkte.map((p, i) => `${i === 0 ? "M" : "L"}${zahl(p.x)} ${zahl(p.y)}`).join(" ");
+const pathData = (points: { x: number; y: number }[]): string =>
+  points.map((p, i) => `${i === 0 ? "M" : "L"}${num(p.x)} ${num(p.y)}`).join(" ");
 
 export function renderPlanSvg(plan: StitchPlan, opts: SvgOptions = {}): string {
-  const breite = opts.stitchWidthMm ?? 0.4;
-  const rand = opts.randMm ?? 4;
-  const px = opts.pxProMm ?? 4;
+  const width = opts.stitchWidthMm ?? 0.4;
+  const padding = opts.paddingMm ?? 4;
+  const px = opts.pxPerMm ?? 4;
   const b = planBbox(plan);
-  const w = b.maxX - b.minX + 2 * rand;
-  const h = b.maxY - b.minY + 2 * rand;
-  const zerlegt = planZerlegen(plan, opts.threads, opts.bisStich);
+  const w = b.maxX - b.minX + 2 * padding;
+  const h = b.maxY - b.minY + 2 * padding;
+  const parts = decomposePlan(plan, opts.threads, opts.upToStitch);
 
-  const teile: string[] = [];
-  teile.push(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${zahl(w * px)}" height="${zahl(h * px)}" viewBox="${zahl(b.minX - rand)} ${zahl(b.minY - rand)} ${zahl(w)} ${zahl(h)}">`,
+  const out: string[] = [];
+  out.push(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${num(w * px)}" height="${num(h * px)}" viewBox="${num(b.minX - padding)} ${num(b.minY - padding)} ${num(w)} ${num(h)}">`,
   );
-  teile.push(
-    `<rect x="${zahl(b.minX - rand)}" y="${zahl(b.minY - rand)}" width="${zahl(w)}" height="${zahl(h)}" fill="${opts.hintergrund ?? "#f4f1ea"}"/>`,
+  out.push(
+    `<rect x="${num(b.minX - padding)}" y="${num(b.minY - padding)}" width="${num(w)}" height="${num(h)}" fill="${opts.background ?? "#f4f1ea"}"/>`,
   );
 
-  // Schatten zuerst, damit der Faden darueber liegt — wie im Canvas-Renderer.
-  teile.push(`<g fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.5">`);
-  for (const zug of zerlegt.zuege) {
-    if (zug.punkte.length < 2) continue;
-    teile.push(
-      `<path d="${pfad(zug.punkte)}" stroke="${abdunkeln(zug.farbe, 0.55)}" stroke-width="${zahl(breite * 1.25)}"/>`,
+  // Shadow first so the thread lies on top — same order as the canvas renderer.
+  out.push(`<g fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.5">`);
+  for (const run of parts.runs) {
+    if (run.points.length < 2) continue;
+    out.push(
+      `<path d="${pathData(run.points)}" stroke="${darken(run.color, 0.55)}" stroke-width="${num(width * 1.25)}"/>`,
     );
   }
-  teile.push(`</g>`);
+  out.push(`</g>`);
 
-  teile.push(`<g fill="none" stroke-linecap="round" stroke-linejoin="round">`);
-  for (const zug of zerlegt.zuege) {
-    if (zug.punkte.length < 2) continue;
-    teile.push(
-      `<path d="${pfad(zug.punkte)}" stroke="${zug.farbe}" stroke-width="${zahl(breite)}"/>`,
+  out.push(`<g fill="none" stroke-linecap="round" stroke-linejoin="round">`);
+  for (const run of parts.runs) {
+    if (run.points.length < 2) continue;
+    out.push(
+      `<path d="${pathData(run.points)}" stroke="${run.color}" stroke-width="${num(width)}"/>`,
     );
   }
-  teile.push(`</g>`);
+  out.push(`</g>`);
 
-  if (opts.zeigeSpruenge !== false && zerlegt.spruenge.length > 0) {
-    const d = zerlegt.spruenge
-      .map(([von, nach]) => `M${zahl(von.x)} ${zahl(von.y)}L${zahl(nach.x)} ${zahl(nach.y)}`)
+  if (opts.showJumps !== false && parts.jumps.length > 0) {
+    const d = parts.jumps
+      .map(([from, to]) => `M${num(from.x)} ${num(from.y)}L${num(to.x)} ${num(to.y)}`)
       .join(" ");
-    teile.push(
-      `<path d="${d}" fill="none" stroke="#8a8a8a" stroke-width="${zahl(breite * 0.4)}" stroke-dasharray="0.8 0.8"/>`,
+    out.push(
+      `<path d="${d}" fill="none" stroke="#8a8a8a" stroke-width="${num(width * 0.4)}" stroke-dasharray="0.8 0.8"/>`,
     );
   }
 
-  if (opts.zeigeTrims !== false && zerlegt.trims.length > 0) {
-    const r = breite * 1.5;
-    const d = zerlegt.trims
+  if (opts.showTrims !== false && parts.trims.length > 0) {
+    const r = width * 1.5;
+    const d = parts.trims
       .map(
         (t) =>
-          `M${zahl(t.x - r)} ${zahl(t.y - r)}L${zahl(t.x + r)} ${zahl(t.y + r)}M${zahl(t.x + r)} ${zahl(t.y - r)}L${zahl(t.x - r)} ${zahl(t.y + r)}`,
+          `M${num(t.x - r)} ${num(t.y - r)}L${num(t.x + r)} ${num(t.y + r)}M${num(t.x + r)} ${num(t.y - r)}L${num(t.x - r)} ${num(t.y + r)}`,
       )
       .join(" ");
-    teile.push(
-      `<path d="${d}" fill="none" stroke="#c0392b" stroke-width="${zahl(breite * 0.5)}"/>`,
-    );
+    out.push(`<path d="${d}" fill="none" stroke="#c0392b" stroke-width="${num(width * 0.5)}"/>`);
   }
 
-  teile.push(`</svg>`);
-  return teile.join("\n");
+  out.push(`</svg>`);
+  return out.join("\n");
 }

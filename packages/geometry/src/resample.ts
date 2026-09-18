@@ -1,8 +1,8 @@
 /**
- * Punkte im Abstand `step` setzen (Kap. 5). Ecken ueber 30 Grad bleiben erhalten,
- * wenn `keepCorners` gesetzt ist: der Pfad wird an den Ecken geteilt und jedes
- * Stueck fuer sich gleichmaessig aufgeteilt. So faellt die Ecke nie zwischen zwei
- * Stiche — und es entsteht kein Reststich (Kap. 6.2).
+ * Place points at a spacing of `step` (spec §5). Corners sharper than 30 degrees
+ * survive when `keepCorners` is set: the path is split at those corners and each
+ * piece is divided evenly on its own. That way a corner never falls between two
+ * stitches — and no remnant stitch is left over (spec §6.2).
  */
 import type { Polyline } from "./types.js";
 import { cumulativeLengths, pointAt } from "./measure.js";
@@ -10,7 +10,7 @@ import { angleBetweenDeg, dist, sub } from "./vec.js";
 
 export const CORNER_ANGLE_DEG = 30;
 
-/** Indizes der Punkte, an denen die Richtung um mehr als `minAngleDeg` knickt. */
+/** Indices of points where the direction turns by more than `minAngleDeg`. */
 export function cornerIndices(poly: Polyline, minAngleDeg = CORNER_ANGLE_DEG): number[] {
   const out: number[] = [];
   for (let i = 1; i < poly.length - 1; i++) {
@@ -22,11 +22,10 @@ export function cornerIndices(poly: Polyline, minAngleDeg = CORNER_ANGLE_DEG): n
 }
 
 /**
- * Gleichmaessige Aufteilung eines Stuecks: n = round(L / step), mindestens 1.
- * Der tatsaechliche Schritt ist L / n und liegt damit nahe am Wunsch, ohne dass
- * am Ende ein Stummel uebrig bleibt.
+ * Even division of one piece: n = round(L / step), at least 1. The actual step
+ * is L / n, close to what was asked for and without a stub left at the end.
  */
-function resampleStraight(piece: Polyline, step: number): Polyline {
+function resamplePiece(piece: Polyline, step: number): Polyline {
   const cum = cumulativeLengths(piece);
   const total = cum[cum.length - 1]!;
   if (total < 1e-9) return [{ ...piece[0]! }];
@@ -50,14 +49,14 @@ export function resample(poly: Polyline, step: number, keepCorners = true): Poly
     const to = bounds[b + 1]!;
     if (to <= from) continue;
     const piece = poly.slice(from, to + 1);
-    const sampled = resampleStraight(piece, step);
-    // Nahtstelle nicht doppeln.
+    const sampled = resamplePiece(piece, step);
+    // Do not duplicate the seam point.
     for (let i = out.length === 0 ? 0 : 1; i < sampled.length; i++) out.push(sampled[i]!);
   }
   return out;
 }
 
-/** Punkte, die dichter als `minDist` beieinander liegen, zusammenfassen. */
+/** Merge points that lie closer together than `minDist`. */
 export function dedupe(poly: Polyline, minDist = 1e-6): Polyline {
   if (poly.length === 0) return [];
   const out: Polyline = [{ ...poly[0]! }];

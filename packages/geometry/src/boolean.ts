@@ -1,11 +1,11 @@
-/** Mengenoperationen auf Polygonen via Clipper2 (Kap. 5). */
+/** Set operations on polygons via Clipper2 (spec §5). */
 import type { Polygon, Polyline } from "./types.js";
 import { clipper, pathsToRings, ringsToPaths, ringsToPolygons, withPaths } from "./clipper.js";
 import { rings } from "./polygon.js";
 
 const allRings = (polys: Polygon[]): Polyline[] => polys.flatMap(rings);
 
-/** Vereinigung. Loest nebenbei Selbstschnitte auf — daher auch fuer `normalize`. */
+/** Union. Also resolves self-intersections — hence its use by `normalizePolygon`. */
 export function union(subjects: Polygon[], clips: Polygon[] = []): Polygon[] {
   const c = clipper();
   const subj = ringsToPaths(allRings(subjects));
@@ -37,25 +37,24 @@ export function intersect(subjects: Polygon[], clips: Polygon[]): Polygon[] {
 }
 
 /**
- * Import-Normierung (Kap. 5): Selbstschnitte per Union aufloesen, Orientierung
- * setzen (Aussenring im Uhrzeigersinn, Loecher gegen), Loecher zuordnen.
+ * Import normalisation (spec §5): resolve self-intersections via union, set the
+ * winding (outer ring clockwise, holes counter-clockwise), assign holes.
  *
- * Gibt eine Liste zurueck, weil ein selbstschneidender Ring in mehrere Flaechen
- * zerfallen kann — der Aufrufer entscheidet, ob er das als einen Objektfehler
- * behandelt oder alle Teile nimmt.
+ * Returns a list, because a self-intersecting ring can fall apart into several
+ * areas. The caller decides whether that is one broken object or all the pieces.
  */
 export function normalizePolygon(poly: Polygon): Polygon[] {
   const c = clipper();
   const subj = ringsToPaths(rings(poly));
   return withPaths([subj], () => {
-    // EvenOdd: der Ring-Import weiss noch nichts ueber Orientierung, also darf
-    // die Fuellregel nicht von ihr abhaengen.
+    // EvenOdd: on import the rings carry no reliable winding yet, so the fill
+    // rule must not depend on it.
     const res = c.UnionSelf64(subj, c.FillRule.EvenOdd);
     return withPaths([res], () => ringsToPolygons(pathsToRings(res)));
   });
 }
 
-/** Wie `normalizePolygon`, aber fuer einen einzelnen Ring ohne Loecher. */
+/** Like `normalizePolygon`, but for a single ring without holes. */
 export function normalizeRing(ring: Polyline): Polygon[] {
   return normalizePolygon({ outer: ring, holes: [] });
 }

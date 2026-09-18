@@ -1,7 +1,7 @@
-/** Warnungscodes (Kap. 11). Ein Ort fuer Code, Text und Schwere. */
+/** Warning codes (spec §11). One place for code, message and severity. */
 import type { Warning, WarningSeverity } from "./types.js";
 
-export const WARNUNG = {
+export const WARNING = {
   SATIN_TOO_NARROW: "SATIN_TOO_NARROW",
   SATIN_TOO_WIDE: "SATIN_TOO_WIDE",
   FILL_TINY: "FILL_TINY",
@@ -14,16 +14,20 @@ export const WARNUNG = {
   EMPTY_OBJECT: "EMPTY_OBJECT",
   INVALID_GEOMETRY: "INVALID_GEOMETRY",
   THREAD_MISSING: "THREAD_MISSING",
-  UNSUPPORTED_OBJECT: "UNSUPPORTED_OBJECT",
+  NOT_IMPLEMENTED: "NOT_IMPLEMENTED",
+  UNSUPPORTED_GLYPH: "UNSUPPORTED_GLYPH",
+  FONT_MISSING: "FONT_MISSING",
 } as const;
 
-export type WarnungsCode = (typeof WARNUNG)[keyof typeof WARNUNG];
+export type WarningCode = (typeof WARNING)[keyof typeof WARNING];
 
-export function warne(
-  code: WarnungsCode,
+export function warn(
+  code: WarningCode,
   message: string,
   severity: WarningSeverity = "warn",
   objectId?: string,
 ): Warning {
-  return objectId === undefined ? { code, message, severity } : { objectId, code, message, severity };
+  return objectId === undefined
+    ? { code, message, severity }
+    : { objectId, code, message, severity };
 }

@@ -1,16 +1,17 @@
 /**
- * Verbindungen zwischen Bloecken (Kap. 10.2).
+ * Connections between blocks (spec §10.2).
  *
- * | Bedingung                                             | Aktion               |
- * |-------------------------------------------------------|----------------------|
- * | Farbe unterschiedlich                                  | trim, color          |
- * | Distanz <= 3 mm und Weg liegt unter einem spaeteren     | Running-Verbindung   |
- * | Objekt derselben Farbe oder innerhalb von B             | (kein Trim)          |
- * | Distanz <= jumpTrimMm (5)                               | jump, kein Trim      |
- * | sonst                                                   | trim, jump           |
+ * | Condition                                              | Action              |
+ * |--------------------------------------------------------|---------------------|
+ * | different colour                                        | trim, color         |
+ * | distance <= 3 mm and the path lies under a later object | running connection  |
+ * | of the same colour, or inside B                         | (no trim)           |
+ * | distance <= jumpTrimMm (5)                              | jump, no trim       |
+ * | otherwise                                               | trim, jump          |
  *
- * `trimAfter` am Objekt uebersteuert: `always` immer Trim, `never` nie. Ein
- * Farbwechsel bleibt auch bei `never` ein Farbwechsel — nur der Trim entfaellt.
+ * `trimAfter` on the object overrides: `always` always trims, `never` never
+ * does. A colour change stays a colour change even with `never` — only the trim
+ * is dropped.
  */
 import type { Point, Polygon } from "@texma-stitch/geometry";
 import { dist, insideTravel, segmentInside } from "@texma-stitch/geometry";
@@ -18,66 +19,66 @@ import { runningStitches } from "./running.js";
 import type { Stitch, StitchBlock, TrimAfter } from "./types.js";
 
 export type ConnectOptions = {
-  /** Bis hierher Sprung statt Trim. */
+  /** Up to this distance a jump replaces a trim. */
   jumpTrimMm: number;
-  /** Bis hierher kommt eine Laufstich-Verbindung in Frage. */
+  /** Up to this distance a running connection is considered at all. */
   runningConnectMm: number;
   travelStitchMm: number;
 };
 
-export const CONNECT_STANDARD: ConnectOptions = {
+export const CONNECT_DEFAULTS: ConnectOptions = {
   jumpTrimMm: 5,
   runningConnectMm: 3,
   travelStitchMm: 2.0,
 };
 
-export type RohBlock = {
+export type RawBlock = {
   objectId: string;
   threadIndex: number;
-  punkte: Point[];
+  points: Point[];
   trimAfter: TrimAfter;
-  /** Flaeche, die dieses Objekt abdeckt — fuer den Verdeckungstest. */
-  deckung?: Polygon;
+  /** The area this object covers — used by the coverage test. */
+  cover?: Polygon;
 };
 
-type Aktion = {
+export type Connection = {
   trim: boolean;
   color: boolean;
-  /** Punkte der Laufstich-Verbindung ohne den Startpunkt, sonst leer. */
+  /** Points of the running connection without its start point, empty otherwise. */
   travel: Point[];
   jump: boolean;
 };
 
-/** Liegt der Weg unter einem spaeteren Objekt derselben Farbe oder in B? */
-function verdeckt(
-  von: Point,
-  nach: Point,
+/** Does the path lie under a later object of the same colour, or inside B? */
+function coveredBy(
+  from: Point,
+  to: Point,
   index: number,
-  bloecke: RohBlock[],
-  farbe: number,
+  blocks: RawBlock[],
+  threadIndex: number,
 ): Polygon | undefined {
-  for (let i = index; i < bloecke.length; i++) {
-    const b = bloecke[i]!;
-    if (b.threadIndex !== farbe) continue;
-    if (!b.deckung) continue;
-    if (segmentInside(b.deckung, von, nach)) return b.deckung;
+  for (let i = index; i < blocks.length; i++) {
+    const b = blocks[i]!;
+    if (b.threadIndex !== threadIndex) continue;
+    if (!b.cover) continue;
+    if (segmentInside(b.cover, from, to)) return b.cover;
   }
   return undefined;
 }
 
-export function entscheide(
+export function decideConnection(
   index: number,
-  bloecke: RohBlock[],
+  blocks: RawBlock[],
   opts: ConnectOptions,
-): Aktion {
-  const a = bloecke[index]!;
-  const b = bloecke[index + 1]!;
-  const endA = a.punkte[a.punkte.length - 1]!;
-  const startB = b.punkte[0]!;
+): Connection {
+  const a = blocks[index]!;
+  const b = blocks[index + 1]!;
+  const endA = a.points[a.points.length - 1]!;
+  const startB = b.points[0]!;
   const d = dist(endA, startB);
-  const farbwechsel = a.threadIndex !== b.threadIndex;
+  const colorChange = a.threadIndex !== b.threadIndex;
 
-  if (farbwechsel) {
+  if (colorChange) {
     return { trim: a.trimAfter !== "never", color: true, travel: [], jump: d > 1e-6 };
   }
 
@@ -86,13 +87,13 @@ export function entscheide(
   }
 
   if (d <= opts.runningConnectMm) {
-    // Der Weg muss unter einem spaeteren Objekt derselben Farbe liegen (Index
-    // index+1 schliesst B selbst ein — "innerhalb von B" ist derselbe Test).
-    const flaeche = verdeckt(endA, startB, index + 1, bloecke, a.threadIndex);
-    if (flaeche) {
-      const weg = insideTravel(flaeche, endA, startB);
-      const gestochen = runningStitches(weg, { stitchLengthMm: opts.travelStitchMm });
-      return { trim: false, color: false, travel: gestochen.slice(1), jump: false };
+    // The path must lie under a later object of the same colour. Starting at
+    // index + 1 includes B itself — "inside B" is the same test.
+    const cover = coveredBy(endA, startB, index + 1, blocks, a.threadIndex);
+    if (cover) {
+      const path = insideTravel(cover, endA, startB);
+      const stitched = runningStitches(path, { stitchLengthMm: opts.travelStitchMm });
+      return { trim: false, color: false, travel: stitched.slice(1), jump: false };
     }
   }
 
@@ -103,47 +104,47 @@ export function entscheide(
   return { trim: a.trimAfter !== "never", color: false, travel: [], jump: d > 1e-6 };
 }
 
-const stich = (p: Point): Stitch => ({ x: p.x, y: p.y, cmd: "stitch" });
+const stitchAt = (p: Point): Stitch => ({ x: p.x, y: p.y, cmd: "stitch" });
 
 /**
- * Rohe Punktbloecke zu Stichbloecken mit Kommandos. Trim und Farbwechsel haengen
- * am Ende von Block A, Sprung und Laufstich-Verbindung am Anfang von Block B —
- * so wie die Maschine sie abarbeitet.
+ * Raw point blocks to stitch blocks carrying commands. Trim and colour change
+ * hang off the end of block A, jump and running connection off the start of
+ * block B — the order in which the machine works through them.
  */
 export function connectBlocks(
-  rohe: RohBlock[],
-  opts: ConnectOptions = CONNECT_STANDARD,
+  raw: RawBlock[],
+  opts: ConnectOptions = CONNECT_DEFAULTS,
 ): StitchBlock[] {
-  const gefuellt = rohe.filter((b) => b.punkte.length > 0);
-  if (gefuellt.length === 0) return [];
+  const filled = raw.filter((b) => b.points.length > 0);
+  if (filled.length === 0) return [];
 
-  const out: StitchBlock[] = gefuellt.map((b) => ({
+  const out: StitchBlock[] = filled.map((b) => ({
     objectId: b.objectId,
     threadIndex: b.threadIndex,
-    stitches: b.punkte.map(stich),
+    stitches: b.points.map(stitchAt),
   }));
 
-  for (let i = 0; i + 1 < gefuellt.length; i++) {
-    const aktion = entscheide(i, gefuellt, opts);
+  for (let i = 0; i + 1 < filled.length; i++) {
+    const action = decideConnection(i, filled, opts);
     const a = out[i]!;
     const b = out[i + 1]!;
     const endA = a.stitches[a.stitches.length - 1]!;
 
-    if (aktion.trim) a.stitches.push({ x: endA.x, y: endA.y, cmd: "trim" });
-    if (aktion.color) a.stitches.push({ x: endA.x, y: endA.y, cmd: "color" });
+    if (action.trim) a.stitches.push({ x: endA.x, y: endA.y, cmd: "trim" });
+    if (action.color) a.stitches.push({ x: endA.x, y: endA.y, cmd: "color" });
 
-    if (aktion.travel.length > 0) {
-      // Der letzte Reisepunkt IST der Blockanfang — den doppelten verwerfen.
-      b.stitches.splice(0, 1, ...aktion.travel.map(stich));
-    } else if (aktion.jump) {
-      const erster = b.stitches[0]!;
-      b.stitches[0] = { x: erster.x, y: erster.y, cmd: "jump" };
+    if (action.travel.length > 0) {
+      // The last travel point IS the start of the block — drop the duplicate.
+      b.stitches.splice(0, 1, ...action.travel.map(stitchAt));
+    } else if (action.jump) {
+      const first = b.stitches[0]!;
+      b.stitches[0] = { x: first.x, y: first.y, cmd: "jump" };
     }
   }
 
-  // Abschluss: `end` an der letzten Position.
-  const letzter = out[out.length - 1]!;
-  const letzte = letzter.stitches[letzter.stitches.length - 1]!;
-  letzter.stitches.push({ x: letzte.x, y: letzte.y, cmd: "end" });
+  // Finish: `end` at the last position.
+  const lastBlock = out[out.length - 1]!;
+  const lastStitch = lastBlock.stitches[lastBlock.stitches.length - 1]!;
+  lastBlock.stitches.push({ x: lastStitch.x, y: lastStitch.y, cmd: "end" });
   return out;
 }

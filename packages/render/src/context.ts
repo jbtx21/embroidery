@@ -1,9 +1,9 @@
 /**
- * Die Teilmenge von CanvasRenderingContext2D, die der Renderer braucht.
+ * The subset of CanvasRenderingContext2D the renderer needs.
  *
- * Bewusst als eigenes Interface: so laeuft der Renderer im Browser, auf einem
- * OffscreenCanvas und im Test gegen eine Attrappe — ohne DOM-Typen im Paket.
- * Ein echtes CanvasRenderingContext2D erfuellt dieses Interface.
+ * Deliberately its own interface: that way the renderer runs in the browser, on
+ * an OffscreenCanvas and in tests against a stub — without pulling DOM types
+ * into the package. A real CanvasRenderingContext2D satisfies this interface.
  */
 export interface Ctx2D {
   save(): void;
@@ -25,19 +25,19 @@ export interface Ctx2D {
   globalAlpha: number;
 }
 
-/** Ansicht: Weltkoordinaten (mm) auf Bildpunkte. */
+/** View: world coordinates (mm) onto pixels. */
 export type View = { scale: number; offsetX: number; offsetY: number };
 
-/** Ansicht, die `bbox` mittig in ein Fenster von `w` x `h` Bildpunkten legt. */
+/** A view that centres `bbox` inside a window of `w` x `h` pixels. */
 export function fitView(
   bbox: { minX: number; minY: number; maxX: number; maxY: number },
   w: number,
   h: number,
-  randPx = 20,
+  paddingPx = 20,
 ): View {
-  const breite = Math.max(bbox.maxX - bbox.minX, 1e-6);
-  const hoehe = Math.max(bbox.maxY - bbox.minY, 1e-6);
-  const scale = Math.min((w - 2 * randPx) / breite, (h - 2 * randPx) / hoehe);
+  const width = Math.max(bbox.maxX - bbox.minX, 1e-6);
+  const height = Math.max(bbox.maxY - bbox.minY, 1e-6);
+  const scale = Math.min((w - 2 * paddingPx) / width, (h - 2 * paddingPx) / height);
   return {
     scale,
     offsetX: w / 2 - ((bbox.minX + bbox.maxX) / 2) * scale,

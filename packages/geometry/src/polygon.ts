@@ -1,14 +1,14 @@
 /**
- * Polygon-Grundlagen: Flaeche, Orientierung, Bounding-Box, Punkt-in-Polygon.
+ * Polygon basics: area, orientation, bounding box, point in polygon.
  *
- * Orientierung im SVG-System (y nach unten): die Shoelace-Formel liefert fuer
- * einen visuell IM Uhrzeigersinn laufenden Ring ein positives Vorzeichen. Die
- * Normierung aus Kap. 5 (Aussenring im Uhrzeigersinn, Loecher gegen) heisst hier
- * also: `signedArea(outer) > 0`, `signedArea(hole) < 0`.
+ * Orientation in the SVG system (y down): the shoelace formula returns a
+ * positive value for a ring that runs visually clockwise. So the normalisation
+ * from spec §5 (outer ring clockwise, holes counter-clockwise) means
+ * `signedArea(outer) > 0` and `signedArea(hole) < 0`.
  */
 import type { Point, Polygon, Polyline, Rect } from "./types.js";
 
-/** Positiv = Uhrzeigersinn im SVG-System (y nach unten). Ring schliesst implizit. */
+/** Positive means clockwise in the SVG system (y down). The ring closes implicitly. */
 export function signedArea(ring: Polyline): number {
   let sum = 0;
   for (let i = 0; i < ring.length; i++) {
@@ -21,7 +21,7 @@ export function signedArea(ring: Polyline): number {
 
 export const area = (ring: Polyline): number => Math.abs(signedArea(ring));
 
-/** Flaeche des Polygons abzueglich seiner Loecher. */
+/** Area of the polygon minus its holes. */
 export function polygonArea(poly: Polygon): number {
   let a = area(poly.outer);
   for (const h of poly.holes) a -= area(h);
@@ -34,12 +34,12 @@ export function reverse(ring: Polyline): Polyline {
   return ring.slice().reverse();
 }
 
-/** Ring auf die gewuenschte Drehrichtung bringen, ohne ihn sonst anzufassen. */
+/** Bring a ring to the requested winding without touching anything else. */
 export function orient(ring: Polyline, clockwise: boolean): Polyline {
   return isClockwise(ring) === clockwise ? ring.slice() : reverse(ring);
 }
 
-/** Schlusspunkt entfernen, falls er den Startpunkt wiederholt. */
+/** Drop the closing point if it repeats the start point. */
 export function openRing(ring: Polyline, eps = 1e-9): Polyline {
   if (ring.length < 2) return ring.slice();
   const a = ring[0]!;
@@ -76,7 +76,7 @@ export function unionRect(a: Rect, b: Rect): Rect {
   };
 }
 
-/** Ray-Casting gegen einen einzelnen Ring. Punkte auf der Kante gelten als innen. */
+/** Ray casting against a single ring. */
 export function pointInRing(ring: Polyline, p: Point): boolean {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -90,19 +90,19 @@ export function pointInRing(ring: Polyline, p: Point): boolean {
   return inside;
 }
 
-/** Innen heisst: im Aussenring und in keinem Loch. */
+/** Inside means: within the outer ring and in none of the holes. */
 export function pointInPolygon(poly: Polygon, p: Point): boolean {
   if (!pointInRing(poly.outer, p)) return false;
   for (const h of poly.holes) if (pointInRing(h, p)) return false;
   return true;
 }
 
-/** Alle Ringe eines Polygons — Aussenring zuerst. */
+/** All rings of a polygon — outer ring first. */
 export function rings(poly: Polygon): Polyline[] {
   return [poly.outer, ...poly.holes];
 }
 
-/** Ring als geschlossene Polyline (Startpunkt wiederholt) — fuer Laufstiche. */
+/** A ring as a closed polyline (start point repeated) — for running stitches. */
 export function closeRing(ring: Polyline): Polyline {
   if (ring.length === 0) return [];
   return [...ring.map((p) => ({ ...p })), { ...ring[0]! }];

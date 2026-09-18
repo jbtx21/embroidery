@@ -1,0 +1,6 @@
+dist/
+node_modules/
+out/
+coverage/
+pnpm-lock.yaml
+docs/Engine-Spezifikation.md
