@@ -3,7 +3,14 @@ import { polygonOf, pt, rect } from "../test/fixtures/shapes.js";
 import { fillObject, runningObject, satinObject } from "../test/fixtures/designs.js";
 import { CONNECT_DEFAULTS, connectBlocks, decideConnection } from "./connect.js";
 import type { RawBlock } from "./connect.js";
-import { analyze, maxDensity } from "./analyze.js";
+import {
+  analyze,
+  DENSITY_ERROR,
+  DENSITY_WARN,
+  LONG_JUMP_MM,
+  MAX_COLOR_CHANGES,
+  maxDensity,
+} from "./analyze.js";
 import { autoOrder } from "./order.js";
 import { coverPolygon, objectStart, orderRank } from "./object.js";
 import { MACHINE_CAP, MACHINE_DEFAULT, MACHINES, preset, PRESETS } from "./presets.js";
@@ -209,6 +216,15 @@ describe("statistics (spec §11)", () => {
         (w) => w.code,
       ),
     ).toContain("OBJECT_OUTSIDE_HOOP");
+  });
+});
+
+describe("documented thresholds (spec §11)", () => {
+  it("matches the numbers from the spec", () => {
+    expect(DENSITY_WARN).toBe(12);
+    expect(DENSITY_ERROR).toBe(18);
+    expect(MAX_COLOR_CHANGES).toBe(8);
+    expect(LONG_JUMP_MM).toBe(30);
   });
 });
 

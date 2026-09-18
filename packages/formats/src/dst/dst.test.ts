@@ -15,6 +15,7 @@ import {
 import {
   decodeRecord,
   DST_MAX_DELTA,
+  DST_UNITS_PER_MM,
   encodeRecord,
   roundHalfEven,
   TRIM_RECORDS,
@@ -124,6 +125,20 @@ describe("records (spec §13.1)", () => {
       dy += d.dy;
     }
     expect([dx, dy]).toEqual([0, 0]);
+  });
+});
+
+describe("documented units (spec §13.1)", () => {
+  it("uses 0.1 mm per DST unit and 121 units per axis", () => {
+    expect(DST_UNITS_PER_MM).toBe(10);
+    expect(DST_MAX_DELTA).toBe(121);
+    expect(DST_HEADER_SIZE).toBe(512);
+    // planToUnits converts millimetres accordingly
+    expect(
+      planToUnits([
+        { objectId: "a", threadIndex: 0, stitches: [{ x: 1.23, y: -4.5, cmd: "stitch" }] },
+      ])[0],
+    ).toEqual({ x: 12.3, y: -45, cmd: "stitch" });
   });
 });
 

@@ -11,7 +11,12 @@ import {
   railSections,
   rungCutLength,
   satinOutline,
+  CENTER_UNDERLAY_STITCH_MM,
+  SATIN_MAX_WIDTH_MM,
+  SATIN_MIN_WIDTH_MM,
+  SATIN_RUNNING_HINT_MM,
   SHORT_STITCH_FACTOR,
+  SHORT_STITCH_RADIUS_MM,
   splitWideStitches,
   zigzagSequence,
 } from "./satin.js";
@@ -127,6 +132,17 @@ describe("short stitches (spec §7.5)", () => {
     expect(applyShortStitches(pairs).map((r) => dist(r.a, r.b))).toEqual(
       pairs.map((r) => dist(r.a, r.b)),
     );
+  });
+});
+
+describe("documented thresholds (spec §7)", () => {
+  it("matches the numbers from the spec", () => {
+    expect(SATIN_MIN_WIDTH_MM).toBe(1.0);
+    expect(SATIN_RUNNING_HINT_MM).toBe(0.6);
+    expect(SATIN_MAX_WIDTH_MM).toBe(12.0);
+    expect(SHORT_STITCH_RADIUS_MM).toBe(1.0);
+    expect(SHORT_STITCH_FACTOR).toBe(0.7);
+    expect(CENTER_UNDERLAY_STITCH_MM).toBe(2.5);
   });
 });
 

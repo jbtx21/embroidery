@@ -4,12 +4,16 @@ import { annulus, polygonOf, pt, rect } from "../test/fixtures/shapes.js";
 import { fillObject } from "../test/fixtures/designs.js";
 import {
   contourUnderlay,
+  DOUBLE_UNDERLAY_EDGE_MM,
+  FILL_TINY_MM2,
   fillRegion,
   generateFill,
   longestEdgeMm,
   rowStitches,
   scanlines,
+  sectionStitches,
   sections,
+  TRAVEL_STITCH_MM,
 } from "./fill.js";
 
 beforeAll(async () => {
@@ -70,6 +74,46 @@ describe("row stitches (spec §8.4)", () => {
     const a = rowStitches({ row: 0, y: 0, x0: 0, x1: 10, idx: 0 }, params, true);
     const b = rowStitches({ row: 0, y: 0, x0: 0, x1: 10, idx: 0 }, params, false);
     expect(b.map((q) => q.x)).toEqual([...a.map((q) => q.x)].reverse());
+  });
+});
+
+describe("section stitches (spec §8.4)", () => {
+  it("serpentines row by row, alternating direction", () => {
+    const section = sections(scanlines(square, 2))[0]!;
+    const stitches = sectionStitches(section, params, {
+      point: { x: 0, y: 10 },
+      fromBottom: true,
+      rightward: true,
+    });
+    expect(stitches.length).toBeGreaterThan(4);
+    // First row left to right, second row back again
+    expect(stitches[1]!.x).toBeGreaterThan(stitches[0]!.x);
+    const rowOne = stitches.filter((p) => Math.abs(p.y - stitches[0]!.y) < 1e-9);
+    const after = stitches[rowOne.length]!;
+    expect(after.y).not.toBeCloseTo(stitches[0]!.y, 6);
+  });
+
+  it("enters from the top when asked", () => {
+    const section = sections(scanlines(square, 2))[0]!;
+    const fromTop = sectionStitches(section, params, {
+      point: { x: 0, y: 0 },
+      fromBottom: false,
+      rightward: true,
+    });
+    const fromBottom = sectionStitches(section, params, {
+      point: { x: 0, y: 10 },
+      fromBottom: true,
+      rightward: true,
+    });
+    expect(fromTop[0]!.y).toBeLessThan(fromBottom[0]!.y);
+  });
+});
+
+describe("documented values (spec §8, §11)", () => {
+  it("matches the numbers from the spec", () => {
+    expect(TRAVEL_STITCH_MM).toBe(2.0);
+    expect(FILL_TINY_MM2).toBe(4);
+    expect(DOUBLE_UNDERLAY_EDGE_MM).toBe(20);
   });
 });
 

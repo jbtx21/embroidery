@@ -3,7 +3,12 @@ import { initGeometry } from "@texma-stitch/geometry";
 import { planDesign } from "@texma-stitch/engine";
 import { polygonOf, rect } from "../../engine/test/fixtures/shapes.js";
 import { design, fillObject, THREAD_BLACK } from "../../engine/test/fixtures/designs.js";
-import { fromNeutralJson, stringifyNeutralJson, toNeutralJson } from "./json.js";
+import {
+  fromNeutralJson,
+  NEUTRAL_JSON_VERSION,
+  stringifyNeutralJson,
+  toNeutralJson,
+} from "./json.js";
 
 beforeAll(async () => {
   await initGeometry();
@@ -30,6 +35,11 @@ describe("neutral JSON", () => {
   it("keeps the tie flag", () => {
     const text = stringifyNeutralJson(toNeutralJson(plan(), "Probe", []));
     expect(text).toContain('"tie":true');
+  });
+
+  it("carries the current version", () => {
+    expect(NEUTRAL_JSON_VERSION).toBe(1);
+    expect(toNeutralJson(plan(), "x", []).version).toBe(NEUTRAL_JSON_VERSION);
   });
 
   it("rejects a foreign version", () => {
