@@ -3,6 +3,29 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Abgleich mit der Punch-Praxis (19.09.2026)
+
+Vollständig mit Messungen in `docs/profi-abgleich.md`. Acht offene Spec-Fragen, kurz:
+
+1. **§14 Reihenabstände.** Unsere 0,25–0,28 mm liegen 35–60 % über der Industriedichte
+   (0,40 Standard, 0,35 schwer, 0,45 dünn). Wechsel auf 0,40 spart gemessen 21 % Stiche
+   und 5–6 min Maschinenzeit je Stück. §14 nennt die Werte selbst „Startwerte".
+2. **§11 Dichtemaß.** Das Maximum über alle 1-mm-Zellen lässt eine einzige Stelle die ganze
+   Datei abstempeln (STUTTGART: 9 von 4.047 Zellen lösen den Fehler aus, 92 % liegen bei
+   höchstens 8/mm²). Fläche über dem Grenzwert wäre aussagekräftiger.
+3. **§11 Breitenkriterium.** `FILL_TINY` misst Fläche < 4 mm². Eine 114-mm²-Sichel mit 79 %
+   Reihenstücken unter 1 mm fällt durch. 35–42 % aller Reihenstücke eines Motivs liegen
+   unter 1 mm und tragen zusammen 3–4 % der Deckung.
+4. **§7/§8 Kontur-Überlappung** gegen Blitzer: existiert nicht. Aus SVG importierte Kontur
+   und Fläche liegen exakt auf Kante.
+5. **§7.2 Push-Ausgleich** ist auf „für später" gesetzt. Cap-Zugausgleich 0,15 mm liegt
+   unter dem Praxisminimum 0,2 mm.
+6. **§10.1 Mitte → außen, unten → oben** ist nicht umgesetzt — obwohl §14 es im Hinweis des
+   Cap-Presets verspricht. `autoOrder` sortiert nach nächster Entfernung.
+7. **§8 Stichwinkel.** Der Import setzt für jede Fläche 0°. Gleiche Winkel überall wirken
+   flach.
+8. **§6 krümmungsabhängige Stichlänge** im Laufstich: nicht vorhanden.
+
 ## Aus der Messung an echten Kundenlogos (19.09.2026)
 
 Zahlen und Belege: `docs/messung-echte-logos.md`.
