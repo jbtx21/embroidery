@@ -3,6 +3,33 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Aus der Messung an echten Kundenlogos (19.09.2026)
+
+Zahlen und Belege: `docs/messung-echte-logos.md`.
+
+- **Übereinanderliegende Flächen werden doppelt gestickt.** Druckvorlagen legen den
+  Untergrund als volle Fläche unter das Motiv; die Engine stickt beides. Alle vier Logos
+  melden deshalb `DENSITY_HIGH` als Fehler (19–27 Stiche/mm²). **Frage an die Spec:** soll
+  `expand()` überdeckte Flächen abziehen (§4 kennt keine Stufe, die Objekte gegeneinander
+  verrechnet; §8 keinen Knockdown), und nach welcher Regel — nur bei voller Überdeckung,
+  nur innerhalb einer Farbe, mit welchem Überstand?
+- **`autoOrder` sollte der Standardweg sein.** Mit der Designreihenfolge braucht
+  STUTTGART zwölf Farbwechsel für zwei Farben, mit `order: "auto"` einen. Köln 21 → 5.
+  §10.1 beschreibt „auto" als Vorschlag. **Frage an die Spec:** umdrehen?
+- **Regel 9 hält auf echter Geometrie noch nicht.** Nach dem Umbau von `insideTravel`
+  (Graph-Cache, nur einspringende Ecken als Knoten, Kantenindex) rechnet das teuerste
+  Objekt statt gar nicht in 1,1 s; ein ganzes Motiv braucht 0,17 s (STUTTGART 80 mm) bis
+  5,7 s (Eislingen). Die Zeit steckt in den Sichtbarkeitstests, nicht in der Stichzahl —
+  STUTTGART 250 mm hat 134.735 Stiche und braucht 0,67 s, Eislingen 48.027 Stiche und
+  5,7 s. Nächster Schritt wäre, die **Zahl** der Tests zu senken (A\* statt Dijkstra,
+  Zielsichtbarkeit erst beim Entnehmen prüfen). Eigene Sitzung.
+- **`pnpm bench` misst zu kleine Formen.** Die Zusage „voller Lauf unter 300 ms" ist dort
+  grün, weil die Benchmark-Formen ein Dutzend Kanten haben. Ein Benchmarkfall mit einer
+  Kontur in der Größenordnung eines echten Logos (2.000+ Kanten, Löcher) würde den
+  Unterschied zeigen. Braucht eine Vorlage, die ins Repo darf.
+- **`FILL_TINY` in Massen** (Köln 64, Eislingen 71): Flächen von 0,3 bis 4 mm² aus der
+  Vektorisierung. Gehört in die Vorbereitung der Vorlage. Die Engine meldet es richtig.
+
 ## Wartet auf Zulieferung
 
 - **Phase-0-Motive** (§15, §16 Abnahme Woche 1): `test-data/phase0/` enthält nur die

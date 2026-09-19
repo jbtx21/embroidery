@@ -87,3 +87,10 @@ steht und was fehlt. Offene Entscheidungen und Zulieferungen stehen in `backlog.
   genau auf der Grenze wäre am Rauschen gescheitert statt an seinen Stichen. Der
   Vergleich rechnet jetzt mit einer Epsilon-Schwelle; die Toleranzen aus §15 bleiben
   unverändert.
+- Der Sichtbarkeitsgraph hinter `insideTravel` wurde für jeden einzelnen Reiseweg neu
+  gebaut, und jeder Sichtbarkeitstest lief über alle Kanten der Form. Auf den
+  Beispielformen der Tests fällt das nicht auf; an einer echten Logokontur mit 2.266
+  Kanten und 41 Löchern rechnete ein einziges Fill-Objekt über fünf Minuten ohne
+  Ergebnis. Jetzt hält jede Form ihren Graphen, Knoten sind nur die einspringenden Ecken
+  (bei dieser Kontur 713 statt 1.127), und ein Kantengitter beantwortet Schnitt- und
+  Innen-Fragen lokal. Dasselbe Objekt: 1,1 s. Zahlen in `docs/messung-echte-logos.md`.

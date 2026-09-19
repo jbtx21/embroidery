@@ -10,6 +10,7 @@ export * from "./transform.js";
 export * from "./clip.js";
 export * from "./boolean.js";
 export * from "./offset.js";
+export * from "./edge-index.js";
 export * from "./travel.js";
 export * from "./delaunay.js";
 export * from "./medial-axis.js";
