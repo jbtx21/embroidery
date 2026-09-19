@@ -79,12 +79,13 @@ export function validate(design: Design): ValidateResult {
           break;
         }
         // Several areas: stitch all of them. Picking one would be a guess, and
-        // dropping the rest would lose the user's geometry.
+        // dropping the rest would lose the user's geometry (spec §11,
+        // SHAPE_SPLIT — the piece count belongs in the message).
         warnings.push(
           warn(
-            WARNING.INVALID_GEOMETRY,
+            WARNING.SHAPE_SPLIT,
             `Area falls into ${parts.length} pieces; each one is stitched separately.`,
-            "info",
+            "warn",
             obj.id,
           ),
         );

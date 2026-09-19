@@ -43,7 +43,11 @@ describe("validate", () => {
     const v = validate(design([fillObject("f", eight)]));
     expect(v.objects).toHaveLength(2);
     expect(v.objects.map((o) => o.id)).toEqual(["f#0", "f#1"]);
-    expect(v.warnings.find((w) => w.code === "INVALID_GEOMETRY")?.severity).toBe("info");
+    const split = v.warnings.find((w) => w.code === "SHAPE_SPLIT")!;
+    expect(split.severity).toBe("warn");
+    // The piece count has to be in the message (spec §11)
+    expect(split.message).toMatch(/\b2\b/);
+    expect(split.objectId).toBe("f");
   });
 
   it("errors on a degenerate area", () => {
