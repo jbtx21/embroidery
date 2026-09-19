@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { bbox } from "@texma-stitch/geometry";
-import { SVG_ARC, SVG_PIXELS, SVG_TWO_PATHS } from "../../test/fixtures/svg.js";
+import { SVG_ARC, SVG_FILLED, SVG_PIXELS, SVG_TWO_PATHS } from "../../test/fixtures/svg.js";
 import { applyMatrix, IDENTITY, multiply, parseTransform } from "./matrix.js";
 import { parsePathData } from "./path-data.js";
 import { importSvg, lengthToMm, unitScale } from "./svg.js";
+import type { FillObject, RunningObject } from "../types.js";
+import { polygonArea } from "@texma-stitch/geometry";
 
 describe("matrix", () => {
   it("parses the transform functions", () => {
@@ -184,5 +186,81 @@ describe("import (spec §4, week 1)", () => {
     const { design } = importSvg(SVG_TWO_PATHS, { preset: "fleece", designId: "logo" });
     expect(design.preset).toBe("fleece");
     expect(design.id).toBe("logo");
+  });
+});
+
+describe("filled paths", () => {
+  const imported = () => importSvg(SVG_FILLED);
+  const byId = (id: string) => imported().design.objects.find((o) => o.id === id);
+
+  it("makes an area out of a filled path and takes the colour from the group", () => {
+    const ring = byId("ring") as FillObject;
+    expect(ring.type).toBe("fill");
+    const { design } = imported();
+    expect(design.threads[ring.threadIndex]!.hex).toBe("#c8102e");
+  });
+
+  it("reads even-odd sub-paths as holes, not as separate areas", () => {
+    const ring = byId("ring") as FillObject;
+    expect(ring.shape.holes).toHaveLength(1);
+    // 20 x 20 outer minus 10 x 10 hole
+    expect(polygonArea(ring.shape)).toBeCloseTo(400 - 100, 3);
+  });
+
+  it("splits a path with two separate outer rings into two areas", () => {
+    const { design } = imported();
+    const parts = design.objects.filter((o) => o.id.startsWith("zwei-flaechen"));
+    expect(parts).toHaveLength(2);
+    for (const p of parts) expect(polygonArea((p as FillObject).shape)).toBeCloseTo(64, 3);
+  });
+
+  it("maps the Ink/Stitch fill attributes", () => {
+    const f = byId("mit-parametern") as FillObject;
+    expect(f.angleDeg).toBe(45);
+    expect(f.rowSpacingMm).toBe(0.4);
+    expect(f.stitchLengthMm).toBe(2.5);
+    expect(f.staggerRows).toBe(2);
+  });
+
+  it("falls back to the preset where no attribute says otherwise", () => {
+    const ring = byId("ring") as FillObject;
+    expect(ring.angleDeg).toBe(0);
+    expect(ring.rowSpacingMm).toBe(0.25); // Piqué
+    const fleece = importSvg(SVG_FILLED, { preset: "fleece" });
+    const ringFleece = fleece.design.objects.find((o) => o.id === "ring") as FillObject;
+    expect(ringFleece.rowSpacingMm).toBe(0.28);
+  });
+
+  it("keeps fill=none with a stroke a running stitch", () => {
+    const line = byId("kontur") as RunningObject;
+    expect(line.type).toBe("running");
+    const { design } = imported();
+    expect(design.threads[line.threadIndex]!.hex).toBe("#2e3192");
+  });
+
+  it("treats a path without any paint as an outline", () => {
+    // SVG would render it as black fill; in an embroidery source an unmarked
+    // path is an outline far more often, and that was the previous behaviour.
+    expect(byId("ohne-farbe")!.type).toBe("running");
+  });
+
+  it("reads a fill out of the style attribute", () => {
+    const f = byId("stil") as FillObject;
+    expect(f.type).toBe("fill");
+    const { design } = imported();
+    expect(design.threads[f.threadIndex]!.hex).toBe("#fedd01");
+  });
+
+  it("makes one thread per distinct colour", () => {
+    const { design } = imported();
+    // #000000 is the fallback for the path that names no colour at all.
+    expect(design.threads.map((t) => t.hex).sort()).toEqual(
+      ["#000000", "#101010", "#2e3192", "#c8102e", "#fedd01"].sort(),
+    );
+  });
+
+  it("keeps the document order, which is the stacking order", () => {
+    const ids = imported().design.objects.map((o) => o.id);
+    expect(ids.indexOf("ring")).toBeLessThan(ids.indexOf("mit-parametern"));
   });
 });

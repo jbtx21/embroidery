@@ -12,11 +12,14 @@
  * Vectorisation is NOT part of the engine (spec §1). This importer takes paths
  * that already exist.
  */
-import { flattenPath } from "@texma-stitch/geometry";
-import type { Design, PresetId, RunningObject, Thread, Warning } from "../types.js";
+import type { Point } from "@texma-stitch/geometry";
+import { flattenPath, ringsToPolygons } from "@texma-stitch/geometry";
+import type { Design, PresetId, StitchObject, Thread, Warning } from "../types.js";
+import { PRESETS } from "../presets.js";
 import { warn, WARNING } from "../warnings.js";
 import type { Matrix } from "./matrix.js";
 import { applyMatrix, IDENTITY, multiply, parseTransform } from "./matrix.js";
+import type { SubPath } from "./path-data.js";
 import { parsePathData } from "./path-data.js";
 
 /** CSS reference: 96 user units per inch. */
@@ -94,20 +97,46 @@ function repeatsFrom(value: string | undefined): 1 | 3 | 5 {
   return 1;
 }
 
-/** `stroke` colour of a path, normalised to lower-case hex where possible. */
-function strokeColor(attrs: Attrs): string | undefined {
+/** Presentation attributes a child inherits from its parent groups. */
+const INHERITED = ["fill", "fill-rule", "stroke"] as const;
+
+/**
+ * One presentation value, from `style` if it is set there, otherwise from the
+ * attribute of the same name.
+ */
+function paintValue(attrs: Attrs, key: string): string | undefined {
   const style = attrs["style"];
-  const fromStyle = style ? /(?:^|;)\s*stroke\s*:\s*([^;]+)/.exec(style)?.[1] : undefined;
-  const raw = (fromStyle ?? attrs["stroke"] ?? "").trim().toLowerCase();
-  if (!raw || raw === "none") return undefined;
-  return raw;
+  const fromStyle = style
+    ? new RegExp(`(?:^|;)\\s*${key}\\s*:\\s*([^;]+)`).exec(style)?.[1]
+    : undefined;
+  const raw = (fromStyle ?? attrs[key])?.trim().toLowerCase();
+  return raw && raw.length > 0 ? raw : undefined;
 }
+
+/** Parent values, overridden by whatever this element sets itself. */
+function inheritPaint(parent: Attrs, attrs: Attrs): Attrs {
+  const out = { ...parent };
+  for (const key of INHERITED) {
+    const value = paintValue(attrs, key);
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
+const isPaint = (value: string | undefined): value is string =>
+  value !== undefined && value !== "none" && value !== "transparent";
 
 // ---------------------------------------------------------------------------
 // Scanner
 // ---------------------------------------------------------------------------
 
-type Element = { name: string; attrs: Attrs; matrix: Matrix };
+type Element = {
+  name: string;
+  attrs: Attrs;
+  matrix: Matrix;
+  /** fill, fill-rule and stroke as they reach this element. */
+  paint: Attrs;
+};
 
 /**
  * Walks the tags and keeps a transform stack. Self-closing tags and `</g>` are
@@ -118,6 +147,9 @@ function scan(text: string): { root: Attrs; paths: Element[] } {
   const paths: Element[] = [];
   let root: Attrs = {};
   const stack: Matrix[] = [IDENTITY];
+  // Presentation attributes run down the tree: these files carry one colour per
+  // group and nothing on the paths themselves.
+  const paintStack: Attrs[] = [{}];
 
   const re = /<\s*(\/)?\s*([a-zA-Z][\w:.-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
   let m: RegExpExecArray | null;
@@ -134,6 +166,7 @@ function scan(text: string): { root: Attrs; paths: Element[] } {
 
     if (closing) {
       if (stack.length > 1) stack.pop();
+      if (paintStack.length > 1) paintStack.pop();
       continue;
     }
 
@@ -141,11 +174,15 @@ function scan(text: string): { root: Attrs; paths: Element[] } {
     const parent = stack[stack.length - 1]!;
     const local = attrs["transform"] ? parseTransform(attrs["transform"]) : IDENTITY;
     const matrix = multiply(parent, local);
+    const paint = inheritPaint(paintStack[paintStack.length - 1]!, attrs);
 
     if (name === "svg") root = { ...root, ...attrs };
-    if (name === "path" && attrs["d"]) paths.push({ name, attrs, matrix });
+    if (name === "path" && attrs["d"]) paths.push({ name, attrs, matrix, paint });
 
-    if (!selfClosing) stack.push(matrix);
+    if (!selfClosing) {
+      stack.push(matrix);
+      paintStack.push(paint);
+    }
   }
 
   return { root, paths };
@@ -173,10 +210,29 @@ export function unitScale(root: Attrs): number {
 // Import
 // ---------------------------------------------------------------------------
 
+/** A closed ring in millimetres, ready for `ringsToPolygons`. */
+function ringInMm(sub: SubPath, matrix: Matrix, mmPerUnit: number): Point[] {
+  // Flatten in user units, then transform and scale to millimetres. The other
+  // way round the flattening tolerance would refer to the wrong unit.
+  const flat = flattenPath(sub.start, sub.segments);
+  const ring = flat.map((q) => {
+    const t = applyMatrix(matrix, q);
+    return { x: t.x * mmPerUnit, y: t.y * mmPerUnit };
+  });
+  // `Z` repeats the start point; a ring closes implicitly.
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (ring.length > 1 && first && last && Math.hypot(last.x - first.x, last.y - first.y) < 1e-9) {
+    ring.pop();
+  }
+  return ring;
+}
+
 export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport {
   const warnings: Warning[] = [];
   const { root, paths } = scan(text);
   const mmPerUnit = unitScale(root);
+  const preset = PRESETS[opts.preset ?? "pique"];
 
   const threads: Thread[] = [];
   const threadIndexOf = (hex: string | undefined): number => {
@@ -187,7 +243,7 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
     return threads.length - 1;
   };
 
-  const objects: RunningObject[] = [];
+  const objects: StitchObject[] = [];
   for (const [pi, el] of paths.entries()) {
     const id = el.attrs["id"] ?? `path${pi}`;
     const subpaths = parsePathData(el.attrs["d"]!);
@@ -198,21 +254,70 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
       continue;
     }
 
-    const threadIndex = threadIndexOf(strokeColor(el.attrs));
+    const fill = el.paint["fill"];
+    const stroke = el.paint["stroke"];
+    const trimAfter = isTrue(inkstitch(el.attrs, "trim_after")) ? "always" : "auto";
+
+    // A filled path is an area, an outlined one is a line. With neither, treat
+    // it as a line: SVG would render an unpainted path as black fill, but in an
+    // embroidery source an unmarked path is an outline far more often than an
+    // area, and that is also what this importer did before it knew about fills.
+    if (isPaint(fill)) {
+      const threadIndex = threadIndexOf(fill);
+      const angle = Number(inkstitch(el.attrs, "angle"));
+      const rowSpacing = Number(inkstitch(el.attrs, "row_spacing_mm"));
+      const stitchLength = Number(inkstitch(el.attrs, "max_stitch_length_mm"));
+      const staggers = Number(inkstitch(el.attrs, "staggers"));
+
+      // Sub-paths of one `d` belong together: the inner ones are the holes.
+      const rings = subpaths
+        .map((sub) => ringInMm(sub, el.matrix, mmPerUnit))
+        .filter((r) => r.length >= 3);
+      const polygons = ringsToPolygons(rings);
+      if (polygons.length === 0) {
+        warnings.push(
+          warn(WARNING.EMPTY_OBJECT, `Filled path "${id}" encloses no area.`, "warn", id),
+        );
+        continue;
+      }
+
+      polygons.forEach((shape, si) => {
+        objects.push({
+          id: polygons.length === 1 ? id : `${id}:${si}`,
+          type: "fill",
+          threadIndex,
+          visible: true,
+          locked: false,
+          trimAfter,
+          shape,
+          angleDeg: Number.isFinite(angle) ? angle : 0,
+          rowSpacingMm:
+            Number.isFinite(rowSpacing) && rowSpacing > 0 ? rowSpacing : preset.fillRowSpacingMm,
+          stitchLengthMm:
+            Number.isFinite(stitchLength) && stitchLength > 0
+              ? stitchLength
+              : preset.fillStitchLengthMm,
+          staggerRows:
+            Number.isFinite(staggers) && staggers >= 1 ? staggers : preset.fillStaggerRows,
+          pullCompMm: 0,
+          underlay: preset.fillUnderlay,
+        });
+      });
+      continue;
+    }
+
+    const threadIndex = threadIndexOf(isPaint(stroke) ? stroke : undefined);
     const lengthAttr = Number(
       inkstitch(el.attrs, "running_stitch_length_mm") ?? inkstitch(el.attrs, "stitch_length_mm"),
     );
     const stitchLengthMm =
       Number.isFinite(lengthAttr) && lengthAttr > 0 ? lengthAttr : (opts.stitchLengthMm ?? 2.5);
     const repeats = repeatsFrom(inkstitch(el.attrs, "repeats"));
-    const trimAfter = isTrue(inkstitch(el.attrs, "trim_after")) ? "always" : "auto";
 
     subpaths.forEach((sub, si) => {
-      // Flatten in user units, then transform and scale to millimetres. The
-      // other way round the flattening tolerance would refer to the wrong unit.
       const flat = flattenPath(sub.start, sub.segments);
-      const path = flat.map((p) => {
-        const t = applyMatrix(el.matrix, p);
+      const path = flat.map((q) => {
+        const t = applyMatrix(el.matrix, q);
         return { x: t.x * mmPerUnit, y: t.y * mmPerUnit };
       });
       objects.push({

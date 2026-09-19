@@ -13,4 +13,4 @@ export * from "./offset.js";
 export * from "./travel.js";
 export * from "./delaunay.js";
 export * from "./medial-axis.js";
-export { initGeometry, isGeometryReady, SCALE } from "./clipper.js";
+export { initGeometry, isGeometryReady, ringsToPolygons, SCALE } from "./clipper.js";
