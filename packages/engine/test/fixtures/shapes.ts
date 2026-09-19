@@ -185,5 +185,22 @@ export function uShape(w = 20, h = 20, slot = 8): Polygon {
 
 export const U_SHAPE = uShape();
 
+// ---------------------------------------------------------------------------
+// L shape — two arms meeting at a reflex corner (auto-satin, spec §7.7)
+// ---------------------------------------------------------------------------
+
+/** L with arms of width `arm`, legs of length `leg`. */
+export function lShape(leg = 30, arm = 8): Polygon {
+  return {
+    outer: orient(
+      [pt(0, 0), pt(leg, 0), pt(leg, arm), pt(arm, arm), pt(arm, leg), pt(0, leg)],
+      true,
+    ),
+    holes: [],
+  };
+}
+
+export const L_SHAPE = lShape();
+
 /** Flatten a fixture path to a polyline — the Bezier and polygon forms should agree. */
 export const flattenFixture = (p: BezierPath): Polyline => flattenPath(p.start, p.segments);

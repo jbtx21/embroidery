@@ -34,7 +34,6 @@ import { clipHorizontal, clipLine } from "./clip.js";
 import { difference, intersect, normalizePolygon, normalizeRing, union } from "./boolean.js";
 import { offset, offsetAll, offsetPolyline } from "./offset.js";
 import { insideTravel, segmentInside } from "./travel.js";
-import { medialAxis } from "./medial-axis.js";
 import {
   applyToPolygon,
   applyToPolyline,
@@ -403,12 +402,5 @@ describe("point in polygon", () => {
     const outline = polygonOf([...arc(0, 0, 10, 0, 180, 24), ...arc(0, 0, 8, 180, 0, 24)]);
     expect(pointInPolygon(outline, pt(0, 9))).toBe(true);
     expect(pointInPolygon(outline, pt(0, 4))).toBe(false);
-  });
-});
-
-describe("medialAxis", () => {
-  it("says clearly that it is not built yet", () => {
-    // CLAUDE.md rule 8: no silent guessing. Week 4 fills this in.
-    expect(() => medialAxis(polygonOf(rect(0, 0, 10, 10)))).toThrow(/not implemented/i);
   });
 });
