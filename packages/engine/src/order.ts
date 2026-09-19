@@ -2,15 +2,15 @@
  * Stitching order (spec §10.1).
  *
  * The default is the object list of the design. `autoOrder` is a SUGGESTION:
- * group by colour (minimising colour changes), and within one colour put areas
- * before outlines, then work from the centre outwards and from the bottom up.
- * The user accepts it or not — the engine never reorders on its own.
+ * group by colour (minimising colour changes), then background before details
+ * before outlines, and within a stage the shortest path. The user accepts it or
+ * not — the engine never reorders on its own.
  *
- * Why not by distance: stitching pushes the fabric ahead of itself. Starting in
- * a corner drags that distortion across the whole design; starting in the middle
- * spreads it evenly towards the edges. On the round cap frame it is not optional
- * — otherwise the cap shifts under the design. It costs jumps, and the rule
- * accepts that: fabric distortion is more expensive than machine time.
+ * `centreOut` turns on the cap rule: from the centre outwards and from the
+ * bottom up. Stitching pushes the fabric ahead of itself, and on the round cap
+ * frame the direction is not optional — a cap stitched like flat goods from left
+ * to right shifts under the design. It costs jumps, so on flat goods the
+ * shortest path wins instead (spec §10.1).
  */
 import { dist } from "@texma-stitch/geometry";
 import { objectStart, orderRank } from "./object.js";
@@ -47,7 +47,12 @@ function designCentre(objects: StitchObject[]): Point {
   return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
 }
 
-export function autoOrder(objects: StitchObject[]): StitchObject[] {
+export type OrderOptions = {
+  /** Cap rule: work outwards from the centre and upwards from the bottom. */
+  centreOut?: boolean;
+};
+
+export function autoOrder(objects: StitchObject[], opts: OrderOptions = {}): StitchObject[] {
   // Colour groups in order of first appearance — that keeps the suggestion close
   // to what the user already sees.
   const groups = new Map<number, StitchObject[]>();
@@ -76,10 +81,11 @@ export function autoOrder(objects: StitchObject[]): StitchObject[] {
       const inRank = open.filter((e) => e.rank === rank);
       // Then the innermost band that still has something in it.
       const inner = Math.min(...inRank.map((e) => e.radius));
-      const band = inRank.filter((e) => e.radius <= inner + bandMm);
+      // Without the cap rule the whole stage is one band: the path decides.
+      const band = opts.centreOut ? inRank.filter((e) => e.radius <= inner + bandMm) : inRank;
 
       let best = band[0]!;
-      if (cursor === undefined) {
+      if (cursor === undefined && opts.centreOut) {
         // "From the bottom up": start at the lowest object of the band, and at
         // equal height the one nearest the centre. y points down (§1).
         for (const e of band) {
@@ -89,10 +95,12 @@ export function autoOrder(objects: StitchObject[]): StitchObject[] {
         }
       } else {
         // Inside the band the travel path decides — at equal distance again the
-        // lower object first.
-        let bestDist = dist(cursor, best.start);
+        // lower object first. With no cursor yet, the first object of the list
+        // is where the machine already stands.
+        const from = cursor ?? best.start;
+        let bestDist = dist(from, best.start);
         for (const e of band) {
-          const d = dist(cursor, e.start);
+          const d = dist(from, e.start);
           if (d < bestDist - 1e-9 || (Math.abs(d - bestDist) <= 1e-9 && e.start.y > best.start.y)) {
             best = e;
             bestDist = d;

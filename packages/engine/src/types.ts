@@ -15,7 +15,7 @@ export type Thread = {
   name: string;
 };
 
-export type PresetId = "pique" | "softshell" | "fleece" | "cap" | "frottee";
+export type PresetId = "pique" | "jersey" | "softshell" | "fleece" | "cap" | "frottee";
 
 export type TrimAfter = "auto" | "always" | "never";
 
@@ -44,8 +44,12 @@ export type FillObject = Base & {
   stitchLengthMm: number;
   /** Stagger across n rows. */
   staggerRows: number;
-  /** Offset outwards (+) or inwards (-). */
+  /** Compensation ALONG `angleDeg`, outwards (+) — spec §8.1.1. */
   pullCompMm: number;
+  /** Compensation ACROSS `angleDeg`, inwards (-) — spec §8.1.1. */
+  pushCompMm: number;
+  /** Overlap under the neighbouring outline, outwards — spec §8.1.2. */
+  underlapMm: number;
   underlay: FillUnderlay;
   startPoint?: Point;
   endPoint?: Point;

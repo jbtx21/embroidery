@@ -87,7 +87,9 @@ type FillObject = Base & {
   rowSpacingMm: number;        // Reihenabstand = Dichte
   stitchLengthMm: number;
   staggerRows: number;         // Versatz über n Reihen
-  pullCompMm: number;          // Offset nach außen (+) oder innen (−)
+  pullCompMm: number;          // Ausgleich ENTLANG angleDeg, nach außen (+)   (19.09.2026)
+  pushCompMm: number;          // Ausgleich QUER zu angleDeg, nach innen (−)   (19.09.2026)
+  underlapMm: number;          // Überlappung unter die Nachbarkontur           (19.09.2026)
   underlay: { contour: boolean; fill: 'none' | 'single' | 'double'; spacingMm: number; insetMm: number };
   startPoint?: Point; endPoint?: Point;
 };
@@ -192,10 +194,27 @@ Polygone werden beim Import normiert: Außenring im Uhrzeigersinn, Löcher gegen
 
 Parameter: `stitchLengthMm` (Standard 2,5), `repeats` (1/3/5), `closed`.
 
-1. Pfad mit `resample(step = stitchLengthMm, keepCorners = true)`.
+1. Pfad abtasten, Ecken bleiben erhalten (`keepCorners`). Die Schrittweite ist **nicht konstant**, siehe unten.
 2. Letzten Abschnitt gleichmäßig aufteilen, damit kein Reststich < 0,5 mm entsteht.
 3. Bean Stitch: je Segment vor, zurück, vor (3) bzw. 5 Durchgänge.
 4. Geschlossen: letzter Stich = erster Stich.
+
+### 6.1 Krümmungsadaptive Stichlänge *(19.09.2026)*
+
+Ein Stich ist eine Sehne. Auf einer engen Kurve schneidet eine Sehne von 2,5 mm die Kurve
+sichtbar ab — die Linie wirkt eckig, und genau davor warnt die Punch-Praxis. Die
+Schrittweite richtet sich deshalb nach dem lokalen Radius:
+
+```
+step(R) = clamp( sqrt(8 · R · toleranceMm), MIN_ADAPTIVE_MM, stitchLengthMm )
+```
+
+- `toleranceMm` ist der größte zugelassene Sehnenabstand (Pfeilhöhe), Standard **0,05 mm** — halb so groß wie die DST-Auflösung von 0,1 mm, also unsichtbar in der Datei.
+- `MIN_ADAPTIVE_MM` = **0,8 mm**. Darunter geht die Kurventreue nicht mehr; kürzer wäre eine Perforation, nicht ein Stich (§11).
+- `R` ist der Umkreisradius dreier aufeinanderfolgender Pfadpunkte. Liegen sie auf einer Geraden, ist R unendlich und die volle Stichlänge gilt.
+
+Die Grenzen gelten in beide Richtungen: eine Gerade bekommt weiterhin genau
+`stitchLengthMm`, ein Kreis von 1 mm Radius bekommt 0,8 mm und keinen kürzeren Stich.
 
 ---
 
@@ -243,11 +262,52 @@ Reihenfolge: center → contour → zigzag → Deckstiche.
 
 ## 8. Fill
 
-Parameter: `angleDeg` (0), `rowSpacingMm` (0,25), `stitchLengthMm` (3,0), `staggerRows` (4), `pullCompMm` (0), `underlay`.
+Parameter: `angleDeg` (0), `rowSpacingMm` (Preset, §14), `stitchLengthMm` (3,0), `staggerRows` (4), `pullCompMm` (0), `pushCompMm` (0), `underlapMm` (0), `underlay`.
 
 ### 8.1 Vorbereitung
-1. Form mit `offset(pullCompMm)` versetzen.
-2. Koordinaten um `-angleDeg` drehen, damit Reihen waagerecht liegen.
+1. Richtungsabhängiger Ausgleich, siehe 8.1.1.
+2. Überlappung `underlapMm` nach außen, siehe 8.1.2.
+3. Koordinaten um `-angleDeg` drehen, damit Reihen waagerecht liegen.
+
+#### 8.1.1 Zug und Schub sind nicht dieselbe Richtung *(19.09.2026)*
+
+Der Faden zieht den Stoff **in Fadenrichtung** zusammen und drückt ihn **quer dazu**
+auseinander. Ein isotroper Offset, wie ihn §8.1 bis zum 19.09.2026 vorsah, gleicht deshalb
+die eine Richtung richtig aus und die andere falsch herum.
+
+- `pullCompMm` wirkt **entlang `angleDeg`** und vergrößert (+).
+- `pushCompMm` wirkt **quer zu `angleDeg`** und verkleinert (−).
+
+Beide zusammen sind ein anisotroper Offset. Umsetzung: um `-angleDeg` drehen, sodass die
+Fadenrichtung auf +x liegt; dann zwei elliptische Offsets. Ein elliptischer Offset mit den
+Halbachsen (a, b) ist ein Kreis-Offset in einem gestauchten Koordinatensystem: Achse um
+`a/b` strecken, um `a` versetzen, zurückstauchen. Für eine Richtung allein wird `b` nicht
+null gesetzt, sondern `a/K` mit **K = 40** — der Rest auf der Gegenachse liegt damit bei
+`a/40`, bei 0,2 mm Ausgleich also 5 µm und weit unter der DST-Auflösung von 0,1 mm.
+
+Standard ist `pushCompMm` 0: ohne Probestick ist der Schub nicht beziffert. Die Presets
+setzen ihn (§14), die Spec schreibt ihn nicht vor.
+
+#### 8.1.2 Überlappung unter die Nachbarkontur *(19.09.2026)*
+
+`underlapMm` vergrößert die Form **isotrop** nach außen, bevor gefüllt wird. Das ist nicht
+derselbe Zweck wie der Zugausgleich: der gleicht die Bewegung des Stoffs aus, die
+Überlappung deckt die Naht. Die Praxis verlangt zwei bis drei Stichbreiten Überlappung
+zwischen Fläche und darüberliegender Kontur, sonst reißt der Stoffzug dort eine Lücke auf
+(„Blitzer"). Reihenfolge: erst der richtungsabhängige Ausgleich, dann die Überlappung.
+
+#### 8.1.3 Warnung `EDGE_GAP_RISK` *(19.09.2026)*
+
+Die Engine kann nicht wissen, welche Kontur zu welcher Fläche gehört — sie sieht aber, wenn
+beide gefährlich nah beieinander liegen, ohne sich zu überlappen. Kriterium je Paar aus
+einem Fill F und einem Satin S:
+
+- der kleinste Abstand zwischen einer Rail von S und der Kontur von F ist kleiner als **0,3 mm**, **und**
+- die von S überdeckte Fläche schneidet die wirksame Fläche von F (also nach `underlapMm`) nicht.
+
+Dann `EDGE_GAP_RISK` als `warn`, mit beiden Objekt-IDs in der Meldung. Geprüft wird auf der
+Objektliste, nicht auf den Stichen, und nur für Paare, deren Bounding-Boxen sich bis auf
+0,3 mm nähern. Nichts wird verändert — die Überlappung setzt der Nutzer (Regel 8).
 
 ### 8.2 Scanlines
 - Reihen im Abstand `rowSpacingMm` von unten nach oben.
@@ -293,10 +353,36 @@ Standard: contour + single. Ab 20 mm Kantenlänge: double.
 
 ### 10.1 Reihenfolge
 - Standard: Objektliste wie im Design.
-- Vorschlag `autoOrder()`: nach Farbe gruppieren (Farbwechsel minimieren), innerhalb einer Farbe **von der Mitte nach außen und von unten nach oben**. Unterlagen und Hintergrundflächen zuerst, Konturen zuletzt. Der Nutzer kann den Vorschlag annehmen oder überschreiben.
-- **Mitte → außen, unten → oben** *(19.09.2026 — vorher „innerhalb einer Farbe nach Distanz")*: Sticken schiebt den Stoff vor sich her. Wer von einer Ecke aus arbeitet, schiebt den Verzug quer durch das ganze Motiv; wer aus der Mitte nach außen arbeitet, verteilt ihn gleichmäßig zu den Rändern. Auf dem runden Kapp-Rahmen ist das zwingend, sonst verschiebt sich die Kappe unter dem Motiv. Umsetzung in **Ringen**, nicht nach reinem Radius: innerhalb von Farbe und Rang wird der innerste Ring der Breite `max(5 mm, 0,2 · größter Radius)` um die Mitte der Design-Bounding-Box abgearbeitet, bevor der nächste beginnt. Jede Farbe startet am **untersten** Objekt ihres innersten Rings (größtes y, §1 zeigt y nach unten), danach entscheidet innerhalb des Rings der kürzeste Weg. Nach einem Trim darf die Maschine überall neu ansetzen, deshalb beginnt jede Farbe für sich.
+- Vorschlag `autoOrder()`: nach Farbe gruppieren (Farbwechsel minimieren), innerhalb einer Farbe in drei Stufen, danach nach dem kürzesten Weg. Der Nutzer kann den Vorschlag annehmen oder überschreiben.
 
-Der Ring ist nicht Kosmetik: nach reinem Radius sortiert springt die Maschine zwischen zwei Objekten, die zufällig auf demselben Kreis liegen, quer durchs Motiv. Gemessen am Eislingen-Logo waren das **922 Sprünge statt 265**. Mit Ringen sind es 334 — die Reihenfolge hält die Regel ein und kostet gegenüber der reinen Wegoptimierung 9 bis 26 % mehr Sprünge. *(19.09.2026)*
+**Hintergrund → Details → Konturen** *(19.09.2026)*. Die Stufe geht dem Weg vor, immer:
+
+| Stufe | Rang | Objekte |
+|---|---|---|
+| Hintergrund | 0 | `fill` — die Flächen, auf denen alles andere liegt |
+| Details | 1, 2 | `satin`, `text` |
+| Konturen | 3 | `running` — Umrandungen und Linien, zuletzt |
+
+Eine Kontur, die vor ihrer Fläche gestickt wird, verschwindet unter ihr. Deshalb ist die
+Reihenfolge keine Optimierung, sondern eine Bedingung. Innerhalb einer Stufe entscheidet
+der kürzeste Weg vom zuletzt gestickten Objekt.
+
+**Mitte → außen, unten → oben: Regel für das Cap-Preset** *(19.09.2026 — am selben Tag
+zuerst für alle Presets eingeführt, dann auf Cap eingegrenzt)*. Sticken schiebt den Stoff
+vor sich her. Auf dem runden Kapp-Rahmen ist die Richtung zwingend: wer eine Kappe wie
+Flachware von links nach rechts stickt, verschiebt sie unter dem Motiv. Auf Flachware
+wiegt der kürzere Weg schwerer, dort bleibt es beim Weg.
+
+Umsetzung in **Ringen**, nicht nach reinem Radius: innerhalb von Farbe und Stufe wird der
+innerste Ring der Breite `max(5 mm, 0,2 · größter Radius)` um die Mitte der
+Design-Bounding-Box abgearbeitet, bevor der nächste beginnt. Jede Farbe startet am
+**untersten** Objekt ihres innersten Rings (größtes y, §1 zeigt y nach unten), danach
+entscheidet innerhalb des Rings der kürzeste Weg. Nach einem Trim darf die Maschine überall
+neu ansetzen, deshalb beginnt jede Farbe für sich.
+
+Der Ring ist nicht Kosmetik: nach reinem Radius sortiert springt die Maschine zwischen zwei
+Objekten, die zufällig auf demselben Kreis liegen, quer durchs Motiv. Gemessen am
+Eislingen-Logo waren das **922 Sprünge statt 265**. Mit Ringen sind es 334.
 
 ### 10.2 Verbindung zweier Blöcke
 Entscheidung zwischen Blockende A und Blockanfang B:
@@ -319,13 +405,15 @@ Entscheidung zwischen Blockende A und Blockanfang B:
 
 ## 11. Post-Processing und Analyse
 
-- Stiche < 0,3 mm entfernen, außer Verriegelung. Verriegelungsstiche sind per Definition 0,3 mm kurz und tragen deshalb `tie: true` (§3), sonst würde genau die Verriegelung aus §10.3 hier verschwinden. *(19.09.2026)*
+- **Mindeststichlänge 0,6 mm** *(19.09.2026 — vorher 0,3 mm)*. Kürzere Stiche entfernen. Die Praxis zieht die Grenze bei 1 mm: darunter perforiert die Nadel den Stoff, statt ihn zu decken, und auf der Unterseite entstehen Fadenknäuel. 1,0 mm als harte Grenze würde allerdings den Reihenwechsel im Tatami mit abräumen, der bei 0,40 mm Reihenabstand genau 0,40 mm lang ist und dazugehört. 0,6 mm trifft die Stiche, die niemand gewollt hat, und lässt die stehen, die aus dem Verfahren kommen.
+- Der Wert ist **konfigurierbar** (`minStitchMm` im Maschinenprofil, §14) — eine Maschine mit anderem Greifer verträgt andere Grenzen.
+- **Verriegelung ist ausgenommen.** Verriegelungsstiche sind per Definition kurz und tragen deshalb `tie: true` (§3), sonst würde genau die Verriegelung aus §10.3 hier verschwinden. *(19.09.2026)*
 - Stiche und Sprünge > 12,1 mm in Teilstücke splitten (DST-Limit 121 Einheiten).
 - **Rundung: kaufmännisch-symmetrisch** (`roundHalfEven`, halbe Werte zur geraden Zahl), überall dort, wo Millimeter zu ganzen Formateinheiten werden. Grund: die Kreuzprüfung aus §13.2 läuft gegen Python, dessen `round()` genauso rundet. Bei Reihenabstand 0,25 mm liegt jede zweite Koordinate exakt auf der halben DST-Einheit — mit `Math.round` wäre die Datei nicht byte-identisch. *(19.09.2026)*
 - Stats:
   - `runtimeSec = stitches / (rpm/60) + trims * 3 + colorChanges * 12`, `rpm` aus Maschinenprofil (Standard 800).
   - Dichte: Raster 1 × 1 mm, Stiche pro Zelle zählen. Warnung ab 12/mm², Fehler ab 18/mm².
-- Warnungen (Auswahl): `SATIN_TOO_NARROW`, `SATIN_TOO_WIDE`, `FILL_TINY` (Fläche < 4 mm²), `FILL_TOO_NARROW`, `TEXT_TOO_SMALL`, `DENSITY_HIGH`, `MANY_COLOR_CHANGES` (> 8), `LONG_JUMP` (> 30 mm), `SELF_INTERSECTING_RAILS`, `OBJECT_OUTSIDE_HOOP`, `SHAPE_SPLIT` (Fläche zerfällt beim Normieren in n Teile; die Teilanzahl steht in der Meldung, jedes Teil wird gestickt — nichts wird verworfen). *(19.09.2026)*
+- Warnungen (Auswahl): `SATIN_TOO_NARROW`, `SATIN_TOO_WIDE`, `FILL_TINY` (Fläche < 4 mm²), `FILL_TOO_NARROW`, `EDGE_GAP_RISK`, `TEXT_TOO_SMALL`, `DENSITY_HIGH`, `MANY_COLOR_CHANGES` (> 8), `LONG_JUMP` (> 30 mm), `SELF_INTERSECTING_RAILS`, `OBJECT_OUTSIDE_HOOP`, `SHAPE_SPLIT` (Fläche zerfällt beim Normieren in n Teile; die Teilanzahl steht in der Meldung, jedes Teil wird gestickt — nichts wird verworfen). *(19.09.2026)*
 - **`FILL_TOO_NARROW`**: eine Fläche kann groß sein und trotzdem überall zu schmal zum Füllen. `FILL_TINY` misst die Fläche und sieht das nicht — eine Sichel von 114 mm² kommt durch, obwohl 79 % ihrer Reihenstücke kürzer als 1 mm sind. Die Praxis sagt: ein Stich unter 1 mm perforiert den Stoff, statt ihn zu decken. Kriterium: Fläche ≥ 4 mm² (darunter greift `FILL_TINY`), mindestens 8 Reihenstücke, und **mehr als die Hälfte davon kürzer als 1 mm**. Gemeldet als `warn` mit dem Anteil und dem Vorschlag Satin oder Laufstich — die Fläche wird trotzdem gestickt, nichts wird still geändert (Regel 8). Die Zahlen fallen in `scanlines` ohnehin an. *(19.09.2026)*
 
 ---
@@ -363,13 +451,25 @@ Vorschau, Größe, Stiche, Farbfolge mit Garnnummern, Trims, Laufzeit, Preset.
 
 Startwerte, in Phase 5 gegen Probesticks justieren.
 
-| Preset | Fill Reihe | Satin Abstand | Zugausgleich | Unterlage Fill | Unterlage Satin | Hinweis |
-|---|---|---|---|---|---|---|
-| Piqué | 0,40 | 0,38 | 0,20 | contour + single | contour + zigzag | Standard |
-| Softshell | 0,35 | 0,40 | 0,25 | contour + single | contour + zigzag | |
-| Fleece | 0,35 | 0,40 | 0,30 | contour + double | contour + zigzag, Inset 0,3 | Topping empfohlen |
-| Cap | 0,35 | 0,38 | 0,15 | contour + single | center + contour | Reihenfolge Mitte → außen, unten → oben |
-| Frottee | 0,35 | 0,35 | 0,20 | contour + double | contour + zigzag | Knockdown-Fill unter Motiv, Topping |
+| Preset | Fill Reihe | Satin Abstand | Zug | Schub | Überlappung | Unterlage Fill | Unterlage Satin | Hinweis |
+|---|---|---|---|---|---|---|---|---|
+| Piqué | 0,40 | 0,38 | 0,20 | 0,10 | 0,20 | contour + single | contour + zigzag | Standard |
+| Jersey | 0,45 | 0,40 | 0,25 | 0,15 | 0,25 | contour + single | contour + zigzag | dünne Shirtware, Schneidvlies |
+| Softshell | 0,35 | 0,40 | 0,25 | 0,10 | 0,20 | contour + single | contour + zigzag | |
+| Fleece | 0,35 | 0,40 | 0,30 | 0,15 | 0,25 | contour + double | contour + zigzag, Inset 0,3 | Topping empfohlen |
+| Cap | 0,35 | 0,35 | 0,15 | 0,10 | 0,20 | contour + single | center + contour | Reihenfolge Mitte → außen, unten → oben (§10.1) |
+| Frottee | 0,35 | 0,35 | 0,20 | 0,15 | 0,30 | contour + double | contour + zigzag | Knockdown-Fill unter Motiv, Topping |
+
+**Jersey** *(19.09.2026)*: dünne, dehnbare Shirtware. Die Praxis nennt dafür 0,45 mm — die
+lockerste Dichte der Skala, weil zu dichte Stiche den Stoff perforieren. Dehnbar heißt
+zugleich mehr Zugausgleich und ein tragendes Schneidvlies.
+
+**Cap-Satin 0,35 statt 0,38** *(19.09.2026)*: auf der Kappe steht das Gewebe unter
+Spannung und der Rahmen dreht unter der Nadel; die dichtere Spalte deckt das ab.
+
+**Schub und Überlappung** *(19.09.2026)*: neue Spalten zu §8.1.1 und §8.1.2. Der Schub
+liegt bei rund der Hälfte des Zugs — er wirkt quer und fällt kleiner aus. Beides sind
+**Startwerte ohne Probestick**; sie sind die ersten, die in Phase 5 zu messen sind.
 
 **Reihenabstand: Industriewerte.** *(19.09.2026 — vorher 0,25 bis 0,28.)* Die Praxis
 punchtet 40er-Garn mit **0,40 mm** als Standard, **0,35 mm** auf schwerer Ware (Kappen,
@@ -385,7 +485,22 @@ gehören beim Probestick zuerst geprüft.
 
 Für dünne Jersey-Ware (0,45) gibt es heute kein Preset. Offen in `docs/backlog.md`.
 
-Maschinenprofile: `rpm`, `hoopWMm`, `hoopHMm`, `maxJumpMm`.
+Maschinenprofile: `rpm`, `hoopWMm`, `hoopHMm`, `maxJumpMm`, `minStitchMm` (§11), `threadWeight`.
+
+**`threadWeight`** *(19.09.2026)*: die Garnstärke, `40` (Standard) oder `60`. Sie ist keine
+Eigenschaft des Motivs, sondern dessen, was auf der Maschine aufgespult ist, und ändert
+zwei Dinge:
+
+| | 40er | 60er |
+|---|---|---|
+| Dichtefaktor auf `fillRowSpacingMm` und `satinSpacingMm` | 1,0 | **0,8** |
+| Faktor auf die Mindesthöhe einer Schrift | 1,0 | **0,7** |
+
+60er Garn ist dünner, deckt also schmaler: die Reihen müssen enger stehen, sonst blitzt der
+Stoff durch — daher 0,8 auf die Abstände (Piqué 0,40 → 0,32). Umgekehrt trägt es feinere
+Formen, deshalb darf die Schrift kleiner werden: eine Schrift mit `minHeightMm` 5 kommt mit
+60er auf **3,5 mm**, was die Praxis als Untergrenze für Kleingedrucktes nennt. Der Faktor
+statt einer festen Zahl, damit eine Schrift mit gröberen Spalten ihre eigene Grenze behält.
 
 ---
 

@@ -22,7 +22,7 @@ import { coverPolygon } from "./object.js";
 import { autoOrder } from "./order.js";
 import { postProcess } from "./post.js";
 import type { MachineProfile } from "./presets.js";
-import { MACHINE_DEFAULT, preset as presetOf } from "./presets.js";
+import { MACHINE_DEFAULT, presetForMachine } from "./presets.js";
 import { generateRunning } from "./running.js";
 import { generateSatin } from "./satin.js";
 import { tieBlocks } from "./tie.js";
@@ -100,16 +100,20 @@ export function planDesign(design: Design, opts: PlanOptions = {}): StitchPlan {
     throw new Error("Engine not initialised — call `await initEngine()` before planning.");
   }
   const machine = opts.machine ?? MACHINE_DEFAULT;
-  const preset = presetOf(design.preset);
+  const preset = presetForMachine(design.preset, machine);
   const warnings: Warning[] = [];
 
   const validated = validate(design);
   warnings.push(...validated.warnings);
 
-  const expanded = expand(validated.objects, { preset, fonts: opts.fonts });
+  const expanded = expand(validated.objects, { preset, fonts: opts.fonts, machine });
   warnings.push(...expanded.warnings);
 
-  const ordered = opts.order === "auto" ? autoOrder(expanded.objects) : expanded.objects;
+  // The cap rule travels with the preset, not with the machine (spec §10.1).
+  const ordered =
+    opts.order === "auto"
+      ? autoOrder(expanded.objects, { centreOut: design.preset === "cap" })
+      : expanded.objects;
 
   const raw: RawBlock[] = [];
   for (const obj of ordered) {
@@ -136,7 +140,7 @@ export function planDesign(design: Design, opts: PlanOptions = {}): StitchPlan {
 
   const connected = connectBlocks(raw, opts.connect ?? CONNECT_DEFAULTS);
   const tied = tieBlocks(connected);
-  const finished = postProcess(tied, machine.maxJumpMm);
+  const finished = postProcess(tied, machine.maxJumpMm, machine.minStitchMm);
 
   const { stats, warnings: analysisWarnings } = analyze(finished, machine);
   warnings.push(...analysisWarnings);

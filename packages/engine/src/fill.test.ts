@@ -205,6 +205,29 @@ describe("generation", () => {
     expect(codes).not.toContain("FILL_TOO_NARROW");
   });
 
+  it("pulls along the thread direction and pushes across it (spec §8.1.1)", () => {
+    const wide = generateFill(
+      fillObject("f", square, { pullCompMm: 0.5, pushCompMm: 0, angleDeg: 0 }),
+    );
+    const both = generateFill(
+      fillObject("f", square, { pullCompMm: 0.5, pushCompMm: 0.4, angleDeg: 0 }),
+    );
+    const bw = bbox(wide.stitches);
+    const bb = bbox(both.stitches);
+    // Rows run along x at angle 0: pull widens x, push narrows y.
+    expect(bw.maxX - bw.minX).toBeCloseTo(bb.maxX - bb.minX, 0);
+    expect(bb.maxY - bb.minY).toBeLessThan(bw.maxY - bw.minY - 0.5);
+  });
+
+  it("lays the underlap outside the outline (spec §8.1.2)", () => {
+    const plain = generateFill(fillObject("f", square));
+    const lapped = generateFill(fillObject("f", square, { underlapMm: 0.6 }));
+    const bp = bbox(plain.stitches);
+    const bl = bbox(lapped.stitches);
+    expect(bl.maxX - bl.minX).toBeGreaterThan(bp.maxX - bp.minX + 0.8);
+    expect(bl.maxY - bl.minY).toBeGreaterThan(bp.maxY - bp.minY + 0.8);
+  });
+
   it("reports an area that vanishes under pull compensation", () => {
     const r = generateFill(fillObject("f", polygonOf(rect(0, 0, 2, 2)), { pullCompMm: -5 }));
     expect(r.stitches).toHaveLength(0);

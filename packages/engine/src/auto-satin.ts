@@ -206,6 +206,8 @@ function fillProposal(shape: Polygon, opts: AutoSatinOptions): FillObject {
     stitchLengthMm: preset.fillStitchLengthMm,
     staggerRows: preset.fillStaggerRows,
     pullCompMm: 0,
+    pushCompMm: 0,
+    underlapMm: 0,
     underlay: preset.fillUnderlay,
   };
 }

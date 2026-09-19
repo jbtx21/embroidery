@@ -10,7 +10,8 @@ import type { Point, Polyline } from "@texma-stitch/geometry";
 import { cumulativeLengths, pointAt, tangentAt } from "@texma-stitch/geometry";
 import type { Font, FontRegistry } from "@texma-stitch/fonts";
 import { kerningOf } from "@texma-stitch/fonts";
-import type { Preset } from "./presets.js";
+import type { MachineProfile, Preset } from "./presets.js";
+import { MACHINE_DEFAULT, textMinFactor } from "./presets.js";
 import type { RunningObject, SatinObject, StitchObject, TextObject, Warning } from "./types.js";
 import { warn, WARNING } from "./warnings.js";
 
@@ -19,7 +20,7 @@ const SPACE_ADVANCE = 0.35;
 /** Split-satin threshold for generated letters (spec §7.4). */
 const TEXT_MAX_WIDTH_MM = 7;
 
-export type ExpandContext = { preset: Preset; fonts?: FontRegistry };
+export type ExpandContext = { preset: Preset; fonts?: FontRegistry; machine?: MachineProfile };
 
 /** Places glyph coordinates (cap heights) at their spot in the design. */
 type Placement = (p: Point) => Point;
@@ -100,11 +101,15 @@ function expandText(
   const warnings: Warning[] = [];
   const objects: StitchObject[] = [];
 
-  if (obj.heightMm < font.minHeightMm) {
+  // Finer thread carries finer shapes, so the font's own minimum comes down with
+  // it (spec §14): a font asking for 5 mm reaches 3.5 mm on 60 weight.
+  const minHeightMm = font.minHeightMm * textMinFactor(ctx.machine ?? MACHINE_DEFAULT);
+  if (obj.heightMm < minHeightMm) {
     warnings.push(
       warn(
         WARNING.TEXT_TOO_SMALL,
-        `${obj.heightMm} mm is below the minimum height ${font.minHeightMm} mm of "${font.name}".`,
+        `${obj.heightMm} mm is below the minimum height ${minHeightMm.toFixed(1)} mm of ` +
+          `"${font.name}" on this thread.`,
         "warn",
         obj.id,
       ),

@@ -103,3 +103,34 @@ steht und was fehlt. Offene Entscheidungen und Zulieferungen stehen in `backlog.
   meint: eine Sichel von 114 mm², deren Reihen zu 79 % kürzer als ein Millimeter sind.
   `FILL_TOO_NARROW` misst stattdessen die Reihenstücke, die beim Scanline-Lauf ohnehin
   anfallen.
+
+## Geänderte Erwartungswerte, 19.09.2026 (zweite Welle)
+
+Die Spec-Änderungen zu §6.1, §8.1, §10.1, §11 und §14 verschieben Schwellwerte. Bestehende
+Tests wurden **nur** an diesen Stellen angefasst; alles andere ist neu dazugekommen.
+
+| Datei                                  | Erwartung vorher                                        | jetzt                                     | Grund                                                                                                                                                           |
+| -------------------------------------- | ------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/engine/src/pipeline.test.ts` | `stats.stitches > 500`                                  | `> 450`                                   | Mindeststichlänge 0,3 → 0,6 mm (§11). Der Reihenwechsel im Tatami ist bei 0,40 mm Reihenabstand genau 0,40 mm lang und fällt jetzt weg. Gemessen 494 statt 512. |
+| `packages/engine/src/connect.test.ts`  | `autoOrder(objects)` in den drei Mitte-nach-außen-Tests | `autoOrder(objects, { centreOut: true })` | §10.1 grenzt die Regel auf das Cap-Preset ein. Kein Schwellwert, sondern eine Signatur.                                                                         |
+
+Keine weitere bestehende Erwartung hat sich geändert. Neu hinzugekommen sind 27 Tests:
+`offsetDirectional`, `curvatureRadii` und `resampleAdaptive` in
+`packages/geometry/src/directional.test.ts`, dazu Schub/Überlappung in `fill.test.ts`,
+`EDGE_GAP_RISK` und die Textmindesthöhe in `pipeline.test.ts`, die Mindeststichlänge und
+die krümmungsadaptive Schrittweite in `running.test.ts`, Jersey, `densityFactor`,
+`presetForMachine` und `textMinFactor` in `connect.test.ts`.
+
+## Beim Bauen gefunden (zweite Welle)
+
+- Der Boden von 0,8 mm für die adaptive Stichlänge (§6.1) galt zuerst für die **Bogenlänge**
+  — gemessen wird aber die **Sehne**, und die ist auf enger Kurve deutlich kürzer: auf einem
+  Kreis mit 0,5 mm Radius wird aus 0,8 mm Bogen eine Sehne von 0,72 mm. Ein Stich IST die
+  Sehne. Die Schrittweite wächst jetzt so lange, bis die Sehne den Boden erreicht.
+- Ein anisotroper Offset ist ein Kreis-Offset in einem gestauchten Koordinatensystem. Für
+  eine Richtung allein wäre die Gegenachse null, was die Stauchung nicht ausdrücken kann;
+  deshalb K = 40 statt unendlich. Der Rest von 5 µm liegt zwanzigfach unter dem, was DST
+  überhaupt speichern kann.
+- Die Mindeststichlänge von 0,6 mm senkt nebenbei die **Dichte**: Köln fällt von 19 auf 14
+  Stiche/mm², Eislingen von 21 auf 15. Beide melden `DENSITY_HIGH` damit nur noch als
+  Warnung statt als Fehler. Die entfernten Stiche waren Nadeleinstiche ohne Deckung.

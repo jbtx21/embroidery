@@ -7,10 +7,116 @@
  * silently dropped: a shape that normalises into several areas becomes several
  * fill objects, not "the largest one".
  */
-import type { Polyline } from "@texma-stitch/geometry";
-import { dedupe, normalizePolygon } from "@texma-stitch/geometry";
-import type { Design, StitchObject, Warning } from "./types.js";
+import type { Point, Polygon, Polyline } from "@texma-stitch/geometry";
+import {
+  bbox,
+  dedupe,
+  intersect,
+  normalizePolygon,
+  offset,
+  polygonArea,
+  rings,
+} from "@texma-stitch/geometry";
+import { coverPolygon } from "./object.js";
+import type { Design, FillObject, SatinObject, StitchObject, Warning } from "./types.js";
 import { warn, WARNING } from "./warnings.js";
+
+/** Below this, a rail and a fill edge are close enough to open a gap (spec §8.1.3). */
+export const EDGE_GAP_MM = 0.3;
+/** Overlap smaller than this counts as none (mm²). */
+const OVERLAP_EPS_MM2 = 1e-6;
+
+/** Shortest distance from a point to a segment. */
+function pointToSegment(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy;
+  if (l2 < 1e-12) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+  return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t));
+}
+
+/** Shortest distance between a polyline and the rings of a polygon. */
+function lineToPolygon(line: Polyline, poly: Polygon): number {
+  let best = Infinity;
+  for (const ring of rings(poly)) {
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i]!;
+      const b = ring[(i + 1) % ring.length]!;
+      for (const p of line) best = Math.min(best, pointToSegment(p, a, b));
+      for (const q of [a, b]) {
+        for (let j = 0; j + 1 < line.length; j++) {
+          best = Math.min(best, pointToSegment(q, line[j]!, line[j + 1]!));
+        }
+      }
+    }
+  }
+  return best;
+}
+
+const boxesNear = (a: Polyline, b: Polyline, gap: number): boolean => {
+  const ba = bbox(a);
+  const bb = bbox(b);
+  return (
+    ba.minX - gap <= bb.maxX &&
+    bb.minX - gap <= ba.maxX &&
+    ba.minY - gap <= bb.maxY &&
+    bb.minY - gap <= ba.maxY
+  );
+};
+
+/**
+ * Fill edge and satin rail close together, but not overlapping (spec §8.1.3).
+ *
+ * The engine cannot know which outline belongs to which area, but it can see
+ * when the two sit on top of each other's edge without sharing any material —
+ * that is exactly where the fabric pull tears a gap open. Nothing is changed;
+ * the overlap is the user's call (rule 8).
+ */
+export function edgeGapRisks(objects: StitchObject[]): Warning[] {
+  const fills = objects.filter((o): o is FillObject => o.type === "fill");
+  const satins = objects.filter((o): o is SatinObject => o.type === "satin");
+  if (fills.length === 0 || satins.length === 0) return [];
+
+  const out: Warning[] = [];
+  for (const f of fills) {
+    // The effective area is the one that gets stitched, underlap included.
+    const effective = f.underlapMm > 0 ? offset(f.shape, f.underlapMm) : [f.shape];
+    for (const s of satins) {
+      const railPoints = [...s.railA, ...s.railB];
+      if (railPoints.length === 0) continue;
+      if (!effective.some((part) => boxesNear(part.outer, railPoints, EDGE_GAP_MM))) continue;
+
+      const gap = Math.min(
+        ...effective.flatMap((part) => [
+          lineToPolygon(s.railA, part),
+          lineToPolygon(s.railB, part),
+        ]),
+      );
+      if (gap >= EDGE_GAP_MM) continue;
+
+      const cover = coverPolygon(s);
+      const shared = cover
+        ? effective.reduce(
+            (sum, part) => sum + intersect([part], [cover]).reduce((a, p) => a + polygonArea(p), 0),
+            0,
+          )
+        : 0;
+      if (shared > OVERLAP_EPS_MM2) continue;
+
+      out.push(
+        warn(
+          WARNING.EDGE_GAP_RISK,
+          `Edge of "${f.id}" and rail of "${s.id}" are ${gap.toFixed(2)} mm apart without ` +
+            `overlapping — the fabric pull will open a gap. Give the fill an underlap.`,
+          "warn",
+          f.id,
+        ),
+      );
+    }
+  }
+  return out;
+}
 
 /** Does the polyline cross itself? Non-adjacent segments, proper crossing. */
 export function selfIntersects(line: Polyline): boolean {
@@ -136,5 +242,6 @@ export function validate(design: Design): ValidateResult {
     }
   }
 
+  warnings.push(...edgeGapRisks(objects));
   return { objects, warnings };
 }

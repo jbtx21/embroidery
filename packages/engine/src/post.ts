@@ -1,13 +1,14 @@
 /**
  * Post-processing (spec §11).
  *
- * - Remove stitches below 0.3 mm, except lock stitches (those ARE short).
+ * - Remove stitches below `minStitchMm` (0.6 by default, from the machine
+ *   profile), except lock stitches — those ARE short by definition (spec §11).
  * - Split stitches and jumps above 12.1 mm — the DST limit is 121 units of
  *   0.1 mm per axis, and a Euclidean length of 12.1 mm keeps both axes below it.
  */
 import type { Stitch, StitchBlock } from "./types.js";
 
-export const MIN_STITCH_MM = 0.3;
+export const MIN_STITCH_MM = 0.6;
 export const MAX_STITCH_MM = 12.1;
 
 const isMovement = (s: Stitch): boolean => s.cmd === "stitch" || s.cmd === "jump";

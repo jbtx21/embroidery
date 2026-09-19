@@ -127,3 +127,24 @@ Laufstich gehören.
 
 `DENSITY_HIGH` bleibt, wie vorhergesagt: 28/24/19/21 statt 24/27/21/25. Der Reihenabstand
 war nie die Ursache, die übereinanderliegenden Flächen der Druckvorlage sind es.
+
+## Nach der zweiten Welle (§6.1, §8.1, §10.1, §11, §14)
+
+Mindeststichlänge 0,6 mm, krümmungsadaptive Schrittweite, Mitte-nach-außen nur noch für
+Cap. `order: "auto"`, Preset Piqué:
+
+| Motiv                      |              Stiche |   Sprünge |   Trims |  Dichte max |      Laufzeit |
+| -------------------------- | ------------------: | --------: | ------: | ----------: | ------------: |
+| STUTTGART 80 mm            | 14.306 → **12.563** |   99 → 90 | 34 → 39 | 28 → **19** |   20 → 17 min |
+| STUTTGART 250 mm           | 98.076 → **93.001** | 268 → 251 | 45 → 45 | 22 → **19** | 136 → 129 min |
+| Berufsfeuerwehr Köln 90 mm | 21.431 → **19.012** | 184 → 162 | 65 → 61 | 19 → **14** |   30 → 27 min |
+| Eislingen Print 200 mm     | 37.568 → **30.484** | 334 → 294 | 96 → 95 | 21 → **15** |   53 → 43 min |
+
+Gegenüber dem Stand von heute früh (vor beiden Wellen) sind das bei Eislingen 47.970 →
+30.484 Stiche, also **36 % weniger**, und bei STUTTGART 80 mm 18.174 → 12.563, **31 %
+weniger**.
+
+Der auffälligste Einzeleffekt ist die Mindeststichlänge: Köln und Eislingen fallen von
+`DENSITY_HIGH` als **Fehler** auf **Warnung** (19 → 14 bzw. 21 → 15 Stiche/mm²). Was da
+wegfällt, sind Nadeleinstiche unter 0,6 mm, die den Zähler füllten, ohne zu decken.
+STUTTGART bleibt beim Fehler — dort liegen die Flächen wirklich übereinander.

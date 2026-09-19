@@ -14,7 +14,7 @@ import { selfIntersects, validate } from "./validate.js";
 import { expand } from "./expand.js";
 import { stableHash } from "./hash.js";
 import { createCache, generateObject, planDesign } from "./pipeline.js";
-import { PRESETS } from "./presets.js";
+import { MACHINE_DEFAULT, PRESETS } from "./presets.js";
 import type { SatinObject } from "./types.js";
 
 beforeAll(async () => {
@@ -75,6 +75,36 @@ describe("validate", () => {
   });
 });
 
+describe("edge gap risk (spec §8.1.3)", () => {
+  // A 10 x 10 fill and a satin column whose rails hug its right edge.
+  const fill = (over = {}) => fillObject("area", polygonOf(rect(0, 0, 10, 10)), over);
+  const rail = (x: number) =>
+    satinObject("outline", [pt(x, 0), pt(x, 10)], [pt(x + 1, 0), pt(x + 1, 10)]);
+
+  it("warns when a rail hugs the fill edge without overlapping", () => {
+    const w = validate(design([fill(), rail(10.2)])).warnings;
+    const hit = w.find((x) => x.code === "EDGE_GAP_RISK")!;
+    expect(hit).toBeDefined();
+    expect(hit.severity).toBe("warn");
+    expect(hit.message).toContain("outline");
+  });
+
+  it("stays quiet when the two overlap", () => {
+    const w = validate(design([fill(), rail(9)])).warnings;
+    expect(w.map((x) => x.code)).not.toContain("EDGE_GAP_RISK");
+  });
+
+  it("stays quiet when they are far apart", () => {
+    const w = validate(design([fill(), rail(40)])).warnings;
+    expect(w.map((x) => x.code)).not.toContain("EDGE_GAP_RISK");
+  });
+
+  it("counts the underlap as overlap", () => {
+    const w = validate(design([fill({ underlapMm: 0.5 }), rail(10.2)])).warnings;
+    expect(w.map((x) => x.code)).not.toContain("EDGE_GAP_RISK");
+  });
+});
+
 describe("text (spec §9)", () => {
   const fonts = fontRegistry([TEST_FONT]);
 
@@ -100,6 +130,27 @@ describe("text (spec §9)", () => {
     });
     const x = (r: { objects: unknown[] }, i: number) => (r.objects[i] as SatinObject).railA[0]!.x;
     expect(x(loose, 1)).toBeGreaterThan(x(tight, 1));
+  });
+
+  it("lets 60 weight thread carry text below the font minimum (spec §14)", () => {
+    // TEST_FONT asks for 5 mm. At 4 mm that is too small on 40 weight thread...
+    const small = textObject("t", "I", pt(0, 0), { heightMm: 4 });
+    const coarse = expand([small], { preset: PRESETS.pique, fonts });
+    expect(coarse.warnings.map((w) => w.code)).toContain("TEXT_TOO_SMALL");
+    // ...and fine on 60 weight, where the minimum comes down to 3,5 mm.
+    const fine = expand([small], {
+      preset: PRESETS.pique,
+      fonts,
+      machine: { ...MACHINE_DEFAULT, threadWeight: 60 },
+    });
+    expect(fine.warnings.map((w) => w.code)).not.toContain("TEXT_TOO_SMALL");
+    // Below 3,5 mm it warns again.
+    const tiny = expand([textObject("t", "I", pt(0, 0), { heightMm: 3 })], {
+      preset: PRESETS.pique,
+      fonts,
+      machine: { ...MACHINE_DEFAULT, threadWeight: 60 },
+    });
+    expect(tiny.warnings.map((w) => w.code)).toContain("TEXT_TOO_SMALL");
   });
 
   it("makes running stitches from stroke glyphs", () => {
@@ -203,7 +254,9 @@ describe("pipeline (spec §4)", () => {
       ]),
     );
     expect(plan.blocks).toHaveLength(2);
-    expect(plan.stats.stitches).toBeGreaterThan(500);
+    // Was > 500 until 19.09.2026; the minimum stitch length went from 0,3 to
+    // 0,6 mm (§11) and now drops the row turns of the fill.
+    expect(plan.stats.stitches).toBeGreaterThan(450);
     expect(plan.stats.colorChanges).toBe(1);
     const all = plan.blocks.flatMap((b) => b.stitches);
     expect(all[all.length - 1]!.cmd).toBe("end");

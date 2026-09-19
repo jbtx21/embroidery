@@ -16,6 +16,7 @@ import {
   withPaths,
 } from "./clipper.js";
 import { rings } from "./polygon.js";
+import { applyToPolygon, rotator, scaler } from "./transform.js";
 
 export function offset(poly: Polygon, deltaMm: number): Polygon[] {
   if (deltaMm === 0) {
@@ -100,4 +101,54 @@ export function offsetPolyline(line: Polyline, deltaMm: number): Polyline {
     out.push({ x: cur.x + (nx / nl) * deltaMm * miter, y: cur.y + (ny / nl) * deltaMm * miter });
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Directional offset (spec §8.1.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * How flat the offset ellipse is made when only one direction is wanted.
+ *
+ * A one-sided offset is an ellipse with a zero semi-axis, which the scale trick
+ * below cannot express. K = 40 leaves `delta / 40` on the other axis — 5 µm at a
+ * 0.2 mm compensation, fifty times under the 0.1 mm the DST format can even
+ * record (spec §8.1.1).
+ */
+export const ANISO_RATIO = 40;
+
+/**
+ * Offset with an ellipse instead of a circle, by doing the circle offset in a
+ * stretched coordinate system: stretch the other axis by `a/b`, offset by `a`,
+ * stretch back. `axis` names the direction the offset mainly acts in.
+ */
+function ellipticalOffset(poly: Polygon, deltaMm: number, axis: "x" | "y"): Polygon[] {
+  if (deltaMm === 0) return offset(poly, 0);
+  const k = ANISO_RATIO;
+  const stretch = axis === "x" ? scaler(1, k) : scaler(k, 1);
+  const squash = axis === "x" ? scaler(1, 1 / k) : scaler(1 / k, 1);
+  return offset(applyToPolygon(stretch, poly), deltaMm).map((part) => applyToPolygon(squash, part));
+}
+
+/**
+ * Pull and push are not the same direction (spec §8.1.1).
+ *
+ * The thread pulls the fabric together ALONG its own direction and presses it
+ * apart ACROSS it, so one isotropic offset gets one of the two wrong way round.
+ * `alongMm` grows the shape along `angleDeg`, `acrossMm` shrinks it across.
+ */
+export function offsetDirectional(
+  poly: Polygon,
+  alongMm: number,
+  acrossMm: number,
+  angleDeg: number,
+): Polygon[] {
+  if (alongMm === 0 && acrossMm === 0) return offset(poly, 0);
+
+  // Turn the thread direction onto +x, compensate, turn back.
+  const upright = applyToPolygon(rotator(-angleDeg), poly);
+  const pulled = alongMm === 0 ? [upright] : ellipticalOffset(upright, alongMm, "x");
+  const pushed =
+    acrossMm === 0 ? pulled : pulled.flatMap((part) => ellipticalOffset(part, -acrossMm, "y"));
+  return pushed.map((part) => applyToPolygon(rotator(angleDeg), part));
 }

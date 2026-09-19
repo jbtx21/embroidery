@@ -8,6 +8,18 @@ import { MAX_STITCH_MM, MIN_STITCH_MM, postProcess } from "./post.js";
 import type { StitchBlock } from "./types.js";
 
 describe("running stitch (spec §6)", () => {
+  it("shortens the stitch in a tight curve and not on a straight run (spec §6.1)", () => {
+    const straight = runningStitches([pt(0, 0), pt(31.4, 0)], { stitchLengthMm: 2.5 });
+    // Same length as the straight line, but wrapped into a 5 mm circle.
+    const curved = runningStitches(circle(0, 0, 5, 128), { stitchLengthMm: 2.5, closed: true });
+    expect(curved.length).toBeGreaterThan(straight.length);
+    for (let i = 1; i < curved.length; i++) {
+      const d = dist(curved[i - 1]!, curved[i]!);
+      expect(d).toBeGreaterThan(0.79);
+      expect(d).toBeLessThan(2.51);
+    }
+  });
+
   it("divides a straight line evenly", () => {
     expect(runningStitches([pt(0, 0), pt(10, 0)], { stitchLengthMm: 2.5 })).toHaveLength(5);
   });
@@ -203,6 +215,29 @@ describe("post-processing (spec §11)", () => {
       { objectId: "b", threadIndex: 0, stitches: [{ x: 0.01, y: 0, cmd: "stitch" }] },
     ]);
     expect(out).toHaveLength(1);
+  });
+
+  it("keeps the minimum stitch at 0,6 mm and lets it be configured (spec §11)", () => {
+    expect(MIN_STITCH_MM).toBe(0.6);
+    const short = (dx: number, tie?: true) => [
+      { x: 0, y: 0, cmd: "stitch" as const },
+      tie ? { x: dx, y: 0, cmd: "stitch" as const, tie } : { x: dx, y: 0, cmd: "stitch" as const },
+    ];
+    const dropped = postProcess([{ objectId: "a", threadIndex: 0, stitches: short(0.4) }]);
+    expect(dropped[0]!.stitches).toHaveLength(1);
+    // Above the limit it stays.
+    const kept = postProcess([{ objectId: "a", threadIndex: 0, stitches: short(0.7) }]);
+    expect(kept[0]!.stitches).toHaveLength(2);
+    // A lock stitch is short by definition and exempt.
+    const tied = postProcess([{ objectId: "a", threadIndex: 0, stitches: short(0.3, true) }]);
+    expect(tied[0]!.stitches).toHaveLength(2);
+    // Configurable.
+    const loose = postProcess(
+      [{ objectId: "a", threadIndex: 0, stitches: short(0.4) }],
+      MAX_STITCH_MM,
+      0.2,
+    );
+    expect(loose[0]!.stitches).toHaveLength(2);
   });
 
   it("honours a custom limit", () => {

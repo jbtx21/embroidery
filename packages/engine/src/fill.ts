@@ -15,6 +15,7 @@ import {
   dist,
   insideTravel,
   offset,
+  offsetDirectional,
   polygonArea,
   polygonBbox,
   rings,
@@ -323,10 +324,16 @@ export function generateFill(obj: FillObject): FillResult {
     }
   }
 
-  const parts = obj.pullCompMm === 0 ? [obj.shape] : offset(obj.shape, obj.pullCompMm);
+  // Pull acts along the thread direction, push across it (spec §8.1.1), and the
+  // underlap goes outwards on top of that (spec §8.1.2).
+  const compensated = offsetDirectional(obj.shape, obj.pullCompMm, obj.pushCompMm, obj.angleDeg);
+  const parts =
+    obj.underlapMm === 0
+      ? compensated
+      : compensated.flatMap((part) => offset(part, obj.underlapMm));
   if (parts.length === 0) {
     warnings.push(
-      warn(WARNING.INVALID_GEOMETRY, "Pull compensation makes the area vanish.", "error", obj.id),
+      warn(WARNING.INVALID_GEOMETRY, "Compensation makes the area vanish.", "error", obj.id),
     );
     return { stitches: [], warnings };
   }

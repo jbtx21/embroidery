@@ -1,14 +1,16 @@
 /**
  * Running stitch (spec §6).
  *
- * 1. Resample the path with `step = stitchLengthMm`, `keepCorners = true`.
+ * 1. Resample the path, corners kept. The step follows the curvature (spec
+ *    §6.1): the full stitch length on a straight run, shorter in a tight curve,
+ *    never below 0.8 mm.
  * 2. Every piece is divided evenly, so no remnant stitch below 0.5 mm appears
  *    (the step is adjusted instead of a stub being appended; see `resample`).
  * 3. Bean stitch: each segment forward, back, forward (3) or 5 passes.
  * 4. Closed: last stitch equals the first stitch.
  */
 import type { Point, Polyline } from "@texma-stitch/geometry";
-import { dedupe, resample } from "@texma-stitch/geometry";
+import { dedupe, resampleAdaptive } from "@texma-stitch/geometry";
 import type { RunningObject } from "./types.js";
 
 export const MIN_REMNANT_MM = 0.5;
@@ -40,7 +42,10 @@ export function runningStitches(path: Polyline, opts: RunningOptions): Polyline 
 
   const closed = opts.closed ?? false;
   const source: Polyline = closed ? [...clean, { ...clean[0]! }] : clean;
-  const sampled = resample(source, opts.stitchLengthMm, true);
+  const sampled = resampleAdaptive(source, opts.stitchLengthMm, {
+    keepCorners: true,
+    closed,
+  });
   return bean(sampled, opts.repeats ?? 1);
 }
 

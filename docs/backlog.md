@@ -3,6 +3,21 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Offen nach der zweiten Welle (19.09.2026)
+
+- **Der Import setzt Zug, Schub und Überlappung auf 0.** `pullCompMm` war das schon vorher;
+  `pushCompMm` und `underlapMm` (§8.1.1, §8.1.2) folgen dem. Die Presets tragen die Werte
+  (§14), aber niemand liest sie beim Import — die Spalten in §14 wirken erst, wenn der
+  Editor sie setzt. Absicht: der Ausgleich gehört zum Stoff und zu dem, was neben der Fläche
+  liegt, und das SVG sagt zu beidem nichts. **Die Überlappung pauschal auf jede importierte
+  Fläche zu legen wäre falsch** — sie ist für eine Fläche unter einer Kontur gedacht, nicht
+  zwischen zwei angrenzenden Farbflächen, wo sie nur die Dichte erhöht. **Frage:** soll der
+  Import den Zugausgleich aus dem Preset übernehmen und die Überlappung dem Editor lassen?
+- **`EDGE_GAP_RISK` prüft Fill gegen Satin, nicht Fill gegen Fill.** §8.1.3 ist so
+  geschrieben, weil die Praxis von „Fläche und darüberliegender Kontur" spricht. Bei
+  importierten Logos ist die Kontur aber oft selbst eine Fläche. **Frage:** auf Fill-Paare
+  ausweiten?
+
 ## Abgleich mit der Punch-Praxis (19.09.2026)
 
 Vollständig mit Messungen in `docs/profi-abgleich.md`. **Drei der acht Punkte sind

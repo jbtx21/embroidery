@@ -299,7 +299,13 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
               : preset.fillStitchLengthMm,
           staggerRows:
             Number.isFinite(staggers) && staggers >= 1 ? staggers : preset.fillStaggerRows,
+          // Compensation and underlap stay at zero on import, as pull already
+          // did before them: they belong to the fabric and to what lies next to
+          // the area, and the SVG says nothing about either. The preset carries
+          // the values (§14), the editor applies them. See docs/backlog.md.
           pullCompMm: 0,
+          pushCompMm: 0,
+          underlapMm: 0,
           underlay: preset.fillUnderlay,
         });
       });

@@ -13,7 +13,16 @@ import {
 } from "./analyze.js";
 import { autoOrder } from "./order.js";
 import { coverPolygon, objectStart, orderRank } from "./object.js";
-import { MACHINE_CAP, MACHINE_DEFAULT, MACHINES, preset, PRESETS } from "./presets.js";
+import {
+  densityFactor,
+  MACHINE_CAP,
+  MACHINE_DEFAULT,
+  MACHINES,
+  preset,
+  presetForMachine,
+  PRESETS,
+  textMinFactor,
+} from "./presets.js";
 import { warn, WARNING } from "./warnings.js";
 
 const raw = (
@@ -245,7 +254,11 @@ describe("order (spec §10.1)", () => {
       runningObject("mid", [pt(48, 0), pt(52, 0)]),
       runningObject("far", [pt(96, 0), pt(100, 0)]),
     ];
-    expect(autoOrder(objects).map((o) => o.id)).toEqual(["mid", "edge", "far"]);
+    expect(autoOrder(objects, { centreOut: true }).map((o) => o.id)).toEqual([
+      "mid",
+      "edge",
+      "far",
+    ]);
   });
 
   it("takes the lower object first at equal distance from the centre", () => {
@@ -254,7 +267,7 @@ describe("order (spec §10.1)", () => {
       runningObject("high", [pt(40, 0), pt(44, 0)]),
       runningObject("low", [pt(40, 20), pt(44, 20)]),
     ];
-    expect(autoOrder(objects).map((o) => o.id)).toEqual(["low", "high"]);
+    expect(autoOrder(objects, { centreOut: true }).map((o) => o.id)).toEqual(["low", "high"]);
   });
 
   it("still groups by colour before anything else", () => {
@@ -266,11 +279,41 @@ describe("order (spec §10.1)", () => {
       runningObject("red", [pt(50, 50), pt(51, 50)], { threadIndex: 1 }),
       runningObject("black-inner", [pt(40, 40), pt(41, 40)]),
     ];
-    expect(autoOrder(objects).map((o) => o.id)).toEqual(["black-inner", "black-outer", "red"]);
+    expect(autoOrder(objects, { centreOut: true }).map((o) => o.id)).toEqual([
+      "black-inner",
+      "black-outer",
+      "red",
+    ]);
+  });
+
+  it("takes the shortest path by default, not the centre", () => {
+    // Without centreOut the machine simply works its way along (spec §10.1).
+    const objects = [
+      runningObject("start", [pt(0, 0), pt(1, 0)]),
+      runningObject("far", [pt(90, 0), pt(91, 0)]),
+      runningObject("next", [pt(5, 0), pt(6, 0)]),
+    ];
+    expect(autoOrder(objects).map((o) => o.id)).toEqual(["start", "next", "far"]);
+  });
+
+  it("puts background before details before outlines", () => {
+    const objects = [
+      runningObject("outline", [pt(0, 0), pt(1, 0)]),
+      satinObject("detail", [pt(0, 0), pt(1, 0)], [pt(0, 2), pt(1, 2)]),
+      fillObject("background", polygonOf(rect(0, 0, 10, 10))),
+    ];
+    for (const opts of [undefined, { centreOut: true }]) {
+      expect(autoOrder(objects, opts).map((o) => o.id)).toEqual([
+        "background",
+        "detail",
+        "outline",
+      ]);
+    }
   });
 
   it("handles an empty list", () => {
     expect(autoOrder([])).toHaveLength(0);
+    expect(autoOrder([], { centreOut: true })).toHaveLength(0);
   });
 });
 
@@ -310,10 +353,37 @@ describe("presets (spec §14)", () => {
     expect(PRESETS.cap.satinUnderlay.center).toBe(true);
     expect(PRESETS.frottee.satinSpacingMm).toBe(0.35);
     expect(preset("softshell").id).toBe("softshell");
+    // Jersey and the directional compensation, 19.09.2026
+    expect(PRESETS.jersey.fillRowSpacingMm).toBe(0.45);
+    expect(PRESETS.cap.satinSpacingMm).toBe(0.35);
+    for (const p of Object.values(PRESETS)) {
+      expect(p.pushCompMm).toBeGreaterThan(0);
+      expect(p.pushCompMm).toBeLessThan(p.pullCompMm);
+      expect(p.underlapMm).toBeGreaterThan(0);
+    }
+  });
+
+  it("thins the rows out for 60 weight thread (spec §14)", () => {
+    expect(densityFactor(MACHINE_DEFAULT)).toBe(1);
+    expect(densityFactor({ ...MACHINE_DEFAULT, threadWeight: 60 })).toBe(0.8);
+    const fine = presetForMachine("pique", { ...MACHINE_DEFAULT, threadWeight: 60 });
+    expect(fine.fillRowSpacingMm).toBeCloseTo(0.32, 9);
+    expect(fine.satinSpacingMm).toBeCloseTo(0.304, 9);
+    // Everything else stays put.
+    expect(fine.pullCompMm).toBe(PRESETS.pique.pullCompMm);
+    expect(presetForMachine("pique", MACHINE_DEFAULT)).toEqual(PRESETS.pique);
+  });
+
+  it("lets 60 weight thread carry smaller text (spec §14)", () => {
+    expect(textMinFactor(MACHINE_DEFAULT)).toBe(1);
+    // A font asking for 5 mm comes down to the 3,5 mm the trade rule names.
+    expect(5 * textMinFactor({ ...MACHINE_DEFAULT, threadWeight: 60 })).toBeCloseTo(3.5, 9);
   });
 
   it("offers machine profiles", () => {
     expect(MACHINE_DEFAULT.rpm).toBe(800);
+    expect(MACHINE_DEFAULT.minStitchMm).toBe(0.6);
+    expect(MACHINE_DEFAULT.threadWeight).toBe(40);
     expect(MACHINES["cap"]).toBe(MACHINE_CAP);
   });
 });
