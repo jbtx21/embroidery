@@ -1,6 +1,15 @@
 # TEXMA Stitch — Engine-Spezifikation
 
-Stand: 18.09.2026 · Zielgruppe: Entwicklung (Claude Code) · Status: Entwurf für Phase 1
+Stand: 19.09.2026 · Zielgruppe: Entwicklung (Claude Code) · Status: Entwurf für Phase 1
+
+**Änderungen 19.09.2026** — beschlossen nach den ersten Umsetzungsfunden, Einzelheiten in
+`backlog.md`:
+
+- §3 `Stitch` bekommt `tie?: true`.
+- §11 Rundung kaufmännisch-symmetrisch (`roundHalfEven`).
+- §13.1 Header nach `0x1A` mit `0x20` auffüllen; Export zentriert auf die
+  Bounding-Box-Mitte; Weg vom Nullpunkt zum ersten Stich als Sprungfolge.
+- §11 Warnung `SHAPE_SPLIT` mit Teilanzahl, wenn eine Fläche beim Normieren zerfällt.
 
 ---
 
@@ -118,7 +127,11 @@ type TextObject = Base & {
 Ausgabe der Engine:
 
 ```ts
-type Stitch = { x: number; y: number; cmd: 'stitch' | 'jump' | 'trim' | 'color' | 'stop' | 'end' };
+type Stitch = {
+  x: number; y: number;
+  cmd: 'stitch' | 'jump' | 'trim' | 'color' | 'stop' | 'end';
+  tie?: true;                  // Verriegelungsstich (19.09.2026), siehe 10.3 und 11
+};
 type StitchBlock = { objectId: string; threadIndex: number; stitches: Stitch[] };
 type StitchPlan = {
   blocks: StitchBlock[];
@@ -303,12 +316,13 @@ Entscheidung zwischen Blockende A und Blockanfang B:
 
 ## 11. Post-Processing und Analyse
 
-- Stiche < 0,3 mm entfernen, außer Verriegelung.
+- Stiche < 0,3 mm entfernen, außer Verriegelung. Verriegelungsstiche sind per Definition 0,3 mm kurz und tragen deshalb `tie: true` (§3), sonst würde genau die Verriegelung aus §10.3 hier verschwinden. *(19.09.2026)*
 - Stiche und Sprünge > 12,1 mm in Teilstücke splitten (DST-Limit 121 Einheiten).
+- **Rundung: kaufmännisch-symmetrisch** (`roundHalfEven`, halbe Werte zur geraden Zahl), überall dort, wo Millimeter zu ganzen Formateinheiten werden. Grund: die Kreuzprüfung aus §13.2 läuft gegen Python, dessen `round()` genauso rundet. Bei Reihenabstand 0,25 mm liegt jede zweite Koordinate exakt auf der halben DST-Einheit — mit `Math.round` wäre die Datei nicht byte-identisch. *(19.09.2026)*
 - Stats:
   - `runtimeSec = stitches / (rpm/60) + trims * 3 + colorChanges * 12`, `rpm` aus Maschinenprofil (Standard 800).
   - Dichte: Raster 1 × 1 mm, Stiche pro Zelle zählen. Warnung ab 12/mm², Fehler ab 18/mm².
-- Warnungen (Auswahl): `SATIN_TOO_NARROW`, `SATIN_TOO_WIDE`, `FILL_TINY` (Fläche < 4 mm²), `TEXT_TOO_SMALL`, `DENSITY_HIGH`, `MANY_COLOR_CHANGES` (> 8), `LONG_JUMP` (> 30 mm), `SELF_INTERSECTING_RAILS`, `OBJECT_OUTSIDE_HOOP`.
+- Warnungen (Auswahl): `SATIN_TOO_NARROW`, `SATIN_TOO_WIDE`, `FILL_TINY` (Fläche < 4 mm²), `TEXT_TOO_SMALL`, `DENSITY_HIGH`, `MANY_COLOR_CHANGES` (> 8), `LONG_JUMP` (> 30 mm), `SELF_INTERSECTING_RAILS`, `OBJECT_OUTSIDE_HOOP`, `SHAPE_SPLIT` (Fläche zerfällt beim Normieren in n Teile; die Teilanzahl steht in der Meldung, jedes Teil wird gestickt — nichts wird verworfen). *(19.09.2026)*
 
 ---
 
@@ -325,9 +339,11 @@ Entscheidung zwischen Blockende A und Blockanfang B:
 ## 13. Export
 
 ### 13.1 DST-Writer (TypeScript, `packages/formats`)
-- Header 512 Byte: `LA:` Label 16 Zeichen, `ST:` Stiche, `CO:` Farbwechsel, `+X -X +Y -Y` Extents, `AX AY MX MY`, `PD:******`, mit `0x1A` gefüllt.
+- Header 512 Byte: `LA:` Label 16 Zeichen, `ST:` Stiche, `CO:` Farbwechsel, `+X -X +Y -Y` Extents, `AX AY MX MY`, `PD:******`, abgeschlossen mit `0x1A` und danach mit `0x20` bis Byte 512 aufgefüllt. *(19.09.2026 — vorher „mit `0x1A` gefüllt"; pyembroidery füllt mit Leerzeichen, und §13.2 verlangt byte-identische Ausgabe gegen genau diese Bibliothek.)*
 - Datensatz 3 Byte, Koordinaten in 0,1 mm, Delta-Kodierung, Bits nach Tajima-Spezifikation. `jump`, `color` (Stop), `end` (`0x00 0x00 0xF3`).
-- Rundungsfehler akkumulieren: Delta immer aus gerundeter Absolutposition berechnen, nicht aus gerundeten Deltas.
+- Rundungsfehler akkumulieren: Delta immer aus gerundeter Absolutposition berechnen, nicht aus gerundeten Deltas. Gerundet wird nach §11 kaufmännisch-symmetrisch.
+- **Zentrierung:** das Motiv wird vor dem Schreiben auf die Mitte seiner Bounding-Box verschoben, ganzzahlig in DST-Einheiten. Die Maschine startet im Nullpunkt; eine Datei mit durchweg positiven Koordinaten fährt aus dem Rahmen. Abschaltbar über `center: false`, wenn eine Datei bewusst im Absolutkoordinatensystem bleiben soll. *(19.09.2026)*
+- **Nullpunkt-Anfahrt:** der Weg vom Nullpunkt zum ersten Stich ist selbst ein Delta und unterliegt dem 121-Einheiten-Limit. Er wird als Folge von `jump`-Datensätzen gefahren, danach folgt der erste Stich an seiner Position. Dasselbe gilt für jede andere Bewegung, die das Limit überschreitet — die Engine teilt sie bereits in §11, der Writer prüft es für fremde Stichlisten erneut. *(19.09.2026)*
 
 ### 13.2 Weitere Formate
 - Neutrales JSON (`StitchPlan`) → `apps/api` → pyembroidery → PES, JEF, VP3, EXP.

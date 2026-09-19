@@ -3,30 +3,39 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
-## Vorgriff auf spätere Wochen — Entscheidung offen
+## Wartet auf Zulieferung
 
-Vor dem Eintreffen von `CLAUDE.md` und dem Wochenplan wurde in einem Zug mehr gebaut
-als Woche 1 vorsieht. Der Code ist getestet und grün, steht aber gegen die Regel
-„keine Features außerhalb des aktuellen Meilensteins":
+- **Phase-0-Motive** (§15, §16 Abnahme Woche 1): `test-data/phase0/` enthält nur die
+  README. Ohne je ein SVG und die zugehörige Ink/Stitch-DST laufen weder der
+  Golden-File-Vergleich noch die Abnahme der Woche. Der Rahmen steht und greift
+  (`test/golden.test.ts`, Vergleichslogik eigens geprüft) — es fehlen die Dateien.
+- **Ink/Stitch-Schriften** (§9): keine Fontdateien im Repo. Der Konverter
+  (`packages/fonts/src/import-inkstitch.ts`) ist bewusst noch ein Stub: die genaue
+  Struktur der Ink/Stitch-SVG-Fonts lässt sich hier nicht aus erster Hand prüfen
+  (inkstitch.org und GitHub sind aus dieser Umgebung nicht erreichbar, nur die
+  npm-Registry). Ihn ohne eine echte Datei zu schreiben hieße raten — dagegen steht
+  CLAUDE.md, Arbeitsweise. Sobald eine Schrift abgelegt ist, ist es eine überschaubare
+  Sitzung.
 
-| Bereich                                                               | Spec                 | Zustand                     |
-| --------------------------------------------------------------------- | -------------------- | --------------------------- |
-| Satin (Paarung, Sprossen, Zugausgleich, Split, Kurzstiche, Unterlage) | §7.1–7.6             | fertig, 19 Tests            |
-| Fill (Sektionsgraph, Serpentine, Reisewege, Unterlage)                | §8                   | fertig, 19 Tests            |
-| Reihenfolge-Vorschlag, Laufstich-Verbindung                           | §10.1, §10.2 Zeile 2 | fertig                      |
-| Textsatz gegen das Schriftformat                                      | §9                   | fertig, Schriftdaten fehlen |
+## Entschieden am 19.09.2026
 
-**Zu entscheiden:** behalten und als Vorgriff führen, oder auf Woche 1 zurückbauen und
-in einem Branch parken. Bis dahin bleibt es drin — getesteten Code wegzuwerfen ist die
-teurere Richtung, und `pipeline.ts` würde sonst `NOT_IMPLEMENTED` für Objekttypen melden,
-die nachweislich funktionieren.
+- **Vorgriff auf spätere Wochen bleibt.** Satin (§7.1–7.6), Fill (§8),
+  Reihenfolge/Laufstich-Verbindung (§10.1, §10.2) und Textsatz (§9) sind gebaut und
+  getestet. Sie bleiben im Code und gelten ab jetzt als regulärer Bestand, nicht als
+  Vorgriff. Ab hier gilt „keine Features außerhalb des Meilensteins" wieder.
+- **DST-Header-Füllung**: `0x1A` als Abschluss, danach `0x20` bis Byte 512. In §13.1
+  eingetragen.
+- **Zentrierung auf die Bounding-Box-Mitte** und **Nullpunkt-Anfahrt als Sprungfolge**:
+  in §13.1 eingetragen.
+- **`roundHalfEven`**: in §11 als allgemeine Rundungsregel eingetragen.
+- **`Stitch.tie`**: in §3 eingetragen.
+- **`SHAPE_SPLIT`**: neue Warnung mit Teilanzahl, wenn eine Fläche beim Normieren
+  zerfällt. In §11 eingetragen, in `validate.ts` umgesetzt.
 
 ## Offene Punkte aus der Spec
 
 - **`medialAxis` und Auto-Satin** (§5, §7.7): Stub mit TODO in
   `packages/geometry/src/medial-axis.ts`. Woche 4.
-- **Ink/Stitch-Font-Konverter** (§9): Stub in `packages/fonts/src/import-inkstitch.ts`.
-  Das JSON-Format steht, Satz und Kerning sind gebaut — es fehlen die SVG-Fonts.
 - **PES, JEF, VP3, EXP** (§13.2): laufen über `apps/api` (Python, pyembroidery). Das
   neutrale JSON dorthin ist da.
 - **Stichbericht als PDF** (§13.3): von der Spec selbst auf „später" gesetzt.
@@ -34,23 +43,10 @@ die nachweislich funktionieren.
 - **Asymmetrischer Zugausgleich, Contour/Guided Fill, Applikation, 3D-Puff** (§17):
   Phase 3 oder nicht geplant.
 
-## Abweichungen, die eine Spec-Entscheidung brauchen
+## Abweichungen, die noch eine Spec-Entscheidung brauchen
 
-- **DST-Header-Füllung** (§13.1 gegen §13.2). §13.1 sagt „mit `0x1A` gefüllt", §13.2
-  verlangt byte-identische Ausgabe gegen pyembroidery — und pyembroidery füllt nach dem
-  `0x1A` mit `0x20`. Beides gleichzeitig geht nicht. Umgesetzt ist die pyembroidery-Form,
-  weil die Kreuzprüfung in der CI misst statt zu beschreiben. **Frage an die Spec:** §13.1
-  präzisieren?
-- **Zentrierung und führende Sprünge beim Export.** Steht nicht in §13, ist aber nötig:
-  die Maschine startet im Nullpunkt, also ist der Weg dorthin selbst ein Delta und
-  unterliegt dem 121-Einheiten-Limit. Ohne das schlägt jeder Export eines Motivs fehl,
-  das weiter als 12,1 mm vom Ursprung beginnt. **Frage an die Spec:** als §13.1-Absatz
-  aufnehmen?
-- **`Stitch.tie`.** §3 kennt nur `{x, y, cmd}`. Ergänzt ist ein optionales `tie?: true`,
-  weil die Nachbearbeitung Stiche unter 0,3 mm entfernt (§11) und sonst genau die
-  Verriegelung wegwirft, die §10.3 verlangt — die ist per Definition 0,3 mm kurz.
 - **`reverse` beim Satin** ist als „Spalte vom anderen Ende her sticken" umgesetzt. §7
-  legt die Bedeutung nicht fest.
+  legt die Bedeutung nicht fest; gegen Verdrehen sind die Sprossen da.
 
 ## Werkzeug
 

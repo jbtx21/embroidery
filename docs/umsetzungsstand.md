@@ -1,7 +1,7 @@
 # Umsetzungsstand
 
-Stand: 18.09.2026. Gegenstück zu `Engine-Spezifikation.md` — Kapitel für Kapitel, was
-steht und was fehlt. Abweichungen und offene Entscheidungen stehen in `backlog.md`.
+Stand: 19.09.2026. Gegenstück zu `Engine-Spezifikation.md` — Kapitel für Kapitel, was
+steht und was fehlt. Offene Entscheidungen und Zulieferungen stehen in `backlog.md`.
 
 ## Gebaut
 
@@ -27,14 +27,14 @@ steht und was fehlt. Abweichungen und offene Entscheidungen stehen in `backlog.m
 
 ## Fehlt
 
-| Kap.   | Was                                         | Warum                                                              |
-| ------ | ------------------------------------------- | ------------------------------------------------------------------ |
-| 5, 7.7 | `medialAxis`, Auto-Satin                    | Stub mit TODO; die Spec setzt es selbst auf Woche 4                |
-| 9      | Ink/Stitch-Konverter und echte Schriftdaten | Stub mit TODO; Format steht, Daten fehlen                          |
-| 13.2   | PES, JEF, VP3, EXP                          | laufen über `apps/api`                                             |
-| 13.3   | Stichbericht als PDF                        | von der Spec auf „später" gesetzt                                  |
-| 2      | `apps/editor`, `apps/api`                   | noch nicht begonnen                                                |
-| 15     | Golden Files aus Phase 0                    | Dateien liegen nicht vor; der Test meldet das laut und läuft nicht |
+| Kap.   | Was                                   | Warum                                                               |
+| ------ | ------------------------------------- | ------------------------------------------------------------------- |
+| 5, 7.7 | `medialAxis`, Auto-Satin              | Stub mit TODO; die Spec setzt es selbst auf Woche 4                 |
+| 9      | Ink/Stitch-Konverter und Schriftdaten | keine Fontdatei im Repo; ohne eine echte wäre der Konverter geraten |
+| 13.2   | PES, JEF, VP3, EXP                    | laufen über `apps/api`                                              |
+| 13.3   | Stichbericht als PDF                  | von der Spec auf „später" gesetzt                                   |
+| 2      | `apps/editor`, `apps/api`             | noch nicht begonnen                                                 |
+| 15     | Golden Files aus Phase 0              | Dateien liegen nicht vor; der Test meldet das laut und läuft nicht  |
 
 ## Was die Tests wirklich prüfen
 
@@ -49,7 +49,10 @@ steht und was fehlt. Abweichungen und offene Entscheidungen stehen in `backlog.m
   Header nicht.
 - **Golden Files Kap. 15** laufen erst, wenn `test-data/phase0/` gefüllt ist. Fehlen die
   Dateien, sagt die Suite das laut und prüft nichts — statt ein schwächeres Kriterium
-  anzulegen.
+  anzulegen. Damit ein leerer Ordner keinen zahnlosen Rahmen verdeckt, ist die
+  Vergleichslogik selbst getestet: sie weist eine Stichzahl über ±10 %, eine Box über
+  ±0,3 mm und eine leere Referenz zurück. Bei vorhandenen Motiven druckt der Lauf je
+  Motiv die Zeile, die `docs/abweichungen.md` braucht — auch wenn er grün ist.
 - **Benchmarks Kap. 15** (`pnpm bench`): ein Fill-Objekt und ein Satin-Objekt je unter
   100 ms, voller Lauf unter 300 ms. Gemessen wird der Median aus mehreren Läufen.
 - **Benchmark Kap. 12** misst nur unseren Anteil (Zerlegung und Zeichenaufrufe) gegen eine
@@ -65,3 +68,8 @@ steht und was fehlt. Abweichungen und offene Entscheidungen stehen in `backlog.m
 - Im SVG-Scanner verschluckte die gierige Attributgruppe den Schrägstrich von `<path …/>`.
   Folge: alles nach `</g>` behielt die Gruppen-Transformation. Fiel im Demo-Lauf auf, weil
   ein 60 × 45 mm großes Dokument als 70 × 58 mm herauskam.
+- Der Toleranzvergleich der Golden Files scheiterte an der Gleitkomma-Darstellung:
+  110/100 − 1 ergibt 0,10000000000000009, 30,3 − 30 ergibt 0,3000000000000007. Ein Motiv
+  genau auf der Grenze wäre am Rauschen gescheitert statt an seinen Stichen. Der
+  Vergleich rechnet jetzt mit einer Epsilon-Schwelle; die Toleranzen aus §15 bleiben
+  unverändert.
