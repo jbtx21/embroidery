@@ -1,6 +1,6 @@
 # Umsetzungsstand
 
-Stand: 19.09.2026. Gegenstück zu `Engine-Spezifikation.md` — Kapitel für Kapitel, was
+Stand: 19.09.2026 (Auto-Satin). Gegenstück zu `Engine-Spezifikation.md` — Kapitel für Kapitel, was
 steht und was fehlt. Offene Entscheidungen und Zulieferungen stehen in `backlog.md`.
 
 ## Gebaut
@@ -12,8 +12,10 @@ steht und was fehlt. Offene Entscheidungen und Zulieferungen stehen in `backlog.
 | 4       | Pipeline validate → expand → order → generate → connect → tie → post → analyze, Objekt-Cache über stabilen Hash                | `engine/src/pipeline.ts`, `hash.ts`                    |
 | 4       | SVG-Import: Pfade, Transformationen, Ink/Stitch-Attribute — ohne DOM                                                           | `engine/src/import/`                                   |
 | 5       | Flachung, Douglas-Peucker, Resampling mit Eckenerhalt, Offset, Mengenoperationen, Scanline-Schnitt, Bogenlänge, `insideTravel` | `geometry/src/`                                        |
+| 5       | `medialAxis`: Delaunay selbst gebaut, Voronoi-Kanten innerhalb der Form, Zweige geschnitten                                    | `geometry/src/delaunay.ts`, `medial-axis.ts`           |
 | 6       | Laufstich, Bean Stitch, geschlossene Pfade                                                                                     | `engine/src/running.ts`                                |
 | 7.1–7.6 | Satin: Paarung, Sprossen, Zugausgleich, Zickzack, Split, Kurzstiche, Unterlage                                                 | `engine/src/satin.ts`                                  |
+| 7.7     | Auto-Satin: Form → Satin-Spalten, Medianbreite entscheidet Satin oder Fill, Reihenfolge entlang des Skeletts                   | `engine/src/auto-satin.ts`                             |
 | 8       | Fill: Scanlines, Sektionsgraph, Serpentine auf festem Raster, Reisewege innerhalb der Form, Unterlage contour/single/double    | `engine/src/fill.ts`                                   |
 | 9       | Textsatz auf Grundlinie und Pfad, Kerning, Mindesthöhe — gegen das Schriftformat                                               | `engine/src/expand.ts`, `fonts/src/types.ts`           |
 | 10      | Reihenfolge-Vorschlag, Verbindungsregeln, Verriegelung                                                                         | `engine/src/order.ts`, `connect.ts`, `tie.ts`          |
@@ -53,6 +55,12 @@ steht und was fehlt. Offene Entscheidungen und Zulieferungen stehen in `backlog.
   Vergleichslogik selbst getestet: sie weist eine Stichzahl über ±10 %, eine Box über
   ±0,3 mm und eine leere Referenz zurück. Bei vorhandenen Motiven druckt der Lauf je
   Motiv die Zeile, die `docs/abweichungen.md` braucht — auch wenn er grün ist.
+- **Skelett Kap. 5** gegen Formen mit bekannter Lösung: Ring 10/6 ergibt einen
+  geschlossenen Ast der Länge 2π·8 mit Radius 2,00 überall; die L-Form hat ihren größten
+  einbeschriebenen Kreis mit r = 8(2−√2) am einspringenden Eck; die Kreisscheibe bekommt
+  gar kein Skelett, weil ihre Mittelachse ein Punkt ist. Die Delaunay-Triangulierung wird
+  über ihre definierende Eigenschaft geprüft (kein Punkt im Umkreis eines Dreiecks), nicht
+  gegen eine erwartete Ausgabe.
 - **Benchmarks Kap. 15** (`pnpm bench`): ein Fill-Objekt und ein Satin-Objekt je unter
   100 ms, voller Lauf unter 300 ms. Gemessen wird der Median aus mehreren Läufen.
 - **Benchmark Kap. 12** misst nur unseren Anteil (Zerlegung und Zeichenaufrufe) gegen eine
@@ -68,6 +76,12 @@ steht und was fehlt. Offene Entscheidungen und Zulieferungen stehen in `backlog.
 - Im SVG-Scanner verschluckte die gierige Attributgruppe den Schrägstrich von `<path …/>`.
   Folge: alles nach `</g>` behielt die Gruppen-Transformation. Fiel im Demo-Lauf auf, weil
   ein 60 × 45 mm großes Dokument als 70 × 58 mm herauskam.
+- Die Seitenbestimmung der Satin-Unterlage (`outwardSign`) kippte an Endkappen: dort liegt
+  der nächste Punkt der Gegen-Rail IN Rail-Richtung statt quer dazu, das Kreuzprodukt ist
+  exakt null und sagt nichts. Folge war eine Unterlage 0,4 mm außerhalb der Form, wo sie
+  am Rand herausschaut. Jetzt entscheidet die Mehrheit mehrerer Stützstellen, und bei
+  durchweg mehrdeutigem Befund der Schwerpunkt der Gegen-Rail. Aufgefallen ist es erst
+  durch Auto-Satin, weil dessen Eckäste kurze Rails erzeugen.
 - Der Toleranzvergleich der Golden Files scheiterte an der Gleitkomma-Darstellung:
   110/100 − 1 ergibt 0,10000000000000009, 30,3 − 30 ergibt 0,3000000000000007. Ein Motiv
   genau auf der Grenze wäre am Rauschen gescheitert statt an seinen Stichen. Der

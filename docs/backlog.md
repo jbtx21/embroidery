@@ -34,8 +34,6 @@ Neue Einträge oben in den passenden Abschnitt.
 
 ## Offene Punkte aus der Spec
 
-- **`medialAxis` und Auto-Satin** (§5, §7.7): Stub mit TODO in
-  `packages/geometry/src/medial-axis.ts`. Woche 4.
 - **PES, JEF, VP3, EXP** (§13.2): laufen über `apps/api` (Python, pyembroidery). Das
   neutrale JSON dorthin ist da.
 - **Stichbericht als PDF** (§13.3): von der Spec selbst auf „später" gesetzt.
@@ -47,6 +45,32 @@ Neue Einträge oben in den passenden Abschnitt.
 
 - **`reverse` beim Satin** ist als „Spalte vom anderen Ende her sticken" umgesetzt. §7
   legt die Bedeutung nicht fest; gegen Verdrehen sind die Sprossen da.
+- **Auto-Satin ist nicht in `expand()` verdrahtet.** §4 nennt „Auto-Satin-Kandidaten
+  auflösen" als Aufgabe von `expand()`, aber §3 kennt keinen Objekttyp, der einen
+  Kandidaten markiert. Einen zu erfinden wäre eine Spec-Änderung. `autoSatin(shape, opts)`
+  ist deshalb eine Funktion, die der Editor aufruft — passend zu §7.7 Punkt 5, wo der
+  Nutzer das Ergebnis als Vorschlag korrigiert. **Frage an die Spec:** soll §3 einen
+  Kandidatentyp bekommen, oder bleibt Auto-Satin Editor-Werkzeug?
+- **Zu breiter Ast → Fill für die ganze Form.** §7.7 Punkt 3 sagt „Median > `maxWidthMm`
+  → Fill statt Satin" je Ast. Die Form je Ast aufzuteilen steht nirgends und wäre geraten;
+  ein Entwurf aus Satin-Spalten plus nicht zugeordneter Restfläche ist außerdem nicht
+  stickbar. Umgesetzt: ist ein Ast zu breit, wird die GANZE Form als Fill vorgeschlagen,
+  mit `SATIN_TOO_WIDE` und der Zahl der betroffenen Äste. **Frage an die Spec:** so
+  festschreiben?
+
+## Bekannte Eigenschaften von Auto-Satin
+
+Beides ist keine Fehlfunktion, sondern folgt aus dem Verfahren. §7.7 Punkt 5 sieht genau
+deshalb die Korrektur durch den Nutzer vor.
+
+- **Spalten überlappen an den Verzweigungen.** Wo Äste zusammenlaufen, decken zwei Spalten
+  dieselbe Stelle ab. Die Dichteprüfung aus §11 meldet das zuverlässig — beim
+  L-Winkel-Probelauf mit `DENSITY_HIGH`. Der Editor löst es, indem der Nutzer die Rails
+  an der Verzweigung trennt.
+- **`pruneFactor` tauscht Spaltenzahl gegen Randabdeckung.** Größere Werte schneiden die
+  kurzen Eckäste weg (ein 40 × 4-Balken wird dann eine Spalte statt fünf), dafür bleiben
+  die äußersten Millimeter der Form unbedeckt. Der Standard 1,0 liefert die Mittelachse
+  so, wie sie mathematisch ist.
 
 ## Werkzeug
 

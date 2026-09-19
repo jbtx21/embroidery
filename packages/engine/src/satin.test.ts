@@ -146,6 +146,23 @@ describe("documented thresholds (spec §7)", () => {
   });
 });
 
+describe("underlay inset direction", () => {
+  it("stays inside even when the other rail lies straight ahead", () => {
+    // End cap of a bar: both rails run into the same corner, so from a point on
+    // railA the nearest point of railB sits ALONG railA, not across it. The
+    // cross product is then exactly zero and says nothing — and an inset that
+    // guesses wrong puts the underlay outside the shape.
+    const obj = satinObject("cap", [pt(2.1, 0), pt(0.3, 0)], [pt(2.01, 4), pt(0, 2.1), pt(0, 0)], {
+      pullCompMm: 0,
+      underlay: { center: false, contour: true, zigzag: true, insetMm: 0.4, zigzagSpacingMm: 3 },
+    });
+    for (const p of generateSatin(obj).stitches) {
+      expect(p.y).toBeGreaterThanOrEqual(-1e-6);
+      expect(p.x).toBeGreaterThanOrEqual(-1e-6);
+    }
+  });
+});
+
 describe("generation", () => {
   it("warns about columns that are too narrow or too wide", () => {
     const narrow = generateSatin(

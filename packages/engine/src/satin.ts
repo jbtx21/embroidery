@@ -15,6 +15,7 @@ import {
   offsetPolyline,
   pointAt,
   resample,
+  tangentAt,
 } from "@texma-stitch/geometry";
 import type { SatinObject, Warning } from "./types.js";
 import { warn, WARNING } from "./warnings.js";
@@ -151,20 +152,46 @@ export function applyPullComp(
   ];
 }
 
-/** +1 when the left normal of `self` points away from `other`, -1 otherwise. */
+/**
+ * +1 when the left normal of `self` points away from `other`, -1 otherwise.
+ *
+ * Decided by majority over several places along the rail, not at one vertex. At
+ * an endpoint of a short rail the other rail can sit almost straight ahead, and
+ * then the cross product is near zero and its sign is noise. Getting it wrong
+ * flips the underlay inset outwards, which puts stabilising stitches outside the
+ * shape where they show around the edge.
+ */
 function outwardSign(self: Polyline, other: Polyline): number {
-  const i = Math.floor(self.length / 2);
-  const a = self[Math.max(0, i - 1)]!;
-  const b = self[Math.min(self.length - 1, i + 1)]!;
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const l = Math.hypot(dx, dy);
-  if (l < 1e-12) return 1;
-  const nLeft = { x: dy / l, y: -dx / l };
-  const here = self[i]!;
-  const opposite = nearestPoint(other, here).point;
-  const toOther = { x: opposite.x - here.x, y: opposite.y - here.y };
-  return nLeft.x * toOther.x + nLeft.y * toOther.y > 0 ? -1 : 1;
+  const cum = cumulativeLengths(self);
+  const total = cum[cum.length - 1]!;
+  if (total < 1e-12) return 1;
+
+  const middle = pointAt(self, 0.5 * total, cum);
+  const midTangent = tangentAt(self, 0.5 * total, cum);
+
+  let vote = 0;
+  for (const f of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+    const here = pointAt(self, f * total, cum);
+    const t = tangentAt(self, f * total, cum);
+    const nLeft = { x: t.y, y: -t.x };
+    const opposite = nearestPoint(other, here).point;
+    const toward = nLeft.x * (opposite.x - here.x) + nLeft.y * (opposite.y - here.y);
+    if (Math.abs(toward) < 1e-9) continue; // ambiguous here, let the others decide
+    vote += toward > 0 ? -1 : 1;
+  }
+  if (vote !== 0) return vote > 0 ? 1 : -1;
+
+  // Every sample was ambiguous: the nearest point of the other rail lies along
+  // this rail rather than across it. That happens at the end cap of a shape,
+  // where both rails run into the same corner. The centre of mass of the other
+  // rail still says which side the column is on.
+  const centroid = other.reduce(
+    (acc, p) => ({ x: acc.x + p.x / other.length, y: acc.y + p.y / other.length }),
+    { x: 0, y: 0 },
+  );
+  const nLeft = { x: midTangent.y, y: -midTangent.x };
+  const toward = nLeft.x * (centroid.x - middle.x) + nLeft.y * (centroid.y - middle.y);
+  return toward > 0 ? -1 : 1;
 }
 
 // ---------------------------------------------------------------------------

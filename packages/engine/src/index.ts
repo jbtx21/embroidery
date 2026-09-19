@@ -4,6 +4,7 @@ export * from "./presets.js";
 export * from "./warnings.js";
 export * from "./running.js";
 export * from "./satin.js";
+export * from "./auto-satin.js";
 export * from "./fill.js";
 export * from "./order.js";
 export * from "./object.js";
