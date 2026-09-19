@@ -9,6 +9,12 @@ Neue Einträge oben in den passenden Abschnitt.
   README. Ohne je ein SVG und die zugehörige Ink/Stitch-DST laufen weder der
   Golden-File-Vergleich noch die Abnahme der Woche. Der Rahmen steht und greift
   (`test/golden.test.ts`, Vergleichslogik eigens geprüft) — es fehlen die Dateien.
+  Am 19.09.2026 kamen fünf Stickvoll-Motive als DST/EXP/HUS/JEF/PES/VP3/XXX. Sie taugen
+  nicht als Golden Files: **kein SVG dabei**, also fehlt die Eingabeseite, die durch die
+  Engine laufen müsste. Dazu untersagt ihre Lizenz („Bitte lesen.txt") Weitergabe und
+  gewerbliche Nutzung — ein Commit ins Repo wäre Weitergabe. Sie liegen deshalb nicht im
+  Repo. Was §15 braucht, ist das SVG mit den Ink/Stitch-Parametern und die daraus
+  gestickte DST vom selben Motiv.
 - **Ink/Stitch-Schriften** (§9): keine Fontdateien im Repo. Der Konverter
   (`packages/fonts/src/import-inkstitch.ts`) ist bewusst noch ein Stub: die genaue
   Struktur der Ink/Stitch-SVG-Fonts lässt sich hier nicht aus erster Hand prüfen
@@ -31,6 +37,26 @@ Neue Einträge oben in den passenden Abschnitt.
 - **`Stitch.tie`**: in §3 eingetragen.
 - **`SHAPE_SPLIT`**: neue Warnung mit Teilanzahl, wenn eine Fläche beim Normieren
   zerfällt. In §11 eingetragen, in `validate.ts` umgesetzt.
+
+## Fremde DST lesen: Trims werden nicht erkannt
+
+Geprüft am 19.09.2026 gegen fünf echte Maschinendateien eines fremden Digitalisierers
+(Stickvoll, DST). Unser Reader kommt mit allen fünf zurecht: die Datensatzzahl deckt sich
+exakt mit dem `ST:`-Feld, die Farbwechsel mit `CO:`, die Extents auf eine Einheit genau.
+Der Renderer gibt die Motive korrekt wieder.
+
+Ein Unterschied bleibt: pyembroidery meldet in denselben Dateien Trims (2 bis 11 je
+Datei), unser Reader nicht — er sieht dort Sprünge. Grund: wir sammeln nur genau das
+Trim-Signal wieder ein, das unser eigener Writer schreibt (drei Sprünge `+2/+2`, `-4/-4`,
+`+2/+2`). Fremde Software signalisiert Trims anders, meist als Lauf mehrerer Sprünge.
+
+**Nicht verallgemeinert**, und zwar mit Absicht: `post()` teilt lange Sprünge in mehrere
+Sprung-Datensätze (§11). Eine Regel „drei Sprünge hintereinander sind ein Trim" würde
+genau diese geteilten Sprünge in unseren eigenen Dateien als Trim lesen und den
+byte-identischen Roundtrip aus §15 zerstören. Für §17 („Import fremder DST … nur
+Anzeige") wäre die Erkennung trotzdem richtig, weil Trims als Kreuz statt als gestrichelte
+Linie gezeichnet gehören. **Frage an die Spec:** soll der Reader einen Modus für fremde
+Dateien bekommen, der Sprungläufe als Trim deutet?
 
 ## Offene Punkte aus der Spec
 
