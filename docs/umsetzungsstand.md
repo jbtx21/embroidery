@@ -94,3 +94,12 @@ steht und was fehlt. Offene Entscheidungen und Zulieferungen stehen in `backlog.
   Ergebnis. Jetzt hält jede Form ihren Graphen, Knoten sind nur die einspringenden Ecken
   (bei dieser Kontur 713 statt 1.127), und ein Kantengitter beantwortet Schnitt- und
   Innen-Fragen lokal. Dasselbe Objekt: 1,1 s. Zahlen in `docs/messung-echte-logos.md`.
+- Die Reihenfolge „Mitte → außen" nach reinem Radius zu sortieren, sieht auf dem Papier
+  richtig aus und ist in der Praxis schlecht: zwei Objekte auf demselben Kreis liegen im
+  Sortierschlüssel nebeneinander, können aber an gegenüberliegenden Rändern des Motivs
+  sitzen. Am Eislingen-Logo gemessen 922 Sprünge statt 265. Deshalb arbeitet `autoOrder`
+  in Ringen — innen nach außen, innerhalb eines Rings der kürzeste Weg. 334 Sprünge.
+- `FILL_TINY` misst die Fläche und übersieht damit genau den Fall, den die Punch-Praxis
+  meint: eine Sichel von 114 mm², deren Reihen zu 79 % kürzer als ein Millimeter sind.
+  `FILL_TOO_NARROW` misst stattdessen die Reihenstücke, die beim Scanline-Lauf ohnehin
+  anfallen.

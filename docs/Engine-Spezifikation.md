@@ -293,7 +293,10 @@ Standard: contour + single. Ab 20 mm Kantenlänge: double.
 
 ### 10.1 Reihenfolge
 - Standard: Objektliste wie im Design.
-- Vorschlag `autoOrder()`: nach Farbe gruppieren (Farbwechsel minimieren), innerhalb einer Farbe nach Distanz. Unterlagen und Hintergrundflächen zuerst, Konturen zuletzt. Der Nutzer kann den Vorschlag annehmen oder überschreiben.
+- Vorschlag `autoOrder()`: nach Farbe gruppieren (Farbwechsel minimieren), innerhalb einer Farbe **von der Mitte nach außen und von unten nach oben**. Unterlagen und Hintergrundflächen zuerst, Konturen zuletzt. Der Nutzer kann den Vorschlag annehmen oder überschreiben.
+- **Mitte → außen, unten → oben** *(19.09.2026 — vorher „innerhalb einer Farbe nach Distanz")*: Sticken schiebt den Stoff vor sich her. Wer von einer Ecke aus arbeitet, schiebt den Verzug quer durch das ganze Motiv; wer aus der Mitte nach außen arbeitet, verteilt ihn gleichmäßig zu den Rändern. Auf dem runden Kapp-Rahmen ist das zwingend, sonst verschiebt sich die Kappe unter dem Motiv. Umsetzung in **Ringen**, nicht nach reinem Radius: innerhalb von Farbe und Rang wird der innerste Ring der Breite `max(5 mm, 0,2 · größter Radius)` um die Mitte der Design-Bounding-Box abgearbeitet, bevor der nächste beginnt. Jede Farbe startet am **untersten** Objekt ihres innersten Rings (größtes y, §1 zeigt y nach unten), danach entscheidet innerhalb des Rings der kürzeste Weg. Nach einem Trim darf die Maschine überall neu ansetzen, deshalb beginnt jede Farbe für sich.
+
+Der Ring ist nicht Kosmetik: nach reinem Radius sortiert springt die Maschine zwischen zwei Objekten, die zufällig auf demselben Kreis liegen, quer durchs Motiv. Gemessen am Eislingen-Logo waren das **922 Sprünge statt 265**. Mit Ringen sind es 334 — die Reihenfolge hält die Regel ein und kostet gegenüber der reinen Wegoptimierung 9 bis 26 % mehr Sprünge. *(19.09.2026)*
 
 ### 10.2 Verbindung zweier Blöcke
 Entscheidung zwischen Blockende A und Blockanfang B:
@@ -322,7 +325,8 @@ Entscheidung zwischen Blockende A und Blockanfang B:
 - Stats:
   - `runtimeSec = stitches / (rpm/60) + trims * 3 + colorChanges * 12`, `rpm` aus Maschinenprofil (Standard 800).
   - Dichte: Raster 1 × 1 mm, Stiche pro Zelle zählen. Warnung ab 12/mm², Fehler ab 18/mm².
-- Warnungen (Auswahl): `SATIN_TOO_NARROW`, `SATIN_TOO_WIDE`, `FILL_TINY` (Fläche < 4 mm²), `TEXT_TOO_SMALL`, `DENSITY_HIGH`, `MANY_COLOR_CHANGES` (> 8), `LONG_JUMP` (> 30 mm), `SELF_INTERSECTING_RAILS`, `OBJECT_OUTSIDE_HOOP`, `SHAPE_SPLIT` (Fläche zerfällt beim Normieren in n Teile; die Teilanzahl steht in der Meldung, jedes Teil wird gestickt — nichts wird verworfen). *(19.09.2026)*
+- Warnungen (Auswahl): `SATIN_TOO_NARROW`, `SATIN_TOO_WIDE`, `FILL_TINY` (Fläche < 4 mm²), `FILL_TOO_NARROW`, `TEXT_TOO_SMALL`, `DENSITY_HIGH`, `MANY_COLOR_CHANGES` (> 8), `LONG_JUMP` (> 30 mm), `SELF_INTERSECTING_RAILS`, `OBJECT_OUTSIDE_HOOP`, `SHAPE_SPLIT` (Fläche zerfällt beim Normieren in n Teile; die Teilanzahl steht in der Meldung, jedes Teil wird gestickt — nichts wird verworfen). *(19.09.2026)*
+- **`FILL_TOO_NARROW`**: eine Fläche kann groß sein und trotzdem überall zu schmal zum Füllen. `FILL_TINY` misst die Fläche und sieht das nicht — eine Sichel von 114 mm² kommt durch, obwohl 79 % ihrer Reihenstücke kürzer als 1 mm sind. Die Praxis sagt: ein Stich unter 1 mm perforiert den Stoff, statt ihn zu decken. Kriterium: Fläche ≥ 4 mm² (darunter greift `FILL_TINY`), mindestens 8 Reihenstücke, und **mehr als die Hälfte davon kürzer als 1 mm**. Gemeldet als `warn` mit dem Anteil und dem Vorschlag Satin oder Laufstich — die Fläche wird trotzdem gestickt, nichts wird still geändert (Regel 8). Die Zahlen fallen in `scanlines` ohnehin an. *(19.09.2026)*
 
 ---
 
@@ -361,11 +365,25 @@ Startwerte, in Phase 5 gegen Probesticks justieren.
 
 | Preset | Fill Reihe | Satin Abstand | Zugausgleich | Unterlage Fill | Unterlage Satin | Hinweis |
 |---|---|---|---|---|---|---|
-| Piqué | 0,25 | 0,38 | 0,20 | contour + single | contour + zigzag | Standard |
-| Softshell | 0,27 | 0,40 | 0,25 | contour + single | contour + zigzag | |
-| Fleece | 0,28 | 0,40 | 0,30 | contour + double | contour + zigzag, Inset 0,3 | Topping empfohlen |
-| Cap | 0,25 | 0,38 | 0,15 | contour + single | center + contour | Reihenfolge Mitte → außen, unten → oben |
-| Frottee | 0,25 | 0,35 | 0,20 | contour + double | contour + zigzag | Knockdown-Fill unter Motiv, Topping |
+| Piqué | 0,40 | 0,38 | 0,20 | contour + single | contour + zigzag | Standard |
+| Softshell | 0,35 | 0,40 | 0,25 | contour + single | contour + zigzag | |
+| Fleece | 0,35 | 0,40 | 0,30 | contour + double | contour + zigzag, Inset 0,3 | Topping empfohlen |
+| Cap | 0,35 | 0,38 | 0,15 | contour + single | center + contour | Reihenfolge Mitte → außen, unten → oben |
+| Frottee | 0,35 | 0,35 | 0,20 | contour + double | contour + zigzag | Knockdown-Fill unter Motiv, Topping |
+
+**Reihenabstand: Industriewerte.** *(19.09.2026 — vorher 0,25 bis 0,28.)* Die Praxis
+punchtet 40er-Garn mit **0,40 mm** als Standard, **0,35 mm** auf schwerer Ware (Kappen,
+Jacken) und **0,45 mm** auf dünnen Shirts. Die alten Werte lagen 35 bis 60 % darüber und
+spreizten untereinander nur 12 % — sie unterschieden die Stoffe praktisch nicht. Gemessen
+an zwei echten Logos kostet der Wechsel auf 0,40 rund 21 % der Stiche und 5 bis 6 Minuten
+Maschinenzeit je Stück (`docs/profi-abgleich.md`).
+
+Zuordnung: Piqué ist die Standardware. Kappen und Softshell nennt die Praxis ausdrücklich
+als schwer. **Fleece und Frottee sind unsere Zuordnung, nicht aus der Quelle**: beide sind
+dick und flauschig, die Stiche versinken, deshalb dieselbe Dichte wie schwere Ware. Sie
+gehören beim Probestick zuerst geprüft.
+
+Für dünne Jersey-Ware (0,45) gibt es heute kein Preset. Offen in `docs/backlog.md`.
 
 Maschinenprofile: `rpm`, `hoopWMm`, `hoopHMm`, `maxJumpMm`.
 

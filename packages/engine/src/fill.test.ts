@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { bbox, dist, initGeometry, pointInPolygon } from "@texma-stitch/geometry";
-import { annulus, polygonOf, pt, rect } from "../test/fixtures/shapes.js";
+import { annulus, circle, polygonOf, pt, rect } from "../test/fixtures/shapes.js";
 import { fillObject } from "../test/fixtures/designs.js";
 import {
   contourUnderlay,
@@ -9,6 +9,9 @@ import {
   fillRegion,
   generateFill,
   longestEdgeMm,
+  NARROW_MIN_ROWS,
+  NARROW_SHARE,
+  narrowRowShare,
   rowStitches,
   scanlines,
   sectionStitches,
@@ -120,7 +123,8 @@ describe("documented values (spec §8, §11)", () => {
 describe("generation", () => {
   it("fills a square and stays inside", () => {
     const r = generateFill(fillObject("f", square));
-    expect(r.stitches.length).toBeGreaterThan(200);
+    // 10 x 10 mm at the preset row spacing of 0,40 mm — 25 rows, plus underlay.
+    expect(r.stitches.length).toBeGreaterThan(120);
     const b = bbox(r.stitches);
     expect(b.minX).toBeGreaterThanOrEqual(-1e-6);
     expect(b.maxX).toBeLessThanOrEqual(10 + 1e-6);
@@ -177,6 +181,30 @@ describe("generation", () => {
     ).toContain("FILL_TINY");
   });
 
+  it("warns about an area that is large but everywhere too narrow", () => {
+    // 0,6 x 40 mm = 24 mm², well past FILL_TINY. The rows run along x, so each
+    // one is 0,6 mm long — a needle stab, not a stitch.
+    const sliver = polygonOf(rect(0, 0, 0.6, 40));
+    const codes = generateFill(fillObject("f", sliver, { pullCompMm: 0 })).warnings.map(
+      (w) => w.code,
+    );
+    expect(codes).toContain("FILL_TOO_NARROW");
+    expect(codes).not.toContain("FILL_TINY");
+  });
+
+  it("leaves a normal area alone", () => {
+    const codes = generateFill(fillObject("f", square)).warnings.map((w) => w.code);
+    expect(codes).not.toContain("FILL_TOO_NARROW");
+  });
+
+  it("leaves the narrow warning to FILL_TINY below 4 mm²", () => {
+    const codes = generateFill(
+      fillObject("f", polygonOf(rect(0, 0, 0.5, 5)), { pullCompMm: 0 }),
+    ).warnings.map((w) => w.code);
+    expect(codes).toContain("FILL_TINY");
+    expect(codes).not.toContain("FILL_TOO_NARROW");
+  });
+
   it("reports an area that vanishes under pull compensation", () => {
     const r = generateFill(fillObject("f", polygonOf(rect(0, 0, 2, 2)), { pullCompMm: -5 }));
     expect(r.stitches).toHaveLength(0);
@@ -214,5 +242,31 @@ describe("generation", () => {
 
   it("measures the longest edge for the underlay decision", () => {
     expect(longestEdgeMm(polygonOf(rect(0, 0, 30, 10)))).toBeCloseTo(30, 9);
+  });
+});
+
+describe("narrowRowShare (spec §11)", () => {
+  it("counts no short pieces in a wide shape", () => {
+    const r = narrowRowShare(scanlines(square, 0.4));
+    expect(r.pieces).toBeGreaterThan(NARROW_MIN_ROWS);
+    // Only the very top and bottom rows are short on a square: none, in fact.
+    expect(r.share).toBeLessThan(NARROW_SHARE);
+  });
+
+  it("counts every piece of a sliver as short", () => {
+    const r = narrowRowShare(scanlines(polygonOf(rect(0, 0, 0.6, 20)), 0.4));
+    expect(r.share).toBe(1);
+  });
+
+  it("leaves a circle alone — only its caps are short, and barely", () => {
+    // A chord under 1 mm sits within 0,013 mm of the pole; at a 0,4 mm grid
+    // hardly any row lands there. A round shape must never be flagged.
+    const r = narrowRowShare(scanlines(polygonOf(circle(0, 0, 10)), 0.4));
+    expect(r.share).toBeLessThan(NARROW_SHARE);
+    expect(r.pieces).toBeGreaterThan(40);
+  });
+
+  it("returns zero for a shape without rows", () => {
+    expect(narrowRowShare([])).toEqual({ pieces: 0, share: 0 });
   });
 });

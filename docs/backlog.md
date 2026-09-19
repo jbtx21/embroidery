@@ -5,11 +5,10 @@ Neue Einträge oben in den passenden Abschnitt.
 
 ## Abgleich mit der Punch-Praxis (19.09.2026)
 
-Vollständig mit Messungen in `docs/profi-abgleich.md`. Acht offene Spec-Fragen, kurz:
+Vollständig mit Messungen in `docs/profi-abgleich.md`. **Drei der acht Punkte sind
+entschieden und umgesetzt** (§14 Industriewerte, §11 `FILL_TOO_NARROW`, §10.1 Mitte →
+außen in Ringen) — Zahlen in `docs/messung-echte-logos.md`. Offen bleiben:
 
-1. **§14 Reihenabstände.** Unsere 0,25–0,28 mm liegen 35–60 % über der Industriedichte
-   (0,40 Standard, 0,35 schwer, 0,45 dünn). Wechsel auf 0,40 spart gemessen 21 % Stiche
-   und 5–6 min Maschinenzeit je Stück. §14 nennt die Werte selbst „Startwerte".
 2. **§11 Dichtemaß.** Das Maximum über alle 1-mm-Zellen lässt eine einzige Stelle die ganze
    Datei abstempeln (STUTTGART: 9 von 4.047 Zellen lösen den Fehler aus, 92 % liegen bei
    höchstens 8/mm²). Fläche über dem Grenzwert wäre aussagekräftiger.
@@ -25,6 +24,8 @@ Vollständig mit Messungen in `docs/profi-abgleich.md`. Acht offene Spec-Fragen,
 7. **§8 Stichwinkel.** Der Import setzt für jede Fläche 0°. Gleiche Winkel überall wirken
    flach.
 8. **§6 krümmungsabhängige Stichlänge** im Laufstich: nicht vorhanden.
+9. **Kein Preset für dünne Jersey-Ware.** Die Praxis nennt 0,45 mm für dünne Shirts; §14
+   hat dafür keinen Platz. Ein sechstes Preset wäre eine Spec-Änderung.
 
 ## Aus der Messung an echten Kundenlogos (19.09.2026)
 

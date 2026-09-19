@@ -238,12 +238,35 @@ describe("order (spec §10.1)", () => {
     expect(autoOrder(objects).map((o) => o.id)).toEqual(["area", "outline", "red"]);
   });
 
-  it("sorts by distance within one rank", () => {
+  it("works from the centre outwards within one rank", () => {
+    // Centre of the bounding box is x = 50; "mid" sits on it, "edge" at the rim.
     const objects = [
-      runningObject("far", [pt(100, 0), pt(110, 0)]),
-      runningObject("near", [pt(1, 0), pt(2, 0)]),
+      runningObject("edge", [pt(0, 0), pt(4, 0)]),
+      runningObject("mid", [pt(48, 0), pt(52, 0)]),
+      runningObject("far", [pt(96, 0), pt(100, 0)]),
     ];
-    expect(autoOrder(objects).map((o) => o.id)).toEqual(["far", "near"]);
+    expect(autoOrder(objects).map((o) => o.id)).toEqual(["mid", "edge", "far"]);
+  });
+
+  it("takes the lower object first at equal distance from the centre", () => {
+    // Both are 10 mm from the centre; y points down, so "low" has the larger y.
+    const objects = [
+      runningObject("high", [pt(40, 0), pt(44, 0)]),
+      runningObject("low", [pt(40, 20), pt(44, 20)]),
+    ];
+    expect(autoOrder(objects).map((o) => o.id)).toEqual(["low", "high"]);
+  });
+
+  it("still groups by colour before anything else", () => {
+    // Starts at (0,0), (40,40) and (50,50) put the centre at (25,25). Black
+    // appears first, so its whole group runs first — and inside it the object
+    // nearer the centre goes first.
+    const objects = [
+      runningObject("black-outer", [pt(0, 0), pt(1, 0)]),
+      runningObject("red", [pt(50, 50), pt(51, 50)], { threadIndex: 1 }),
+      runningObject("black-inner", [pt(40, 40), pt(41, 40)]),
+    ];
+    expect(autoOrder(objects).map((o) => o.id)).toEqual(["black-inner", "black-outer", "red"]);
   });
 
   it("handles an empty list", () => {
@@ -278,7 +301,10 @@ describe("object helpers", () => {
 
 describe("presets (spec §14)", () => {
   it("carries the values from the table", () => {
-    expect(PRESETS.pique.fillRowSpacingMm).toBe(0.25);
+    // Industry values since 19.09.2026: 0,40 standard, 0,35 on heavy goods.
+    expect(PRESETS.pique.fillRowSpacingMm).toBe(0.4);
+    expect(PRESETS.cap.fillRowSpacingMm).toBe(0.35);
+    expect(PRESETS.softshell.fillRowSpacingMm).toBe(0.35);
     expect(PRESETS.fleece.pullCompMm).toBe(0.3);
     expect(PRESETS.fleece.fillUnderlay.fill).toBe("double");
     expect(PRESETS.cap.satinUnderlay.center).toBe(true);

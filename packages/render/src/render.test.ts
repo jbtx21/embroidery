@@ -49,9 +49,11 @@ let plan: StitchPlan;
 
 beforeAll(async () => {
   await initEngine();
+  // The fill row spacing is pinned: these tests are about drawing, not about
+  // whatever density the preset carries (spec §14 moved it on 19.09.2026).
   plan = planDesign(
     design([
-      fillObject("f", polygonOf(rect(0, 0, 20, 12))),
+      fillObject("f", polygonOf(rect(0, 0, 20, 12)), { rowSpacingMm: 0.25 }),
       satinObject("s", [pt(30, 0), pt(30, 12)], [pt(34, 0), pt(34, 12)], { threadIndex: 1 }),
       runningObject("r", [pt(0, 20), pt(40, 20)], { threadIndex: 1 }),
     ]),
@@ -264,9 +266,15 @@ describe("PNG output", () => {
 describe("benchmark (spec §12)", () => {
   it("draws 50,000 stitches fast enough for a fluid view", () => {
     // 130 x 130 mm, dense rows and short stitches — the order of magnitude
-    // spec §12 names.
+    // spec §12 names. The row spacing is pinned here: this benchmark is about
+    // drawing 50.000 stitches, not about whatever density the preset carries.
     const big = planDesign(
-      design([fillObject("f", polygonOf(rect(0, 0, 130, 130)), { stitchLengthMm: 1.2 })]),
+      design([
+        fillObject("f", polygonOf(rect(0, 0, 130, 130)), {
+          stitchLengthMm: 1.2,
+          rowSpacingMm: 0.25,
+        }),
+      ]),
     );
     expect(big.blocks.reduce((n, b) => n + b.stitches.length, 0)).toBeGreaterThan(50_000);
 

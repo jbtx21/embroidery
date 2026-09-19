@@ -28,6 +28,15 @@ import { warn, WARNING } from "./warnings.js";
 export const TRAVEL_STITCH_MM = 2.0;
 /** Area below which a fill stops making sense (spec §11). */
 export const FILL_TINY_MM2 = 4;
+/**
+ * A row piece shorter than this does not cover, it perforates — the trade rule
+ * is that no stitch belongs below 1 mm (spec §11).
+ */
+export const SHORT_ROW_MM = 1.0;
+/** Fewer row pieces than this and the shape is too small to judge (spec §11). */
+export const NARROW_MIN_ROWS = 8;
+/** From this share of short row pieces on, a fill is the wrong stitch (spec §11). */
+export const NARROW_SHARE = 0.5;
 /** From this edge length on, use the double underlay (spec §8.6). */
 export const DOUBLE_UNDERLAY_EDGE_MM = 20;
 
@@ -169,6 +178,25 @@ export function sectionStitches(section: Section, params: FillParams, entry: Ent
   return out;
 }
 
+/**
+ * How much of a shape is too narrow to fill (spec §11).
+ *
+ * `FILL_TINY` asks how big an area is; this asks how WIDE it is. A crescent of
+ * 114 mm² passes the area check and is still nothing but needle stabs, because
+ * every one of its rows is shorter than a stitch.
+ */
+export function narrowRowShare(rows: Segment[][]): { pieces: number; share: number } {
+  let pieces = 0;
+  let short = 0;
+  for (const row of rows) {
+    for (const seg of row) {
+      pieces++;
+      if (seg.x1 - seg.x0 < SHORT_ROW_MM) short++;
+    }
+  }
+  return { pieces, share: pieces === 0 ? 0 : short / pieces };
+}
+
 // ---------------------------------------------------------------------------
 // Section order and travel paths (spec §8.5)
 // ---------------------------------------------------------------------------
@@ -276,6 +304,23 @@ export function generateFill(obj: FillObject): FillResult {
         obj.id,
       ),
     );
+  }
+
+  if (area >= FILL_TINY_MM2) {
+    // Measured on the shape as it is stitched, so the angle counts.
+    const rotated = applyToPolygon(rotator(-obj.angleDeg), obj.shape);
+    const { pieces, share } = narrowRowShare(scanlines(rotated, obj.rowSpacingMm));
+    if (pieces >= NARROW_MIN_ROWS && share > NARROW_SHARE) {
+      warnings.push(
+        warn(
+          WARNING.FILL_TOO_NARROW,
+          `${(share * 100).toFixed(0)} % of the rows are shorter than ${SHORT_ROW_MM} mm — ` +
+            `${area.toFixed(1)} mm² but everywhere too narrow. Use satin or a running stitch.`,
+          "warn",
+          obj.id,
+        ),
+      );
+    }
   }
 
   const parts = obj.pullCompMm === 0 ? [obj.shape] : offset(obj.shape, obj.pullCompMm);

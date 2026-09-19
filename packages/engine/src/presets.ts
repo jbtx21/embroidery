@@ -1,6 +1,12 @@
 /**
  * Presets (spec §14) and machine profiles. Starting values — to be adjusted
  * against test sew-outs in phase 5.
+ *
+ * Row spacing follows commercial practice for 40-weight thread: 0.40 mm as the
+ * standard, 0.35 mm on heavy goods (caps, jackets). Fleece and terry are our own
+ * mapping, not taken from the trade rule — both are thick and lofty, so the
+ * stitches sink in and need the coverage of heavy goods. They are the two to
+ * check first on a test sew-out.
  */
 import type { FillUnderlay, PresetId, SatinUnderlay } from "./types.js";
 
@@ -37,7 +43,7 @@ export const PRESETS: Record<PresetId, Preset> = {
   pique: {
     id: "pique",
     label: "Piqué",
-    fillRowSpacingMm: 0.25,
+    fillRowSpacingMm: 0.4,
     fillStitchLengthMm: 3.0,
     fillStaggerRows: 4,
     satinSpacingMm: 0.38,
@@ -49,7 +55,7 @@ export const PRESETS: Record<PresetId, Preset> = {
   softshell: {
     id: "softshell",
     label: "Softshell",
-    fillRowSpacingMm: 0.27,
+    fillRowSpacingMm: 0.35,
     fillStitchLengthMm: 3.0,
     fillStaggerRows: 4,
     satinSpacingMm: 0.4,
@@ -60,7 +66,7 @@ export const PRESETS: Record<PresetId, Preset> = {
   fleece: {
     id: "fleece",
     label: "Fleece",
-    fillRowSpacingMm: 0.28,
+    fillRowSpacingMm: 0.35,
     fillStitchLengthMm: 3.0,
     fillStaggerRows: 4,
     satinSpacingMm: 0.4,
@@ -72,7 +78,7 @@ export const PRESETS: Record<PresetId, Preset> = {
   cap: {
     id: "cap",
     label: "Cap",
-    fillRowSpacingMm: 0.25,
+    fillRowSpacingMm: 0.35,
     fillStitchLengthMm: 3.0,
     fillStaggerRows: 4,
     satinSpacingMm: 0.38,
@@ -84,7 +90,7 @@ export const PRESETS: Record<PresetId, Preset> = {
   frottee: {
     id: "frottee",
     label: "Frottee",
-    fillRowSpacingMm: 0.25,
+    fillRowSpacingMm: 0.35,
     fillStitchLengthMm: 3.0,
     fillStaggerRows: 4,
     satinSpacingMm: 0.35,

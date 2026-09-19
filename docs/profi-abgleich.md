@@ -132,14 +132,28 @@ Praxis: in engen Kurven muss die Stichlänge herunter, sonst wirkt die Linie eck
 `runningStitches` teilt zwischen den Ecken gleichmäßig mit fester Länge (§6). Eine
 Anpassung an die Krümmung gibt es nicht.
 
-## Was davon Spec-Entscheidungen sind
+## Entschieden am 19.09.2026
 
-1. §14 Reihenabstände auf Industriewerte (0,40 Standard, 0,35 schwer, 0,45 dünn)?
+Drei der acht Punkte sind umgesetzt, Spec und Code nachgezogen:
+
+1. **§14 Reihenabstände auf Industriewerte.** Piqué 0,40, alle anderen 0,35. Fleece und
+   Frottee sind unsere Zuordnung, nicht aus der Quelle — sie gehören beim Probestick
+   zuerst geprüft. Gemessen: rund 21 % weniger Stiche über alle vier Motive.
+2. **§11 `FILL_TOO_NARROW`.** Fläche ≥ 4 mm², mindestens 8 Reihenstücke, über die Hälfte
+   davon kürzer als 1 mm → Warnung mit dem Vorschlag Satin oder Laufstich. Meldet sich bei
+   den echten Logos 10 bis 32 Mal je Motiv.
+3. **§10.1 Mitte → außen, unten → oben**, für alle Presets, in Ringen statt nach reinem
+   Radius. Der Ring war nötig: nach Radius sortiert sprang Eislingen von 265 auf 922
+   Sprünge, mit Ringen sind es 334.
+
+Zahlen in `docs/messung-echte-logos.md`.
+
+## Was noch offen ist
+
 2. §11 Dichtemaß: Fläche über dem Grenzwert statt Spitzenwert einer einzelnen Zelle?
-3. §11 Breitenkriterium neben `FILL_TINY`?
-4. §7/§8 Kontur-Überlappung gegen Blitzer — und wer legt sie fest, Engine oder Editor?
-5. §7.2 Push-Ausgleich aus „für später" holen? Cap-Zugausgleich auf 0,2 mm?
-6. §10.1 Reihenfolge Mitte → außen, unten → oben — mindestens für das Cap-Preset, das sie
-   heute verspricht?
-7. §8 Standardwinkel beim Import, und ob die Engine Winkel überhaupt variieren darf?
-8. §6 krümmungsabhängige Stichlänge?
+3. §7/§8 Kontur-Überlappung gegen Blitzer — und wer legt sie fest, Engine oder Editor?
+4. §7.2 Push-Ausgleich aus „für später" holen? Cap-Zugausgleich auf 0,2 mm?
+5. §8 Standardwinkel beim Import, und ob die Engine Winkel überhaupt variieren darf?
+6. §6 krümmungsabhängige Stichlänge?
+7. Kein Preset für dünne Jersey-Ware (0,45 mm) — die Praxis nennt den Wert, wir haben
+   keinen Platz dafür.

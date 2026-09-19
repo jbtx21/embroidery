@@ -54,10 +54,12 @@ beforeAll(async () => {
   await initGeometry();
 });
 
+// The fill row spacing is pinned: these tests are about the DST format, not
+// about whatever density the preset carries (spec §14 moved it on 19.09.2026).
 const samplePlan = (): StitchPlan =>
   planDesign(
     design([
-      fillObject("f", polygonOf(rect(0, 0, 20, 12))),
+      fillObject("f", polygonOf(rect(0, 0, 20, 12)), { rowSpacingMm: 0.25 }),
       satinObject("s", [pt(30, 0), pt(30, 12)], [pt(34, 0), pt(34, 12)], { threadIndex: 1 }),
       runningObject("r", [pt(0, 20), pt(40, 20)], { threadIndex: 1 }),
     ]),

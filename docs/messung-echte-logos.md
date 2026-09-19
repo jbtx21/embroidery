@@ -104,3 +104,26 @@ Die Zusage aus Regel 9 gilt erst, wenn sie an einem echten Logo gemessen ist.
 - **STUTTGART 250 mm** ebenso: 250 × 233 mm gegen einen Rahmen von 360 × 200 mm.
 - Die Zeile `Laufzeit` im Demo-Werkzeug ist die geschätzte **Maschinenlaufzeit** in
   Sekunden (Köln: 2.470 s ≈ 41 min). In Minuten wäre sie lesbarer.
+
+## Nachher: die drei Entscheidungen vom 19.09.2026
+
+Reihenabstand auf Industriewerte (§14), `FILL_TOO_NARROW` (§11), Reihenfolge Mitte → außen
+in Ringen (§10.1). Dieselben vier Motive, `order: "auto"`:
+
+| Motiv                      | Stiche vorher |            nachher | Sprünge vorher | nachher | Trims vorher | nachher |      Laufzeit |
+| -------------------------- | ------------: | -----------------: | -------------: | ------: | -----------: | ------: | ------------: |
+| STUTTGART 80 mm            |        18.174 | **14.306** (−21 %) |             85 |      99 |           35 |      34 |   25 → 20 min |
+| STUTTGART 250 mm           |       134.736 | **98.076** (−27 %) |            259 |     268 |           45 |      45 | 187 → 136 min |
+| Berufsfeuerwehr Köln 90 mm |        26.653 | **21.431** (−20 %) |            169 |     184 |           59 |      65 |   37 → 30 min |
+| Eislingen Print 200 mm     |        47.970 | **37.568** (−22 %) |            265 |     334 |           97 |      96 |   67 → 53 min |
+
+Rund ein Fünftel weniger Stiche bei praktisch gleicher Sprung- und Trimzahl. Die
+Ringbreite ist der Grund für den letzten Teil: nach reinem Radius sortiert wären es bei
+Eislingen **922 Sprünge** statt 334 gewesen.
+
+`FILL_TOO_NARROW` meldet sich sofort: 15 Flächen bei STUTTGART 80 mm, 10 bei Köln, 32 bei
+Eislingen — Flächen über 4 mm², die `FILL_TINY` nicht sieht und die trotzdem als Satin oder
+Laufstich gehören.
+
+`DENSITY_HIGH` bleibt, wie vorhergesagt: 28/24/19/21 statt 24/27/21/25. Der Reihenabstand
+war nie die Ursache, die übereinanderliegenden Flächen der Druckvorlage sind es.
