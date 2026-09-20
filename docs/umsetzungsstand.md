@@ -134,3 +134,28 @@ die krümmungsadaptive Schrittweite in `running.test.ts`, Jersey, `densityFactor
 - Die Mindeststichlänge von 0,6 mm senkt nebenbei die **Dichte**: Köln fällt von 19 auf 14
   Stiche/mm², Eislingen von 21 auf 15. Beide melden `DENSITY_HIGH` damit nur noch als
   Warnung statt als Fehler. Die entfernten Stiche waren Nadeleinstiche ohne Deckung.
+
+## Geänderte Erwartungswerte, 21.09.2026 (vierte Welle)
+
+| Datei                                    | Erwartung vorher                                    | jetzt                                             | Grund                                                                                                      |
+| ---------------------------------------- | --------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `packages/engine/src/connect.test.ts`    | `DENSITY_ERROR_PEAK` 30, `DENSITY_ERROR_SHARE` 0,01 | 40 und 0,02                                       | §11 neu geschnitten: ein Fehler ist, was flächig ist oder wirklich hart. 1 % bleibt jetzt eine Warnung.    |
+| `packages/engine/src/connect.test.ts`    | eine Zelle über 30 ist ein Fehler                   | 41 ist ein Fehler, 35 eine Warnung                | dasselbe.                                                                                                  |
+| `packages/engine/src/import/svg.test.ts` | Flächen unter 1 mm² werden Objekte                  | verworfen, `IMPORT_DROPPED_TINY` nennt die Anzahl | §5.1. Eislingen: 52 Splitter aus der Vektorisierung.                                                       |
+| `packages/engine/src/fonts-all.test.ts`  | `TEXT_TOO_LARGE` als `warn`                         | `TEXT_ABOVE_FONT_MAX` als `info`                  | §9.4: eine Satinschrift hochzuskalieren macht die Spalten breiter, nicht dünner. Nach unten bleibt `warn`. |
+
+Die Erwartungen in `auto-satin.test.ts` sind nicht verschoben, sondern neu: der Umbau von
+§7.7.1 prüft jetzt an den Buchstaben S, T und R, dass beide Rails zusammen die Kontur nicht
+überschreiten.
+
+## Beim Bauen gefunden (vierte Welle)
+
+- **`pnpm lint` war seit der dritten Welle rot**, und mir ist es durchgegangen, weil ich
+  Prettier nur auf die geänderten Dateien laufen ließ. Die Schrift-JSONs kommen unverändert
+  aus dem Ink/Stitch-Repo; genau so gehören sie dorthin, als Beleg, was importiert wurde.
+  Sie stehen deshalb jetzt in `.prettierignore`, die eigene `README.md` daneben nicht.
+- **`documentHeight` las das `height`-Attribut.** `medium_font` hat dort 23,8125 mm bei
+  `viewBox="0 0 90 90"` — die Grundlinie saß 47 Einheiten daneben. Jetzt führt die viewBox.
+- **Die Mittelachse eines Rechtecks hat fünf Äste**, die eines T neun: ein Sporn in jede
+  Ecke. Jeder schnitt sich eigene Rails aus derselben Kontur. Ein Ast, kürzer als das
+  1,5-fache seiner größten Weite, ist seitdem eine Ecke und keine Spalte.

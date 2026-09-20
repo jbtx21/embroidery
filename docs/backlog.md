@@ -5,16 +5,17 @@ Neue Einträge oben in den passenden Abschnitt.
 
 ## Offen nach der vierten Welle (21.09.2026)
 
-- **Die Ausdehnungs-Schranke aus §5.1 ist von 2,0 auf 4,0 gelockert.** Sie war eine
-  Notbremse gegen windende Rails und konnte eine echte Kurve nicht davon unterscheiden: ein
-  Buchstabenbogen misst 2,2 bis 2,9 seiner eigenen Ausdehnung, genau wie die gewundenen
-  vorher. Seit §7.7.1 fängt das Budget das Winden allein (97–99 % gegen 155–188 %). Die
-  Schranke steht nur noch als Rückfallebene. **Frage:** ganz streichen?
-- **Die Schriftwahl nach Höhe setzt `caffeine_tiny` über ihre eigene Grenze.** §9.4 schaltet
-  bei 9 mm um; `caffeine_tiny` reicht nach eigener Angabe bis 5,7 mm Versalhöhe,
-  `caffeine_KOR` beginnt bei 8,3 mm. Zwischen 5,7 und 9 mm warnt die Engine jetzt mit
-  `TEXT_TOO_LARGE`. **Frage:** Umschaltpunkt auf 5,7 mm ziehen und `excalibur_KOR`
-  (5,8–16,2 mm) dazwischenschieben?
+- ~~**Die Ausdehnungs-Schranke aus §5.1 ist von 2,0 auf 4,0 gelockert.** Ganz streichen?~~
+  _(21.09.2026 entschieden: bleibt bei 4,0. Sie kostet nichts und fängt den Fall ab, in dem
+  das Budget durchrutscht — Rails, die zufällig fast die Konturlänge treffen und sich
+  trotzdem wickeln. Rolle in §5.1 eingetragen: Budget entscheidet, Ausdehnung ist harte
+  Obergrenze.)_
+- ~~**Die Schriftwahl nach Höhe setzt `caffeine_tiny` über ihre eigene Grenze.** Umschalt-
+  punkt auf 5,7 mm ziehen und `excalibur_KOR` dazwischenschieben?~~ _(21.09.2026
+  entschieden: kein `excalibur_KOR` — eine Rustikale passt stilistisch nicht zwischen zwei
+  Serifenlose. `caffeine_tiny` darf bis 9 mm hochskaliert werden, weil die Spalten dabei
+  breiter werden statt dünner; Meldung dafür ist `info TEXT_ABOVE_FONT_MAX`. Unter
+  `min_scale` bleibt es `warn`. §9.4.)_
 - **Eislingen hat noch 926 Objekte und 1008 Sprünge.** Deutlich besser als die 2408 und
   1963 vorher, aber die Vorlage bleibt eine Vektorisierung aus Hunderten Fragmenten.
   **Frage:** Mindestfläche für die Satin-Erkennung, oder gehört das in die Vorbereitung?

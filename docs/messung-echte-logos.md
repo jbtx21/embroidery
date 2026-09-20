@@ -209,7 +209,7 @@ Import verworfen (§5.1), sechs Schriften im Repo (§9.4). Preset Piqué, Standa
 | -------------------------- | -------------: | ------------------: | --------------: | ------------: | -----: | ----------: | ---------- |
 | STUTTGART 80 mm            |   130 → **80** | 18.473 → **17.966** |   190 → **135** |   48 → **38** |      6 | 32 → **24** | keine      |
 | STUTTGART 250 mm           |    92 → **72** | 87.086 → **85.935** |   575 → **384** |  143 → **64** |      6 | 29 → **23** | nur Rahmen |
-| Berufsfeuerwehr Köln 90 mm |      209 ← 316 | 30.437 → **24.919** |   358 → **266** |   87 → **68** | 13 → 9 | 37 → **28** | keine      |
+| Berufsfeuerwehr Köln 90 mm |  316 → **209** | 30.437 → **24.919** |   358 → **266** |   87 → **68** | 13 → 9 | 37 → **28** | keine      |
 | Eislingen Print 200 mm     | 2408 → **926** | 52.430 → **31.368** | 1963 → **1008** | 156 → **109** |      5 | 37 → **22** | nur Rahmen |
 
 **Kein `DENSITY_HIGH`-Fehler mehr, auf keinem der vier.** Zwei Ursachen: die gelockerten
@@ -244,3 +244,15 @@ ist ein Dach mit einem Sporn in jede Ecke — **fünf Äste für einen Balken, n
 Jeder Sporn schnitt seine eigenen Rails aus derselben Kontur. Ein Ast, der kürzer ist als
 das 1,5-fache seiner größten Weite, ist eine Ecke und keine Spalte; die Ecken bleiben
 trotzdem gedeckt, weil die Rails des langen Astes ohnehin um den ganzen Ring laufen.
+
+### Nachtrag: die beiden offenen Punkte sind entschieden _(21.09.2026)_
+
+- **Die Ausdehnungs-Schranke bleibt bei 4.** Sie ist ab jetzt ausdrücklich Rückfall, nicht
+  Entscheider: das Budget trennt gesund von gewunden (97–99 % gegen 155–188 %), die
+  Ausdehnung fängt nur den Fall ab, in dem eine gewickelte Rail zufällig die Konturlänge
+  trifft. Eingetragen in §5.1.
+- **Die Schriftlücke zwischen 5,7 und 9 mm bleibt offen, absichtlich.** `excalibur_KOR`
+  passt rechnerisch, stilistisch aber nicht — eine Rustikale zwischen zwei Serifenlosen.
+  `caffeine_tiny` wird stattdessen bis 9 mm hochskaliert; das macht die Spalten breiter,
+  nicht dünner, und heißt deshalb nur noch `info TEXT_ABOVE_FONT_MAX` statt einer Warnung.
+  Nach unten, unter `min_scale`, bleibt es `warn`. §9.4.

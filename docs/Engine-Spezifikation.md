@@ -263,14 +263,20 @@ Zwei Schranken:
   überschreiten (Faktor 1,3 für Abtastung und Endkappen). Die Rails werden von der Kontur
   abgelesen, können zusammen also nicht länger sein als sie — es sei denn, ein Stück wird
   mehrfach benutzt.
-- **Ausdehnung je Spalte:** die Rails einer Spalte dürfen höchstens das Doppelte der
+- **Ausdehnung je Spalte:** die Rails einer Spalte dürfen höchstens das **Vierfache** der
   Ausdehnung dieser Spalte messen. Das Budget allein ist blind für eine gewundene Spalte
   zwischen gesunden, weil eine Form mit Löchern genug Kontur hat, sie zu verstecken.
 
 Reißt eine der beiden Schranken, wird die Form ein Fill und meldet `AUTOSATIN_MIXED`.
-**Das ist eine Notbremse, keine Lösung** — `railsForBranch` gehört überarbeitet (Kontur in
-zwei Ketten zwischen den Astenden teilen statt punktweise nächster Nachbar je Seite). Steht
-in `docs/backlog.md`.
+
+**Wer wovon entscheidet** *(21.09.2026)*. Seit dem Umbau von `railsForBranch` (§7.7.1)
+**entscheidet das Budget**; die Ausdehnung ist die **harte Obergrenze** als Rückfall. Grund
+ist die Messung: am STUTTGART-Logo trennt das Budget sauber (gesunde Spalten 97–99 % der
+Kontur, gewundene 155–188 %), während die Ausdehnung einen echt gekrümmten Buchstabenbogen
+(2,2–2,9 × Ausdehnung) nicht von einer gewundenen Rail (2,5 ×) unterscheiden kann — mit dem
+alten Faktor 2 verwarf sie 13 gesunde Buchstaben. Deshalb steht sie jetzt auf **4** und
+fängt nur noch den Fall ab, in dem das Budget durchrutscht: Rails, die zufällig fast die
+Konturlänge treffen und sich trotzdem wickeln. Sie bleibt stehen — sie kostet nichts.
 
 Ist ein Ast der Form breiter als `maxWidthMm` (§7.4), wird die **ganze** Form ein Fill und
 meldet `AUTOSATIN_MIXED` als `info` mit der Zahl der betroffenen Äste. Die Form je Ast in
@@ -392,7 +398,13 @@ Die Kontur **ist** die Rail; sie muss nur richtig zerteilt werden:
 
 Die beiden Schranken aus §5.1 (Rail-Budget gegen die Kontur, Ausdehnung je Spalte) bleiben
 als Sicherung bestehen. Sie sollen nach diesem Umbau nicht mehr greifen — tun sie es doch,
-ist das ein Befund und kein Grund, sie zu lockern.
+ist das ein Befund.
+
+*(21.09.2026)* Gemessen nach dem Umbau: STUTTGART 80 mm hat **kein** `AUTOSATIN_MIXED` mehr
+(vorher 16), 74 Satinspalten statt 49. Das Budget greift nicht mehr. Die Ausdehnung schon —
+aber gegen gesunde Buchstaben, nicht gegen gewundene Rails; sie steht deshalb auf 4 und ist
+nur noch Rückfall (§5.1, „Wer wovon entscheidet"). Das ist eine bewusste Lockerung mit
+Messwerten, keine stille.
 
 ---
 
@@ -544,13 +556,21 @@ Im Repo liegen sechs Schriften (`packages/fonts/src/inkstitch/`). Die Voreinstel
 die, die zur Höhe passt: **bis 9 mm `caffeine_tiny`, darüber `caffeine_KOR`.**
 
 `maxHeightMm` kommt neu aus `max_scale` der Schrift, wie `minHeightMm` aus `min_scale`.
-Damit meldet die Engine, wenn eine Schrift über ihren eigenen Bereich hinaus gesetzt wird —
-und das tut die Regel oben: `caffeine_tiny` reicht nach eigener Angabe bis 5,7 mm
-Versalhöhe (`max_scale` 0,55 × 16,2 mm × 0,641), `caffeine_KOR` beginnt erst bei 8,3 mm.
-Zwischen 5,7 und 9 mm wird `caffeine_tiny` also über ihre Grenze gesetzt, und zwischen 9
-und 8,3 mm gibt es eine Überschneidung. Die Warnung `TEXT_TOO_LARGE` sagt es, statt es zu
-verschweigen (Regel 8). Wer die Lücke schließen will, nimmt `excalibur_KOR` (5,8–16,2 mm
-Versalhöhe), die genau dort liegt.
+`caffeine_tiny` reicht nach eigener Angabe bis 5,7 mm Versalhöhe (`max_scale` 0,55 ×
+16,2 mm × 0,641), `caffeine_KOR` beginnt erst bei 8,3 mm.
+
+**Die 9 mm sind Absicht, nicht die Fontgrenze** *(21.09.2026)*. `caffeine_tiny` darf über
+ihr Maximum bis 9 mm skaliert werden. Eine Satinschrift hochzuskalieren ist unkritisch: die
+Spalten werden **breiter**, nicht dünner — und breiter ist die Richtung, in der nichts
+kaputtgeht. Gemeldet wird es trotzdem (Regel 8), aber als `info TEXT_ABOVE_FONT_MAX`, nicht
+als Warnung und erst recht nicht als Fehler. Ab 9 mm übernimmt `caffeine_KOR`.
+
+**Nach unten bleibt es eine Warnung.** Unter `min_scale` werden die Spalten zu schmal, dort
+geht etwas kaputt: `TEXT_TOO_SMALL` bleibt `warn` (§11).
+
+`excalibur_KOR` schließt die Lücke zwischen 5,7 und 9 mm rechnerisch (5,8–16,2 mm), wird
+dafür aber **nicht** genommen: eine Rustikale passt stilistisch nicht zwischen zwei
+Serifenlose. Gleichmäßige Schrift schlägt gleichmäßigen Zahlenbereich.
 
 **Lizenz je Schrift.** Nicht jede Schrift im Ink/Stitch-Repo darf weitergegeben werden. Die `LICENSE` des Ordners gehört mit ins Repo, und ohne sie kommt keine Schrift herein. `caffeine_tiny` steht unter der SIL Open Font License 1.1.
 - `expand()`: Glyphen auf Grundlinie oder Pfad setzen, auf `heightMm` skalieren. Reihenfolge: Buchstabe für Buchstabe, Verbindung zwischen Buchstaben als Running unter dem nächsten Buchstaben, sonst Trim.
@@ -665,7 +685,7 @@ Entscheidung zwischen Blockende A und Blockanfang B:
 - Stats:
   - `runtimeSec = stitches / (rpm/60) + trims * 3 + colorChanges * 12`, `rpm` aus Maschinenprofil (Standard 800).
   - Dichte: Raster 1 × 1 mm, Stiche pro Zelle zählen. **Warnung**, sobald das Maximum über 12/mm² liegt. **Fehler** erst, wenn mehr als **2 % der belegten Zellen** über 18/mm² liegen **oder** eine einzelne Zelle über **40/mm²**. *(21.09.2026 — vorher 1 % und 30/mm²; davor, bis 20.09.2026, „Fehler ab 18/mm²" auf den Spitzenwert.)* Der Spitzenwert allein taugt nicht: beim STUTTGART-Logo lösten **9 von 4.047 Zellen** den Fehler aus, während 92 % der Zellen bei höchstens 8/mm² lagen. Eine einzelne heiße Stelle ist eine Warnung wert, keine Ablehnung — eine Zelle über 40 dagegen schon, und eine Fläche, die zu zwei Prozent überfüllt ist, erst recht. Die Grenzen sind am 21.09.2026 gelockert worden: mit dem Knockdown aus §4.1 legt jede Naht ihre 0,8 mm Unterlappung übereinander, und an einem Punkt, wo acht Flächen zusammenstoßen, summiert sich das auf Werte, die gewollt sind.
-- Warnungen (Auswahl): `SATIN_TOO_NARROW`, `SATIN_TOO_WIDE`, `FILL_TINY` (Fläche < 4 mm²), `FILL_TOO_NARROW`, `EDGE_GAP_RISK`, `FILL_COVERED`, `AUTOSATIN_MIXED`, `TEXT_TOO_SMALL`, `DENSITY_HIGH`, `MANY_COLOR_CHANGES` (> 8), `LONG_JUMP` (> 30 mm), `SELF_INTERSECTING_RAILS`, `OBJECT_OUTSIDE_HOOP`, `SHAPE_SPLIT` (Fläche zerfällt beim Normieren in n Teile; die Teilanzahl steht in der Meldung, jedes Teil wird gestickt — nichts wird verworfen). *(19.09.2026)*
+- Warnungen (Auswahl): `SATIN_TOO_NARROW`, `SATIN_TOO_WIDE`, `FILL_TINY` (Fläche < 4 mm²), `FILL_TOO_NARROW`, `EDGE_GAP_RISK`, `FILL_COVERED`, `AUTOSATIN_MIXED`, `IMPORT_DROPPED_TINY`, `TEXT_TOO_SMALL`, `TEXT_ABOVE_FONT_MAX` (`info`, §9.4), `DENSITY_HIGH`, `MANY_COLOR_CHANGES` (> 8), `LONG_JUMP` (> 30 mm), `SELF_INTERSECTING_RAILS`, `OBJECT_OUTSIDE_HOOP`, `SHAPE_SPLIT` (Fläche zerfällt beim Normieren in n Teile; die Teilanzahl steht in der Meldung, jedes Teil wird gestickt — nichts wird verworfen). *(19.09.2026)*
 - **`FILL_TOO_NARROW`**: eine Fläche kann groß sein und trotzdem überall zu schmal zum Füllen. `FILL_TINY` misst die Fläche und sieht das nicht — eine Sichel von 114 mm² kommt durch, obwohl 79 % ihrer Reihenstücke kürzer als 1 mm sind. Die Praxis sagt: ein Stich unter 1 mm perforiert den Stoff, statt ihn zu decken. Kriterium: Fläche ≥ 4 mm² (darunter greift `FILL_TINY`), mindestens 8 Reihenstücke, und **mehr als die Hälfte davon kürzer als 1 mm**. Gemeldet als `warn` mit dem Anteil und dem Vorschlag Satin oder Laufstich — die Fläche wird trotzdem gestickt, nichts wird still geändert (Regel 8). Die Zahlen fallen in `scanlines` ohnehin an. *(19.09.2026)*
 
 ---
