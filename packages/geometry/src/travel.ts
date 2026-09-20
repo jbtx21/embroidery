@@ -24,6 +24,24 @@ const GRAPH_SIMPLIFY_MM = 0.1;
 /** How far off the corner the reflex probe sits (mm). */
 const CORNER_PROBE_MM = 1e-3;
 /**
+ * How far a graph node sits inside the material, off its corner (mm).
+ *
+ * A node ON the outline sees its neighbours only along the boundary, and a
+ * segment that runs exactly on the boundary is neither in nor out: the
+ * visibility test drops it. Around a round hole every corner is reflex and each
+ * one only ever sees its neighbours that way — the graph falls apart and the
+ * path cuts straight through the hole (measured on the Atzensport logo,
+ * 21.09.2026: 20 mm of it). A node a hair inside the material sees its
+ * neighbours properly, and the path it yields is the same one, drawn a tenth of
+ * a millimetre further in — under what the machine can place.
+ *
+ * The inset has to clear `GRAPH_SIMPLIFY_MM`: on a simplified round hole the
+ * chord between two neighbours bulges into the hole by up to that much. Thin
+ * shapes cannot hold it, so it is tried in three steps and falls back to the
+ * corner itself.
+ */
+const NODE_INSET_MM = [0.12, 0.05, 0.02];
+/**
  * Below this, an intersection counts as touching an endpoint rather than
  * crossing (mm). Far under any embroidery geometry, far over the rounding noise
  * of a double at millimetre scale.
@@ -133,6 +151,29 @@ function isReflexCorner(idx: EdgeIndex, p: Point, v: Point, q: Point): boolean {
   return !idx.contains({ x: v.x + (ux / ul) * step, y: v.y + (uy / ul) * step });
 }
 
+/**
+ * The corner moved a hair into the material, along the bisector of its two
+ * edges. Returns the corner itself when the shape is too thin to hold the
+ * offset — then the node is no worse than before.
+ */
+function insetCorner(idx: EdgeIndex, p: Point, v: Point, q: Point): Point {
+  const l1 = dist(p, v);
+  const l2 = dist(q, v);
+  if (l1 < 1e-12 || l2 < 1e-12) return { ...v };
+  // On a reflex corner the bisector points into the hole, so the way into the
+  // material is the other direction.
+  const ux = (p.x - v.x) / l1 + (q.x - v.x) / l2;
+  const uy = (p.y - v.y) / l1 + (q.y - v.y) / l2;
+  const ul = Math.hypot(ux, uy);
+  if (ul < 1e-9) return { ...v };
+  for (const inset of NODE_INSET_MM) {
+    const step = Math.min(inset, 0.25 * Math.min(l1, l2));
+    const moved = { x: v.x - (ux / ul) * step, y: v.y - (uy / ul) * step };
+    if (idx.contains(moved)) return moved;
+  }
+  return { ...v };
+}
+
 /** Reflex corners of the simplified rings — the only places a geodesic bends. */
 function graphNodes(poly: Polygon, idx: EdgeIndex): Point[] {
   const out: Point[] = [];
@@ -142,8 +183,10 @@ function graphNodes(poly: Polygon, idx: EdgeIndex): Point[] {
     const n = pts.length;
     if (n < 3) continue;
     for (let i = 0; i < n; i++) {
+      const before = pts[(i + n - 1) % n]!;
       const v = pts[i]!;
-      if (isReflexCorner(idx, pts[(i + n - 1) % n]!, v, pts[(i + 1) % n]!)) out.push({ ...v });
+      const after = pts[(i + 1) % n]!;
+      if (isReflexCorner(idx, before, v, after)) out.push(insetCorner(idx, before, v, after));
     }
   }
   return out;

@@ -363,6 +363,32 @@ describe("insideTravel", () => {
     expect(segmentInside(u, pt(2, 2), pt(2, 2))).toBe(true);
     expect(segmentInside(u, pt(-9, -9), pt(-9, -9))).toBe(false);
   });
+
+  it("goes around a round hole instead of straight through it", () => {
+    // Every corner of a round hole is reflex, and two of them only see each
+    // other along the outline. A graph without those edges falls apart and the
+    // travel path cuts across the hole (found on the Atzensport logo,
+    // 21.09.2026).
+    const ring = annulus(0, 0, 20, 12);
+    const a = pt(0, 16);
+    const b = pt(0, -16);
+    expect(segmentInside(ring, a, b)).toBe(false);
+    const path = insideTravel(ring, a, b);
+    expect(path.length).toBeGreaterThan(2);
+    for (let i = 1; i < path.length; i++)
+      expect(segmentInside(ring, path[i - 1]!, path[i]!)).toBe(true);
+    // Half the way around the hole is about pi * 14 mm; the straight line is 32.
+    expect(arcLength(path)).toBeGreaterThan(dist(a, b));
+    expect(arcLength(path)).toBeLessThan(60);
+  });
+
+  it("keeps the way inside when both points sit on the outline", () => {
+    const ring = annulus(0, 0, 20, 12);
+    const path = insideTravel(ring, pt(0, 20), pt(0, -20));
+    expect(path.length).toBeGreaterThan(2);
+    for (let i = 1; i < path.length; i++)
+      expect(segmentInside(ring, path[i - 1]!, path[i]!)).toBe(true);
+  });
 });
 
 describe("transform", () => {
