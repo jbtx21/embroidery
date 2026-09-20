@@ -120,6 +120,21 @@ function expandText(
     );
   }
 
+  // A font also has an upper limit — the glyphs were drawn for a size range
+  // (spec §9.4). Scaling past it is said out loud, not silently allowed.
+  const maxHeightMm = font.maxHeightMm;
+  if (maxHeightMm !== undefined && obj.heightMm > maxHeightMm) {
+    warnings.push(
+      warn(
+        WARNING.TEXT_TOO_LARGE,
+        `${obj.heightMm} mm is above the maximum height ${maxHeightMm.toFixed(1)} mm of ` +
+          `"${font.name}".`,
+        "warn",
+        obj.id,
+      ),
+    );
+  }
+
   const scale = obj.heightMm;
   const pathPlacement: Placement | undefined = obj.onPath ? onPath(obj.onPath, scale) : undefined;
 

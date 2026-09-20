@@ -2,7 +2,12 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { capHeightUnits, importInkstitchFont, parseGlyphLayers } from "./import-inkstitch.js";
+import {
+  capHeightUnits,
+  documentHeight,
+  importInkstitchFont,
+  parseGlyphLayers,
+} from "./import-inkstitch.js";
 import { columnsOf, strokesOf } from "./types.js";
 import type { InkstitchMeta } from "./import-inkstitch.js";
 
@@ -107,5 +112,15 @@ describe("glyph order (spec §9.3)", () => {
     // The font walks in: run, column, run, column — not all columns first.
     expect(kinds).toMatch(/rS/);
     expect(kinds).not.toBe("S".repeat(kinds.length));
+  });
+});
+
+describe("documentHeight (spec §9.1)", () => {
+  it("takes the viewBox, not the height attribute", () => {
+    // medium_font says height="23.8125mm" with viewBox="0 0 90 90" — the guides
+    // live in the viewBox space.
+    expect(documentHeight('<svg height="23.8125mm" viewBox="0 0 90 90">')).toBe(90);
+    expect(documentHeight('<svg width="150" height="150">')).toBe(150);
+    expect(documentHeight("<svg>")).toBe(0);
   });
 });

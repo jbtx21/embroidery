@@ -15,6 +15,7 @@ export * from "./analyze.js";
 export * from "./validate.js";
 export * from "./resolve-overlaps.js";
 export * from "./expand.js";
+export * from "./font-choice.js";
 export * from "./hash.js";
 export * from "./pipeline.js";
 export * from "./import/svg.js";

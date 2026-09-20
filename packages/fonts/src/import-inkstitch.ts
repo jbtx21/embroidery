@@ -23,6 +23,7 @@ export type InkstitchMeta = {
   /** Height of the em in mm at scale 1. */
   size?: number;
   min_scale?: number;
+  max_scale?: number;
   horiz_adv_x?: Record<string, number>;
   horiz_adv_x_default?: number;
   horiz_adv_x_space?: number;
@@ -73,13 +74,20 @@ export function capHeightUnits(svg: string): number {
   return units;
 }
 
-/** Height of the document in user units — needed to place the baseline. */
-function documentHeight(svg: string): number {
+/**
+ * Height of the document in USER units — needed to place the baseline.
+ *
+ * The `viewBox` comes first: it defines the coordinate space the guides and the
+ * paths live in. `height` may well be in millimetres and say something else —
+ * `medium_font` carries `height="23.8125mm"` with `viewBox="0 0 90 90"`, and
+ * reading the height put its baseline 47 units off.
+ */
+export function documentHeight(svg: string): number {
   const open = /<svg\b[\s\S]*?>/.exec(svg)?.[0] ?? "";
+  const box = /viewBox="\s*[\d.eE+-]+[\s,]+[\d.eE+-]+[\s,]+[\d.eE+-]+[\s,]+([\d.eE+-]+)/.exec(open);
+  if (box) return Number(box[1]);
   const h = /\bheight="([\d.]+)/.exec(open);
-  if (h) return Number(h[1]);
-  const box = /viewBox="[\d.eE+-]+\s+[\d.eE+-]+\s+[\d.eE+-]+\s+([\d.eE+-]+)"/.exec(open);
-  return box ? Number(box[1]) : 0;
+  return h ? Number(h[1]) : 0;
 }
 
 /** The body of every `GlyphLayer-…` group, keyed by the character. */
@@ -199,6 +207,9 @@ export function importInkstitchFont(svg: string, meta: InkstitchMeta, id: string
       meta.min_scale && meta.size ? meta.min_scale * meta.size * (capUnits / unitsPerEm) : 5,
     glyphs,
   };
+  if (meta.max_scale && meta.size) {
+    font.maxHeightMm = meta.max_scale * meta.size * (capUnits / unitsPerEm);
+  }
 
   const pairs = meta.kerning_pairs ?? {};
   const kerning: Record<string, number> = {};

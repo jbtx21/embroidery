@@ -54,6 +54,8 @@ export type Font = {
   name: string;
   /** Below this height the engine warns (spec §9, typically 5 mm). */
   minHeightMm: number;
+  /** Above this height too — what the font itself declares (spec §9.4). */
+  maxHeightMm?: number;
   glyphs: Record<string, Glyph>;
   /** Pairwise kerning, key "AV", in cap heights. */
   kerning?: Record<string, number>;
