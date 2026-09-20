@@ -242,6 +242,12 @@ function ringInMm(sub: SubPath, matrix: Matrix, mmPerUnit: number): Point[] {
 
 /** Below this median width a shape is a satin column, not an area (spec §5.1). */
 export const AUTOSATIN_MAX_WIDTH_MM = 5;
+/**
+ * Below this area a shape is dropped on import (spec §5.1). A square millimetre
+ * does not show on fabric but costs a trim and two jumps; the Eislingen logo
+ * carries over 2000 such leftovers from the vectorisation.
+ */
+export const DROP_TINY_MM2 = 1;
 /** Default stitch angle on import (spec §5.1). */
 export const DEFAULT_ANGLE_DEG = 45;
 
@@ -310,11 +316,17 @@ export function touchesOrCovers(a: Polygon, b: Polygon): boolean {
 export const RAIL_BUDGET_SLACK = 1.3;
 /**
  * How long one column's rails may be against the extent of that column
- * (spec §5.1). A column that follows a shape runs roughly the length of it; a
- * curve stretches that, a wound rail multiplies it. Measured on the test logos:
- * sound columns land at 1,0, wound ones at 2,5.
+ * (spec §5.1).
+ *
+ * Loosened from 2,0 to 4,0 on 21.09.2026. It was a stopgap against rails that
+ * wound, and it could not tell them from a column that genuinely curves: a
+ * letter bow measures 2,2 to 2,9 times its own extent, exactly like the wound
+ * ones did. Since §7.7.1 the rails are cut out of the outline and the branches
+ * divide it between them, so the budget above catches winding by itself — it
+ * measured 97 to 99 % on sound shapes and 155 to 188 % on wound ones. This
+ * bound stays as a backstop against something neither of us thought of.
  */
-export const RAIL_EXTENT_MAX = 2.0;
+export const RAIL_EXTENT_MAX = 4.0;
 
 /**
  * Rail length of a proposal against the outline it was read from (spec §5.1).
@@ -379,6 +391,8 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
   const objects: StitchObject[] = [];
   /** Shapes already placed — needed for the crossing angle rule (spec §5.1). */
   const placed: Polygon[] = [];
+  /** Areas dropped for being under `DROP_TINY_MM2`, reported together. */
+  const dropped: number[] = [];
   for (const [pi, el] of paths.entries()) {
     const id = el.attrs["id"] ?? `path${pi}`;
     const subpaths = parsePathData(el.attrs["d"]!);
@@ -419,6 +433,13 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
       polygons.forEach((shape, si) => {
         const objId = polygons.length === 1 ? id : `${id}:${si}`;
 
+        // Too small to see, big enough to cost a trim (spec §5.1).
+        const area = polygonArea(shape);
+        if (area < DROP_TINY_MM2) {
+          dropped.push(area);
+          return;
+        }
+
         // Narrow shapes are satin columns, not areas (spec §5.1).
         if (!Number.isFinite(angle) && medianShapeWidthMm(shape) < AUTOSATIN_MAX_WIDTH_MM) {
           const r = autoSatin(shape, {
@@ -442,17 +463,15 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
             placed.push(shape);
             return;
           }
+          const why = mixed
+            ? `"${objId}" has branches wider than the satin limit`
+            : columns.length === 0
+              ? `Auto-satin found no column in "${objId}"`
+              : `Auto-satin rails wind instead of following "${objId}": ` +
+                `${(fit * 100).toFixed(0)} % of its outline, worst column ` +
+                `${worst.toFixed(1)}x its own extent`;
           warnings.push(
-            warn(
-              WARNING.AUTOSATIN_MIXED,
-              mixed
-                ? `"${objId}" has branches wider than the satin limit — stitched as a fill.`
-                : `Auto-satin rails wind instead of following "${objId}": ` +
-                    `${(fit * 100).toFixed(0)} % of its outline, worst column ${worst.toFixed(1)}x ` +
-                    `its own extent. Stitched as a fill.`,
-              "info",
-              objId,
-            ),
+            warn(WARNING.AUTOSATIN_MIXED, `${why} — stitched as a fill.`, "info", objId),
           );
         }
 
@@ -524,6 +543,17 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
     });
   }
 
+  if (dropped.length > 0) {
+    // One line for all of them, not one per speck (spec §5.1).
+    warnings.push(
+      warn(
+        WARNING.IMPORT_DROPPED_TINY,
+        `${dropped.length} areas under ${DROP_TINY_MM2} mm² were left out — the largest was ` +
+          `${Math.max(...dropped).toFixed(2)} mm². They cost a trim and do not show.`,
+        "warn",
+      ),
+    );
+  }
   if (objects.length === 0) {
     warnings.push(warn(WARNING.EMPTY_OBJECT, "The SVG contains no usable path.", "error"));
   }

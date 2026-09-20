@@ -334,6 +334,28 @@ describe("import decisions (spec §5.1)", () => {
     expect((r.design.objects[0] as FillObject).angleDeg).toBe(10);
   });
 
+  it("drops areas under a square millimetre and says how many (spec §5.1)", () => {
+    const r = importSvg(
+      svg(
+        '<path d="M5 5 H45 V35 H5 Z" fill="#000"/>' +
+          '<path d="M50 50 h0.6 v0.6 h-0.6 Z" fill="#000"/>' +
+          '<path d="M52 52 h0.5 v0.5 h-0.5 Z" fill="#000"/>',
+      ),
+    );
+    expect(r.design.objects).toHaveLength(1);
+    const w = r.warnings.find((x) => x.code === "IMPORT_DROPPED_TINY")!;
+    expect(w.severity).toBe("warn");
+    expect(w.message).toContain("2 areas");
+  });
+
+  it("keeps everything from a square millimetre up", () => {
+    // 1,2 x 1,2 mm = 1,44 mm² — small, but it stays. Narrow enough to become a
+    // satin proposal, so the object count is not the point; the warning is.
+    const r = importSvg(svg('<path d="M5 5 h1.2 v1.2 h-1.2 Z" fill="#000"/>'));
+    expect(r.design.objects.length).toBeGreaterThan(0);
+    expect(r.warnings.map((x) => x.code)).not.toContain("IMPORT_DROPPED_TINY");
+  });
+
   it("measures the rail budget against the outline", () => {
     const bar = polygonOf(rect(0, 0, 40, 3));
     const sound = autoSatin(bar, { idPrefix: "b" }).objects;
@@ -349,7 +371,9 @@ describe("import decisions (spec §5.1)", () => {
       },
     ];
     expect(railBudgetRatio(bar, wound)).toBeGreaterThan(RAIL_BUDGET_SLACK);
-    expect(worstRailExtent(wound)).toBeGreaterThan(RAIL_EXTENT_MAX);
+    // The extent bound is a backstop since 21.09.2026, not the main test — a
+    // column that genuinely curves reaches the same figures (spec §5.1).
+    expect(worstRailExtent(wound)).toBeGreaterThan(2);
   });
 
   it("falls back to a fill when the proposal does not fit", () => {
