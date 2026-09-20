@@ -238,6 +238,17 @@ Reparatur (Regel 8).
 
 Polygone werden beim Import normiert: Außenring im Uhrzeigersinn, Löcher gegen, Selbstschnitte mit Clipper-Union aufgelöst.
 
+**Die Knoten des Sichtbarkeitsgraphen liegen im Material** *(21.09.2026)*. Der Graph nimmt
+die Reflexecken — dort und nur dort knickt ein kürzester Weg. Liegt ein Knoten **auf** der
+Kontur, sieht er seinen Nachbarn nur entlang der Kontur, und eine Strecke genau auf der
+Grenze ist weder innen noch außen: die Kante fällt weg. Bei einem **runden Loch** ist jede
+Ecke reflex und jede sieht ihre Nachbarn nur so — der Graph zerfällt, `insideTravel` findet
+keinen Weg und gibt die Gerade **quer durch das Loch** zurück. Gefunden am Atzensport-Logo,
+21.09.2026. Die Knoten sitzen deshalb 0,12 mm in das Material versetzt (entlang der
+Winkelhalbierenden, in drei Stufen bis 0,02 mm, sonst die Ecke selbst). Der Versatz muss
+über der Vereinfachung des Graphen (0,1 mm) liegen, weil die Sehne zwischen zwei Nachbarn
+sonst noch im Loch liegt.
+
 ### 5.1 Import aus SVG *(20.09.2026)*
 
 Der Import ist die Stelle, an der aus Grafik ein Stickobjekt wird. Bis zum 20.09.2026 hat
@@ -486,8 +497,17 @@ verändert (Regel 8).
 
 ### 8.5 Sektionsreihenfolge und Reisewege
 - Start: Sektion nächst `startPoint`, sonst unten links.
-- Greedy: nächste unbesuchte Sektion nach Distanz; Reiseweg mit `insideTravel` als Running (Stichlänge 2,0) **innerhalb der Form**, damit er später überdeckt wird. Kein Sprung im Fill.
+- Greedy: nächste unbesuchte Sektion nach Distanz; Reiseweg mit `insideTravel` als Running (Stichlänge 2,0) **innerhalb der Form**, damit er später überdeckt wird.
 - Ende bei `endPoint`, falls gesetzt.
+
+**Nächste heißt erreichbare** *(21.09.2026)*. Die Distanz ist die Luftlinie, und hinter
+einer Engstelle liegt eine Sektion nah, die nur über einen Umweg zu erreichen ist. Von den
+acht nächsten Einstiegen wird deshalb der erste genommen, zu dem die **direkte** Linie
+innerhalb der Form liegt; gibt es keinen, bleibt es beim nächsten. Aus demselben Grund
+werden mehrere Teilstücke — die der Einsatz der Unterlage erzeugt — nach Nähe abgearbeitet
+und nicht in der Reihenfolge, in der das Verschneiden sie ausgibt. Gemessen an STUTTGART
+80 mm: ohne diese Reihenfolge 33 Stiche aus **einer** Füllfläche in einem Quadratmillimeter,
+Dichtespitze 44; mit ihr 33.
 
 ### 8.6 Unterlage
 | Typ | Erzeugung |
@@ -522,6 +542,38 @@ Regeln:
 
 Zusage: **kein Stich im Fill ist länger als 1,5 × `stitchLengthMm`.** Gemessen an den vier
 Logos: längster Stich 3,0 mm bei einer Stichlänge von 3,0.
+
+### 8.7.1 Der Reiseweg bleibt in der Form, sonst wird er ein Sprung *(21.09.2026)*
+
+`insideTravel` (§5) antwortet mit der **Geraden**, wenn es keinen Weg innerhalb findet. Der
+Fill hat diese Gerade als Laufstich gestickt — quer über blanken Stoff. Gemessen: Atzensport
+80 mm, Objekt `z03`, 20 mm am Stück; STUTTGART 250 mm 149 mm; Köln 90 mm 88 mm.
+
+Drei Regeln:
+
+1. **Ein Reisegebiet je Teilfläche.** Alle Phasen eines Fills reisen im selben Gebiet: der
+   Form nach dem Knockdown (§4.1), nach Zugausgleich und Unterlappung (§8.1), zuzüglich
+   0,05 mm Luft. Die Luft ist nötig, weil Phasen- und Reihenenden **auf** der Kontur liegen
+   und ein Punkt auf der Grenze weder innen noch außen ist. Vorher reiste die Gitterunterlage
+   in ihrem eigenen, eingerückten Stück — und der Weg von einem Stück zum nächsten lag
+   außerhalb davon.
+2. **Der Weg wird geprüft, nicht geglaubt.** Liegt er nicht in diesem Gebiet, wird **nicht**
+   gestickt, sondern **gesprungen**, und das Objekt meldet `TRAVEL_OUTSIDE` (`warn`, §11)
+   mit Anzahl und längster Strecke. Ein Sprung im Fill ist damit nicht mehr ausgeschlossen —
+   er ist die ehrliche Antwort auf eine Form, die in getrennte Teile zerfallen ist.
+3. **Ein Wächter am Ausgang.** Auch der Reihenwechsel (§8.7, Punkt 4) kann die Form
+   verlassen, wenn sie eine Taille hat. Jedes Stichsegment eines Fills wird deshalb geprüft;
+   was außen liegt, wird durch den Weg innen ersetzt, und wo es keinen gibt, durch einen
+   Sprung.
+
+**Der Weg folgt der Kontur, ohne sie abzuzeichnen.** Jeder Knick der Kontur als Stich wäre
+eine Perforation; nur nach Länge abzutasten schneidet Ecken ab. Also: so weit greifen, wie
+ein Stich reicht **und** die Sehne innen bleibt.
+
+**Was bleibt** *(gemessen, 21.09.2026)*: `postProcess` entfernt Stiche unter 0,6 mm (§11)
+und trifft dabei die Knicke enger Wege. Die Sehne schneidet dann die Ecke — an den sechs
+Logos bleibt ein Überstand von **0,21 bis 0,37 mm**, unter dem Zugausgleich von 0,2 mm je
+Seite. Das ist der Preis der Mindeststichlänge, kein Rückfall in das alte Verhalten.
 
 ---
 
@@ -685,7 +737,7 @@ Entscheidung zwischen Blockende A und Blockanfang B:
 - Stats:
   - `runtimeSec = stitches / (rpm/60) + trims * 3 + colorChanges * 12`, `rpm` aus Maschinenprofil (Standard 800).
   - Dichte: Raster 1 × 1 mm, Stiche pro Zelle zählen. **Warnung**, sobald das Maximum über 12/mm² liegt. **Fehler** erst, wenn mehr als **2 % der belegten Zellen** über 18/mm² liegen **oder** eine einzelne Zelle über **40/mm²**. *(21.09.2026 — vorher 1 % und 30/mm²; davor, bis 20.09.2026, „Fehler ab 18/mm²" auf den Spitzenwert.)* Der Spitzenwert allein taugt nicht: beim STUTTGART-Logo lösten **9 von 4.047 Zellen** den Fehler aus, während 92 % der Zellen bei höchstens 8/mm² lagen. Eine einzelne heiße Stelle ist eine Warnung wert, keine Ablehnung — eine Zelle über 40 dagegen schon, und eine Fläche, die zu zwei Prozent überfüllt ist, erst recht. Die Grenzen sind am 21.09.2026 gelockert worden: mit dem Knockdown aus §4.1 legt jede Naht ihre 0,8 mm Unterlappung übereinander, und an einem Punkt, wo acht Flächen zusammenstoßen, summiert sich das auf Werte, die gewollt sind.
-- Warnungen (Auswahl): `SATIN_TOO_NARROW`, `SATIN_TOO_WIDE`, `FILL_TINY` (Fläche < 4 mm²), `FILL_TOO_NARROW`, `EDGE_GAP_RISK`, `FILL_COVERED`, `AUTOSATIN_MIXED`, `IMPORT_DROPPED_TINY`, `TEXT_TOO_SMALL`, `TEXT_ABOVE_FONT_MAX` (`info`, §9.4), `DENSITY_HIGH`, `MANY_COLOR_CHANGES` (> 8), `LONG_JUMP` (> 30 mm), `SELF_INTERSECTING_RAILS`, `OBJECT_OUTSIDE_HOOP`, `SHAPE_SPLIT` (Fläche zerfällt beim Normieren in n Teile; die Teilanzahl steht in der Meldung, jedes Teil wird gestickt — nichts wird verworfen). *(19.09.2026)*
+- Warnungen (Auswahl): `SATIN_TOO_NARROW`, `SATIN_TOO_WIDE`, `FILL_TINY` (Fläche < 4 mm²), `FILL_TOO_NARROW`, `EDGE_GAP_RISK`, `FILL_COVERED`, `AUTOSATIN_MIXED`, `IMPORT_DROPPED_TINY`, `TRAVEL_OUTSIDE` (§8.7.1), `TEXT_TOO_SMALL`, `TEXT_ABOVE_FONT_MAX` (`info`, §9.4), `DENSITY_HIGH`, `MANY_COLOR_CHANGES` (> 8), `LONG_JUMP` (> 30 mm), `SELF_INTERSECTING_RAILS`, `OBJECT_OUTSIDE_HOOP`, `SHAPE_SPLIT` (Fläche zerfällt beim Normieren in n Teile; die Teilanzahl steht in der Meldung, jedes Teil wird gestickt — nichts wird verworfen). *(19.09.2026)*
 - **`FILL_TOO_NARROW`**: eine Fläche kann groß sein und trotzdem überall zu schmal zum Füllen. `FILL_TINY` misst die Fläche und sieht das nicht — eine Sichel von 114 mm² kommt durch, obwohl 79 % ihrer Reihenstücke kürzer als 1 mm sind. Die Praxis sagt: ein Stich unter 1 mm perforiert den Stoff, statt ihn zu decken. Kriterium: Fläche ≥ 4 mm² (darunter greift `FILL_TINY`), mindestens 8 Reihenstücke, und **mehr als die Hälfte davon kürzer als 1 mm**. Gemeldet als `warn` mit dem Anteil und dem Vorschlag Satin oder Laufstich — die Fläche wird trotzdem gestickt, nichts wird still geändert (Regel 8). Die Zahlen fallen in `scanlines` ohnehin an. *(19.09.2026)*
 
 ---

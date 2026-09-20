@@ -256,3 +256,53 @@ trotzdem gedeckt, weil die Rails des langen Astes ohnehin um den ganzen Ring lau
   `caffeine_tiny` wird stattdessen bis 9 mm hochskaliert; das macht die Spalten breiter,
   nicht dünner, und heißt deshalb nur noch `info TEXT_ABOVE_FONT_MAX` statt einer Warnung.
   Nach unten, unter `min_scale`, bleibt es `warn`. §9.4.
+
+## Nach dem Reisewege-Fix (21.09.2026)
+
+Befund aus dem Atzensport-Logo: der Fill stickte gerade Strecken **außerhalb** der Form.
+`insideTravel` antwortet mit der Geraden, wenn es keinen Weg innen findet, und der Fill hat
+sie als Laufstich genommen (§8.7.1). Die Ursache lag eine Ebene tiefer: der
+Sichtbarkeitsgraph fand um ein **rundes Loch** keinen Weg, weil seine Knoten auf der Kontur
+saßen und sich dort gegenseitig nicht sehen (§5).
+
+Gemessen über alle Fill-Objekte, nach dem kompletten Lauf (also nach `postProcess`):
+
+| Motiv                      | längste Strecke außerhalb | Segmente außerhalb | größter Überstand |
+| -------------------------- | ------------------------: | -----------------: | ----------------: |
+| STUTTGART 80 mm            |      55,0 mm → **3,2 mm** |       783 → **70** |       **0,27 mm** |
+| STUTTGART 250 mm           |     149,0 mm → **2,6 mm** |     4182 → **121** |       **0,30 mm** |
+| Berufsfeuerwehr Köln 90 mm |      88,0 mm → **3,3 mm** |      497 → **100** |       **0,37 mm** |
+| Eislingen Print 200 mm     |     130,7 mm → **2,3 mm** |      1486 → **46** |       **0,21 mm** |
+| Atzensport 80 mm           |      20,0 mm → **2,3 mm** |       107 → **29** |       **0,29 mm** |
+| Atzensport 200 mm          |      70,0 mm → **2,5 mm** |       418 → **41** |       **0,33 mm** |
+
+**Der Überstand ist die ehrliche Zahl.** Was bleibt, sind keine Strecken über blanken Stoff,
+sondern Ecken enger Wege, die `postProcess` aufschneidet: die Mindeststichlänge von 0,6 mm
+(§11) entfernt den Knickpunkt, und die Sehne schneidet die Kurve. 0,21 bis 0,37 mm liegen
+unter dem Zugausgleich von 0,2 mm je Seite. Vor `postProcess` bleibt an STUTTGART 80 mm und
+Atzensport 80 mm je **ein** Segment von 19.000 übrig (1,9 bzw. 1,6 mm).
+
+### Was der Fix kostet
+
+| Motiv                      |          Stiche |     Sprünge | Trims | Dichte max |
+| -------------------------- | --------------: | ----------: | ----: | ---------: |
+| STUTTGART 80 mm            | 17.966 → 18.258 |   135 → 170 |    38 |    24 → 33 |
+| STUTTGART 250 mm           | 85.935 → 83.267 |   384 → 673 |    64 |    23 → 34 |
+| Berufsfeuerwehr Köln 90 mm | 24.919 → 24.550 |   266 → 281 |    68 |    28 → 32 |
+| Eislingen Print 200 mm     | 31.368 → 29.334 | 1008 → 1188 |   109 |         22 |
+| Atzensport 80 mm           | 14.878 → 14.021 |   281 → 303 |   106 |         27 |
+| Atzensport 200 mm          | 49.985 → 48.213 |   518 → 545 |   132 |    22 → 22 |
+
+**Die Trims ändern sich nicht** — ein Sprung im Fill schneidet den Faden nicht, er bleibt in
+demselben Block. Die Sprünge steigen dort, wo eine Form nach dem Knockdown in getrennte
+Teile zerfällt: dorthin gibt es keinen Weg, und der Sprung ist die richtige Antwort.
+
+**Die Dichte steigt**, weil die Wege jetzt im Material liegen statt daneben. Zwei Schritte
+haben das begrenzt (§8.5): Teilstücke werden nach Nähe abgearbeitet statt in der Reihenfolge
+des Verschneidens, und beim Sektionswechsel gewinnt ein Einstieg, der direkt erreichbar ist.
+Ohne sie lag STUTTGART 80 mm bei **44** (33 Stiche aus einer einzigen Füllfläche in einem
+Quadratmillimeter) — das wäre nach §11 ein Fehler gewesen. Mit ihnen: 33, eine Warnung.
+Offen bleibt, die Wege zu streuen statt zu bündeln; steht im Backlog.
+
+**Laufzeit.** Der Wächter prüft jedes Stichsegment eines Fills. STUTTGART 250 mm braucht
+damit 20 s statt 6 s. Für den Batch-Lauf hinnehmbar, für den Editor nicht — im Backlog.

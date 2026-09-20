@@ -3,6 +3,24 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Aus dem Reisewege-Fix (21.09.2026)
+
+- **Die Reisewege bündeln sich.** Sie laufen jetzt innerhalb der Form (§8.7.1) — und mehrere
+  hintereinander gern auf derselben Linie an der Kontur. STUTTGART 80 mm: Dichtespitze von
+  24 auf 33. Zwei Reihenfolge-Regeln (§8.5) haben 44 auf 33 gedrückt, der Rest bleibt.
+  **Frage:** die Wege streuen (Versatz nach innen, wechselnde Seite), oder die Sektionen in
+  Bändern füllen statt greedy?
+- **Die Mindeststichlänge schneidet Ecken enger Wege ab.** `postProcess` entfernt den
+  Knickpunkt (§11), die Sehne schneidet die Kurve: 0,21 bis 0,37 mm Überstand an den sechs
+  Logos. **Frage:** Knickpunkte eines Reisewegs wie Verriegelungen schützen (dann Stiche
+  unter 0,6 mm), oder den Überstand hinnehmen? Er liegt unter dem Zugausgleich.
+- **Der Wächter kostet Laufzeit.** Jedes Stichsegment eines Fills wird gegen die Form
+  geprüft; STUTTGART 250 mm braucht 20 s statt 6 s. **Frage:** nur Segmente prüfen, die
+  keine Füllreihe sind (dafür müsste `fillRegion` sie markieren)?
+- **`insideTravel` ist der Flaschenhals dahinter.** Der Graph wird je Aufruf für ein frisch
+  gedrehtes Polygon neu gebaut, weil der Cache auf der Objektidentität sitzt. **Frage:** das
+  Reisegebiet einmal je Winkel drehen und wiederverwenden?
+
 ## Aus der Abnahme vor dem ersten Probestick (21.09.2026)
 
 - **61 Warnungen für ein Logo sind für den Editor zu viel.** Nach Code gruppieren, mit

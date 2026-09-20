@@ -159,3 +159,34 @@ Die Erwartungen in `auto-satin.test.ts` sind nicht verschoben, sondern neu: der 
 - **Die Mittelachse eines Rechtecks hat fünf Äste**, die eines T neun: ein Sporn in jede
   Ecke. Jeder schnitt sich eigene Rails aus derselben Kontur. Ein Ast, kürzer als das
   1,5-fache seiner größten Weite, ist seitdem eine Ecke und keine Spalte.
+
+## Geänderte Erwartungswerte, 21.09.2026 (Reisewege-Fix)
+
+Kein Schwellwert verschoben. Drei bestehende Tests mussten an eine geänderte **Signatur**
+angepasst werden: `fillRegion` und `contourUnderlay` geben jetzt `{ points, jumpAt }` statt
+einer Punktliste zurück, weil ein Fill sagen können muss, welche Stelle er springt statt
+sie zu sticken (§8.7.1).
+
+| Datei                                    | vorher                       | jetzt                       |
+| ---------------------------------------- | ---------------------------- | --------------------------- |
+| `packages/engine/src/fill.test.ts` (3 ×) | `fillRegion(...)[0]`         | `fillRegion(...).points[0]` |
+| `packages/engine/src/pipeline.ts`        | `StitchCache` hält `Point[]` | hält `{ points, jumpAt }`   |
+
+Neu dazugekommen sind 7 Tests: `travelStitches` (Sprung und Nicht-Sprung), drei Fälle für
+„kein Laufstich verlässt die Form" (Ring, Sanduhr mit zerfallender Unterlage, Sanduhr, die
+der Schub zerteilt) und zwei in `geometry.test.ts` für den Weg um ein rundes Loch.
+
+## Beim Bauen gefunden (Reisewege-Fix)
+
+- **Der Sichtbarkeitsgraph fand um ein rundes Loch keinen Weg.** Seine Knoten saßen auf der
+  Kontur, und zwei benachbarte Reflexecken sehen sich dort nur entlang der Grenze — eine
+  Strecke genau auf der Grenze zählt weder als innen noch als außen, die Kante fiel weg. Bei
+  einem runden Loch ist jede Ecke reflex, also blieb kein einziger Weg übrig. Das war die
+  Ursache hinter den geraden Strecken außerhalb der Form, nicht der Fill.
+- **Der Weg als Stichfolge ist nicht der Weg als Linie.** Erst habe ich jeden Knick zum
+  Stich gemacht — auf einer Kontur mit einem Knick je 0,1 mm perforiert das den Stoff. Nur
+  nach Länge abzutasten schneidet dagegen Ecken ab. Beides zusammen: so weit greifen, wie
+  ein Stich reicht und die Sehne innen bleibt.
+- **Die Reihenfolge der Teilstücke kam aus dem Verschneiden.** `offset` gibt die Stücke in
+  seiner eigenen Ordnung zurück; der Fill lief sie der Reihe nach ab und querte die Form für
+  jedes erneut. Gemessen: 33 Stiche aus einer Füllfläche in einem Quadratmillimeter.
