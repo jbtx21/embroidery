@@ -199,3 +199,48 @@ Stand; die Objektzahl kommt vollständig aus der Satin-Erkennung.
 Nachbar je Seite gelesen, was auf gekrümmten Formen umschlägt. Richtig wäre, die Kontur in
 zwei Ketten zwischen den Astenden zu teilen. Bis dahin sind die beiden Schranken aus §5.1
 eine Notbremse, und ein Teil der schmalen Formen wird weiterhin als Fill gestickt.
+
+## Nach der vierten Welle (21.09.2026)
+
+Dichtegrenzen gelockert (§11), `railsForBranch` neu (§7.7.1), Flächen unter 1 mm² beim
+Import verworfen (§5.1), sechs Schriften im Repo (§9.4). Preset Piqué, Standardweg:
+
+| Motiv                      |        Objekte |              Stiche |         Sprünge |         Trims | Farbw. |  Dichte max | Fehler     |
+| -------------------------- | -------------: | ------------------: | --------------: | ------------: | -----: | ----------: | ---------- |
+| STUTTGART 80 mm            |   130 → **80** | 18.473 → **17.966** |   190 → **135** |   48 → **38** |      6 | 32 → **24** | keine      |
+| STUTTGART 250 mm           |    92 → **72** | 87.086 → **85.935** |   575 → **384** |  143 → **64** |      6 | 29 → **23** | nur Rahmen |
+| Berufsfeuerwehr Köln 90 mm |      209 ← 316 | 30.437 → **24.919** |   358 → **266** |   87 → **68** | 13 → 9 | 37 → **28** | keine      |
+| Eislingen Print 200 mm     | 2408 → **926** | 52.430 → **31.368** | 1963 → **1008** | 156 → **109** |      5 | 37 → **22** | nur Rahmen |
+
+**Kein `DENSITY_HIGH`-Fehler mehr, auf keinem der vier.** Zwei Ursachen: die gelockerten
+Grenzen aus §11 (2 % statt 1 %, Spitze 40 statt 30) und die Spalten selbst — eine
+Satin-Spalte, deren Rails auf der Kontur sitzen, deckt ohne die Überlappungen, die der alte
+Vorschlag erzeugte.
+
+**STUTTGART 80 mm hat kein `AUTOSATIN_MIXED` mehr.** Vorher 16, jetzt 0; 74 Satin-Spalten
+statt 49. Das war die Messlatte für den Umbau von §7.7.1.
+
+**Eislingen fällt von 2408 auf 926 Objekte und von 1963 auf 1008 Sprünge.** Die 52
+verworfenen Splitter unter 1 mm² sind nur ein kleiner Teil davon; den Rest macht die
+Satin-Erkennung, die jetzt Spalten findet, wo sie vorher aufgab und Flächen füllte.
+
+### Was der Umbau von §7.7.1 gekostet hat
+
+Zwei Anläufe, beide gemessen:
+
+1. **Kontur an den Astenden schneiden** (wie in §7.7.1 beschrieben): Balken 1,00, T 1,07 —
+   gut. An den Verzweigungen kippte es aber, weil ein Astende dort keinen Konturpunkt
+   „quer" hat: Rails von 4 gegen 25 Punkten, Breiten von 9 mm bei einem 2,4-mm-Buchstaben.
+2. **Konturpunkte auf den Ast projizieren** und die Seite an der lokalen Tangente
+   bestimmen. Robust auf Kurven, aber zuerst griffen sich an den Verzweigungen mehrere Äste
+   dieselben Punkte: Budget 1,86 beim T, 2,25 beim R.
+3. **Jeder Konturpunkt gehört genau einem Ast** — dem, dessen Freiraum am besten passt.
+   Damit teilen sich die Äste die Kontur, statt sich darum zu streiten, und die Summe der
+   Rails kann die Kontur nicht mehr überschreiten. Gemessen: 97 bis 99 % bei gesunden
+   Formen, 155 bis 188 % bei den beiden, die noch winden.
+
+Dazu kam ein Befund, der nichts mit den Rails zu tun hatte: die Mittelachse eines Rechtecks
+ist ein Dach mit einem Sporn in jede Ecke — **fünf Äste für einen Balken, neun für ein T**.
+Jeder Sporn schnitt seine eigenen Rails aus derselben Kontur. Ein Ast, der kürzer ist als
+das 1,5-fache seiner größten Weite, ist eine Ecke und keine Spalte; die Ecken bleiben
+trotzdem gedeckt, weil die Rails des langen Astes ohnehin um den ganzen Ring laufen.

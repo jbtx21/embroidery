@@ -3,9 +3,27 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Offen nach der vierten Welle (21.09.2026)
+
+- **Die Ausdehnungs-Schranke aus §5.1 ist von 2,0 auf 4,0 gelockert.** Sie war eine
+  Notbremse gegen windende Rails und konnte eine echte Kurve nicht davon unterscheiden: ein
+  Buchstabenbogen misst 2,2 bis 2,9 seiner eigenen Ausdehnung, genau wie die gewundenen
+  vorher. Seit §7.7.1 fängt das Budget das Winden allein (97–99 % gegen 155–188 %). Die
+  Schranke steht nur noch als Rückfallebene. **Frage:** ganz streichen?
+- **Die Schriftwahl nach Höhe setzt `caffeine_tiny` über ihre eigene Grenze.** §9.4 schaltet
+  bei 9 mm um; `caffeine_tiny` reicht nach eigener Angabe bis 5,7 mm Versalhöhe,
+  `caffeine_KOR` beginnt bei 8,3 mm. Zwischen 5,7 und 9 mm warnt die Engine jetzt mit
+  `TEXT_TOO_LARGE`. **Frage:** Umschaltpunkt auf 5,7 mm ziehen und `excalibur_KOR`
+  (5,8–16,2 mm) dazwischenschieben?
+- **Eislingen hat noch 926 Objekte und 1008 Sprünge.** Deutlich besser als die 2408 und
+  1963 vorher, aber die Vorlage bleibt eine Vektorisierung aus Hunderten Fragmenten.
+  **Frage:** Mindestfläche für die Satin-Erkennung, oder gehört das in die Vorbereitung?
+
 ## Offen nach der dritten Welle (20.09.2026)
 
-- **`railsForBranch` überarbeiten.** Die Rail wird punktweise als nächster Nachbar je Seite
+- **`railsForBranch` überarbeiten.** _(Am 21.09.2026 erledigt, §7.7.1 — Konturpunkte werden
+  auf den Ast projiziert und jeder gehört genau einem Ast. STUTTGART 80 mm meldet kein
+  `AUTOSATIN_MIXED` mehr.)_ Die Rail wird punktweise als nächster Nachbar je Seite
   vom Skelett gelesen. Auf einer gekrümmten Form schlägt die Seitenzuordnung um, die Rail
   windet sich, und die Spalte stickt dieselbe Stelle mehrfach — gemessen 92 Stiche in einem
   Quadratmillimeter bei einem Buchstaben von 10 × 13 mm. Richtig wäre, die Kontur zwischen

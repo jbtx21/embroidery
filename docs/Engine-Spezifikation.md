@@ -277,6 +277,13 @@ meldet `AUTOSATIN_MIXED` als `info` mit der Zahl der betroffenen Äste. Die Form
 Satin und Fill zu zerlegen steht nirgends und wäre geraten; ein Entwurf aus Spalten plus
 nicht zugeordneter Restfläche ist außerdem nicht stickbar.
 
+**Flächen unter 1 mm² werden verworfen** *(21.09.2026)*. Gemessen an der Zielgröße, also
+nach der Skalierung. Eine Fläche von einem Quadratmillimeter ist auf Stoff nicht zu sehen,
+kostet aber einen Trim und zwei Sprünge; beim Eislingen-Logo sind es über 2000 solcher
+Reste aus der Vektorisierung. Verworfen wird **nicht still**: eine Sammelwarnung
+`IMPORT_DROPPED_TINY` nennt die Anzahl und die größte verworfene Fläche (Regel 8). Ab
+1 mm² bleibt alles erhalten, und `FILL_TINY` (§11) meldet weiterhin, was unter 4 mm² liegt.
+
 **Zugausgleich aus dem Preset.** `pullCompMm` und `pushCompMm` kommen aus dem Preset (§14).
 Sie gehören zum Stoff, und der steht mit dem Preset fest. `underlapMm` bleibt **0** — es
 kommt aus `resolveOverlaps()` (§4.1), das als Einziges weiß, was neben und unter der Fläche
@@ -352,10 +359,40 @@ Reihenfolge: center → contour → zigzag → Deckstiche.
 
 ### 7.7 Auto-Satin (Form → Satin)
 1. `medialAxis(shape)` → Skelett, an Verzweigungen in Äste teilen.
-2. Pro Ast: Rails = jeweils nächster Konturabschnitt links und rechts.
+2. Pro Ast: Rails aus der **Kontur schneiden**, siehe 7.7.1.
 3. Breite entlang des Astes prüfen: Median > `maxWidthMm` → Fill statt Satin.
 4. Ergebnis: mehrere `SatinObject`, verbunden in Reihenfolge entlang des Skeletts.
 5. Der Editor zeigt das Ergebnis als Vorschlag, Nutzer korrigiert Rails/Sprossen.
+
+#### 7.7.1 Rails aus der Kontur schneiden *(21.09.2026)*
+
+Bis zum 21.09.2026 stand hier „Rails = jeweils nächster Konturabschnitt links und rechts",
+umgesetzt als: für jeden Skelettpunkt den nächsten Konturpunkt auf jeder Seite suchen. Das
+hält nur, solange der Ast gerade ist. Auf einer Kurve kippt die Seitenzuordnung, die Rail
+springt von einer Seite auf die andere und wieder zurück — die Spalte stickt dieselbe
+Stelle mehrfach. Gemessen an einem Buchstaben von 10 × 13 mm: Rails von 38 mm Länge und
+**92 Stiche in einem Quadratmillimeter**.
+
+Die Kontur **ist** die Rail; sie muss nur richtig zerteilt werden:
+
+1. **Schnittpunkte bestimmen.** Für jedes Astende den nächsten Punkt auf der Kontur suchen.
+   Hat das Skelett Verzweigungen, kommen die Konturpunkte hinzu, die den
+   **Verzweigungspunkten** am nächsten liegen — sonst laufen zwei Äste über dieselbe
+   Kontur.
+2. **Kontur zerschneiden.** Die Schnittpunkte teilen den Ring in Ketten. Ein Ast mit zwei
+   Enden bekommt genau die zwei Ketten zwischen seinen Schnittpunkten, eine links und eine
+   rechts herum; welche welche ist, entscheidet die Seite des Astes (Kreuzprodukt am
+   Mittelpunkt).
+3. **Paaren nach Bogenlängenanteil.** Beide Ketten werden auf denselben Parameter t ∈ [0,1]
+   gelegt, wie §7.1 es ohne Sprossen ohnehin vorschreibt. Damit läuft die Spalte die Form
+   entlang, statt zwischen den Seiten zu springen.
+4. **Löcher.** Eine Form mit Löchern hat mehrere Ringe. Geschnitten wird der Ring, auf dem
+   die nächsten Punkte der Astenden liegen; ein Ast, dessen Enden auf verschiedenen Ringen
+   landen, bekommt keine Spalte und meldet `SATIN_TOO_NARROW`.
+
+Die beiden Schranken aus §5.1 (Rail-Budget gegen die Kontur, Ausdehnung je Spalte) bleiben
+als Sicherung bestehen. Sie sollen nach diesem Umbau nicht mehr greifen — tun sie es doch,
+ist das ein Befund und kein Grund, sie zu lockern.
 
 ---
 
@@ -501,6 +538,20 @@ In einer Glyph-Ebene stehen die Pfade **in Stickreihenfolge**:
 
 `rtl.svg` wird nicht gelesen — §9 setzt von links nach rechts.
 
+### 9.4 Schriftwahl nach Höhe *(21.09.2026)*
+
+Im Repo liegen sechs Schriften (`packages/fonts/src/inkstitch/`). Die Voreinstellung nimmt
+die, die zur Höhe passt: **bis 9 mm `caffeine_tiny`, darüber `caffeine_KOR`.**
+
+`maxHeightMm` kommt neu aus `max_scale` der Schrift, wie `minHeightMm` aus `min_scale`.
+Damit meldet die Engine, wenn eine Schrift über ihren eigenen Bereich hinaus gesetzt wird —
+und das tut die Regel oben: `caffeine_tiny` reicht nach eigener Angabe bis 5,7 mm
+Versalhöhe (`max_scale` 0,55 × 16,2 mm × 0,641), `caffeine_KOR` beginnt erst bei 8,3 mm.
+Zwischen 5,7 und 9 mm wird `caffeine_tiny` also über ihre Grenze gesetzt, und zwischen 9
+und 8,3 mm gibt es eine Überschneidung. Die Warnung `TEXT_TOO_LARGE` sagt es, statt es zu
+verschweigen (Regel 8). Wer die Lücke schließen will, nimmt `excalibur_KOR` (5,8–16,2 mm
+Versalhöhe), die genau dort liegt.
+
 **Lizenz je Schrift.** Nicht jede Schrift im Ink/Stitch-Repo darf weitergegeben werden. Die `LICENSE` des Ordners gehört mit ins Repo, und ohne sie kommt keine Schrift herein. `caffeine_tiny` steht unter der SIL Open Font License 1.1.
 - `expand()`: Glyphen auf Grundlinie oder Pfad setzen, auf `heightMm` skalieren. Reihenfolge: Buchstabe für Buchstabe, Verbindung zwischen Buchstaben als Running unter dem nächsten Buchstaben, sonst Trim.
 
@@ -613,7 +664,7 @@ Entscheidung zwischen Blockende A und Blockanfang B:
 - **Rundung: kaufmännisch-symmetrisch** (`roundHalfEven`, halbe Werte zur geraden Zahl), überall dort, wo Millimeter zu ganzen Formateinheiten werden. Grund: die Kreuzprüfung aus §13.2 läuft gegen Python, dessen `round()` genauso rundet. Bei Reihenabstand 0,25 mm liegt jede zweite Koordinate exakt auf der halben DST-Einheit — mit `Math.round` wäre die Datei nicht byte-identisch. *(19.09.2026)*
 - Stats:
   - `runtimeSec = stitches / (rpm/60) + trims * 3 + colorChanges * 12`, `rpm` aus Maschinenprofil (Standard 800).
-  - Dichte: Raster 1 × 1 mm, Stiche pro Zelle zählen. **Warnung**, sobald das Maximum über 12/mm² liegt. **Fehler** erst, wenn mehr als **1 % der belegten Zellen** über 18/mm² liegen **oder** eine einzelne Zelle über **30/mm²**. *(20.09.2026 — vorher „Fehler ab 18/mm²" auf den Spitzenwert.)* Der Spitzenwert allein taugt nicht: beim STUTTGART-Logo lösten **9 von 4.047 Zellen** den Fehler aus, während 92 % der Zellen bei höchstens 8/mm² lagen. Eine einzelne heiße Stelle ist eine Warnung wert, keine Ablehnung — eine Zelle über 30 dagegen schon, und eine Fläche, die zu einem Prozent überfüllt ist, erst recht.
+  - Dichte: Raster 1 × 1 mm, Stiche pro Zelle zählen. **Warnung**, sobald das Maximum über 12/mm² liegt. **Fehler** erst, wenn mehr als **2 % der belegten Zellen** über 18/mm² liegen **oder** eine einzelne Zelle über **40/mm²**. *(21.09.2026 — vorher 1 % und 30/mm²; davor, bis 20.09.2026, „Fehler ab 18/mm²" auf den Spitzenwert.)* Der Spitzenwert allein taugt nicht: beim STUTTGART-Logo lösten **9 von 4.047 Zellen** den Fehler aus, während 92 % der Zellen bei höchstens 8/mm² lagen. Eine einzelne heiße Stelle ist eine Warnung wert, keine Ablehnung — eine Zelle über 40 dagegen schon, und eine Fläche, die zu zwei Prozent überfüllt ist, erst recht. Die Grenzen sind am 21.09.2026 gelockert worden: mit dem Knockdown aus §4.1 legt jede Naht ihre 0,8 mm Unterlappung übereinander, und an einem Punkt, wo acht Flächen zusammenstoßen, summiert sich das auf Werte, die gewollt sind.
 - Warnungen (Auswahl): `SATIN_TOO_NARROW`, `SATIN_TOO_WIDE`, `FILL_TINY` (Fläche < 4 mm²), `FILL_TOO_NARROW`, `EDGE_GAP_RISK`, `FILL_COVERED`, `AUTOSATIN_MIXED`, `TEXT_TOO_SMALL`, `DENSITY_HIGH`, `MANY_COLOR_CHANGES` (> 8), `LONG_JUMP` (> 30 mm), `SELF_INTERSECTING_RAILS`, `OBJECT_OUTSIDE_HOOP`, `SHAPE_SPLIT` (Fläche zerfällt beim Normieren in n Teile; die Teilanzahl steht in der Meldung, jedes Teil wird gestickt — nichts wird verworfen). *(19.09.2026)*
 - **`FILL_TOO_NARROW`**: eine Fläche kann groß sein und trotzdem überall zu schmal zum Füllen. `FILL_TINY` misst die Fläche und sieht das nicht — eine Sichel von 114 mm² kommt durch, obwohl 79 % ihrer Reihenstücke kürzer als 1 mm sind. Die Praxis sagt: ein Stich unter 1 mm perforiert den Stoff, statt ihn zu decken. Kriterium: Fläche ≥ 4 mm² (darunter greift `FILL_TINY`), mindestens 8 Reihenstücke, und **mehr als die Hälfte davon kürzer als 1 mm**. Gemeldet als `warn` mit dem Anteil und dem Vorschlag Satin oder Laufstich — die Fläche wird trotzdem gestickt, nichts wird still geändert (Regel 8). Die Zahlen fallen in `scanlines` ohnehin an. *(19.09.2026)*
 
