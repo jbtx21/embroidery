@@ -205,6 +205,45 @@ describe("generation", () => {
     expect(codes).not.toContain("FILL_TOO_NARROW");
   });
 
+  it("never leaves a stitch longer than 1,5 x the stitch length (spec §8.7)", () => {
+    // The phases — contour underlay, grid underlay, top stitching, and several
+    // parts — used to be strung together with nothing in between, so the move
+    // from one to the next became a single stitch of any length.
+    const shapes = [
+      polygonOf(rect(0, 0, 40, 30)),
+      annulus(0, 0, 20, 12),
+      polygonOf(circle(0, 0, 25)),
+    ];
+    for (const shape of shapes) {
+      for (const underlay of [
+        { contour: true, fill: "single" as const, spacingMm: 2, insetMm: 0.4 },
+        { contour: true, fill: "double" as const, spacingMm: 2, insetMm: 0.4 },
+      ]) {
+        const obj = fillObject("f", shape, { underlay });
+        const r = generateFill(obj);
+        const limit = 1.5 * obj.stitchLengthMm;
+        let worst = 0;
+        for (let i = 1; i < r.stitches.length; i++) {
+          worst = Math.max(worst, dist(r.stitches[i - 1]!, r.stitches[i]!));
+        }
+        expect(worst).toBeLessThanOrEqual(limit);
+      }
+    }
+  });
+
+  it("walks from phase to phase inside the shape", () => {
+    const ring = annulus(0, 0, 20, 12);
+    const r = generateFill(
+      fillObject("f", ring, {
+        underlay: { contour: true, fill: "single", spacingMm: 2, insetMm: 0.4 },
+      }),
+    );
+    // The travel is a running stitch inside the shape, so almost every point
+    // lies in it — only the outline itself sits exactly on the boundary.
+    const outside = r.stitches.filter((p) => !pointInPolygon(ring, p)).length;
+    expect(outside / r.stitches.length).toBeLessThan(0.35);
+  });
+
   it("pulls along the thread direction and pushes across it (spec §8.1.1)", () => {
     const wide = generateFill(
       fillObject("f", square, { pullCompMm: 0.5, pushCompMm: 0, angleDeg: 0 }),

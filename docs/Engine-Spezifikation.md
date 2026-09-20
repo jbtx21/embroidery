@@ -337,6 +337,31 @@ Objektliste, nicht auf den Stichen, und nur für Paare, deren Bounding-Boxen sic
 
 Standard: contour + single. Ab 20 mm Kantenlänge: double.
 
+### 8.7 Wege zwischen den Phasen *(20.09.2026)*
+
+Ein Fill besteht aus mehreren Phasen: Konturunterlage, Gitterunterlage (ein- oder
+zweilagig), Deckstich — und bei mehreren Teilflächen jede davon erneut. Bis zum 20.09.2026
+wurden sie **aneinandergehängt**. Der Übergang von einer Phase zur nächsten war damit ein
+einziger Stich über die ganze Strecke: am STUTTGART-Logo 62,8 mm, am Köln-Logo 105,3 mm.
+
+Regeln:
+
+1. **Zwischen zwei Phasen** läuft der Weg mit `insideTravel` innerhalb der Form, als
+   Laufstich mit 2,0 mm (wie in §8.5).
+2. **Die nächste Phase beginnt nahe dem Cursor.** Bei der Konturunterlage heißt das: der
+   Ring wird auf seinen dem Cursor nächsten Punkt gedreht. Beim Fill übernimmt das der
+   vorhandene `startPoint`.
+3. **Zwischen den Ringen der Konturunterlage** gilt dasselbe — eine Form mit Löchern hat
+   mehrere Ringe, und der Weg vom einen zum nächsten ist ein Reiseweg, kein Stich quer
+   durch die Form.
+4. **Der Reihenwechsel in der Serpentine** wird unterteilt, wenn er länger als
+   `stitchLengthMm` ist. Am geraden Rand ist er genau der Reihenabstand, am gekrümmten
+   wandert das Reihenende seitwärts: beim 2-mm-Abstand der Gitterunterlage ergibt ein Kreis
+   6 mm. Es ist dieselbe Linie wie vorher, nur nicht mehr in einem Stich.
+
+Zusage: **kein Stich im Fill ist länger als 1,5 × `stitchLengthMm`.** Gemessen an den vier
+Logos: längster Stich 3,0 mm bei einer Stichlänge von 3,0.
+
 ---
 
 ## 9. Text (Lettering)

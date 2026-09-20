@@ -6,7 +6,7 @@
  * origin) — otherwise the stagger drifts with the start of each segment and the
  * stitch rows form visible lines (spec §8.4).
  */
-import type { Point, Polygon } from "@texma-stitch/geometry";
+import type { Point, Polygon, Polyline } from "@texma-stitch/geometry";
 import {
   applyToPolygon,
   clipHorizontal,
@@ -167,13 +167,41 @@ function entries(section: Section): Entry[] {
   ];
 }
 
-/** Serpentine through the section — row by row, alternating direction. */
+/**
+ * Points between a and b so no step is longer than `maxMm` — a and b themselves
+ * are not included.
+ */
+export function bridge(a: Point, b: Point, maxMm: number): Point[] {
+  const d = dist(a, b);
+  if (d <= maxMm || maxMm <= 0) return [];
+  const n = Math.ceil(d / maxMm);
+  const out: Point[] = [];
+  for (let i = 1; i < n; i++) {
+    out.push({ x: a.x + ((b.x - a.x) * i) / n, y: a.y + ((b.y - a.y) * i) / n });
+  }
+  return out;
+}
+
+/**
+ * Serpentine through the section — row by row, alternating direction.
+ *
+ * The step from the end of one row to the start of the next runs along the
+ * boundary. On a straight edge that is the row spacing, but on a curved one the
+ * row end walks sideways: at the 2 mm spacing of the grid underlay a circle
+ * produces a 6 mm step. It is subdivided (spec §8.7) — the line is the same one
+ * that was stitched before, just no longer in a single stitch.
+ */
 export function sectionStitches(section: Section, params: FillParams, entry: Entry): Point[] {
   const rows = entry.fromBottom ? section.segments : [...section.segments].reverse();
   const out: Point[] = [];
   let rightward = entry.rightward;
   for (const seg of rows) {
-    out.push(...rowStitches(seg, params, rightward));
+    const pts = rowStitches(seg, params, rightward);
+    const last = out[out.length - 1];
+    if (last !== undefined && pts[0] !== undefined) {
+      out.push(...bridge(last, pts[0], params.stitchLengthMm));
+    }
+    out.push(...pts);
     rightward = !rightward;
   }
   return out;
@@ -270,15 +298,60 @@ export function fillRegion(
 // ---------------------------------------------------------------------------
 
 /** Contour underlay: running stitch on the inward-offset outline. */
-export function contourUnderlay(poly: Polygon, insetMm: number, stitchLengthMm = 2.5): Point[] {
+/** Rotate a ring so it starts at the point nearest `from` (spec §8.7). */
+export function rotateRingTo(ring: Polyline, from: Point): Polyline {
+  if (ring.length < 2) return ring.map((p) => ({ ...p }));
+  let best = 0;
+  let bestD = Infinity;
+  for (const [i, p] of ring.entries()) {
+    const d = dist(from, p);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  }
+  return [...ring.slice(best), ...ring.slice(0, best)].map((p) => ({ ...p }));
+}
+
+/**
+ * Contour underlay: running stitch on the inward-offset outline.
+ *
+ * A shape with holes has several rings, and the way from one to the next is a
+ * travel path inside the shape — not a single stitch across it (spec §8.7).
+ */
+export function contourUnderlay(
+  poly: Polygon,
+  insetMm: number,
+  stitchLengthMm = 2.5,
+  from?: Point,
+): Point[] {
   const inner = offset(poly, -Math.abs(insetMm));
   const out: Point[] = [];
+  let cursor = from;
   for (const part of inner) {
     for (const ring of rings(part)) {
-      out.push(...runningStitches(closeRing(ring), { stitchLengthMm }));
+      const started = cursor ? rotateRingTo(ring, cursor) : ring;
+      const pts = runningStitches(closeRing(started), { stitchLengthMm });
+      if (pts.length === 0) continue;
+      if (cursor !== undefined && out.length > 0) {
+        out.push(...travelStitches(poly, cursor, pts[0]!));
+      }
+      out.push(...pts);
+      cursor = pts[pts.length - 1]!;
     }
   }
   return out;
+}
+
+/**
+ * Way from a to b inside the shape, as running stitches, WITHOUT the starting
+ * point — the cursor already sits there (spec §8.5, §8.7).
+ */
+export function travelStitches(poly: Polygon, a: Point, b: Point): Point[] {
+  const stitched = runningStitches(insideTravel(poly, a, b), {
+    stitchLengthMm: TRAVEL_STITCH_MM,
+  });
+  return stitched.slice(1);
 }
 
 /** Longest bounding-box edge — decides single versus double underlay (spec §8.6). */
@@ -346,9 +419,22 @@ export function generateFill(obj: FillObject): FillResult {
   };
 
   const stitches: Point[] = [];
+  const cursor = (): Point | undefined => stitches[stitches.length - 1];
+  /**
+   * Append one phase. Between two phases the needle travels INSIDE the shape
+   * (spec §8.7) — before, the move from the underlay to the top stitching was a
+   * single stitch of whatever length the two happened to be apart.
+   */
+  const phase = (pts: Point[], within: Polygon): void => {
+    if (pts.length === 0) return;
+    const from = cursor();
+    if (from !== undefined) stitches.push(...travelStitches(within, from, pts[0]!));
+    stitches.push(...pts);
+  };
+
   for (const part of parts) {
     if (obj.underlay.contour) {
-      stitches.push(...contourUnderlay(part, obj.underlay.insetMm));
+      phase(contourUnderlay(part, obj.underlay.insetMm, 2.5, cursor()), part);
     }
     if (obj.underlay.fill !== "none") {
       const inner = offset(part, -Math.abs(obj.underlay.insetMm));
@@ -358,18 +444,25 @@ export function generateFill(obj: FillObject): FillResult {
           : [obj.angleDeg + 90];
       for (const angleDeg of angles) {
         for (const i of inner) {
-          stitches.push(
-            ...fillRegion(i, {
-              angleDeg,
-              rowSpacingMm: obj.underlay.spacingMm,
-              stitchLengthMm: 3.0,
-              staggerRows: obj.staggerRows,
-            }),
+          phase(
+            fillRegion(
+              i,
+              {
+                angleDeg,
+                rowSpacingMm: obj.underlay.spacingMm,
+                stitchLengthMm: 3.0,
+                staggerRows: obj.staggerRows,
+              },
+              cursor(),
+            ),
+            part,
           );
         }
       }
     }
-    stitches.push(...fillRegion(part, topParams, obj.startPoint, obj.endPoint));
+    // The top stitching starts where the user asked, or else where the needle
+    // already stands.
+    phase(fillRegion(part, topParams, obj.startPoint ?? cursor(), obj.endPoint), part);
   }
 
   return { stitches: dedupe(stitches, 1e-6), warnings };
