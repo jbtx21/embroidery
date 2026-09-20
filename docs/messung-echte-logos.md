@@ -300,9 +300,20 @@ Teile zerfällt: dorthin gibt es keinen Weg, und der Sprung ist die richtige Ant
 **Die Dichte steigt**, weil die Wege jetzt im Material liegen statt daneben. Zwei Schritte
 haben das begrenzt (§8.5): Teilstücke werden nach Nähe abgearbeitet statt in der Reihenfolge
 des Verschneidens, und beim Sektionswechsel gewinnt ein Einstieg, der direkt erreichbar ist.
-Ohne sie lag STUTTGART 80 mm bei **44** (33 Stiche aus einer einzigen Füllfläche in einem
-Quadratmillimeter) — das wäre nach §11 ein Fehler gewesen. Mit ihnen: 33, eine Warnung.
-Offen bleibt, die Wege zu streuen statt zu bündeln; steht im Backlog.
+Ohne sie lag STUTTGART 80 mm bei **44**; mit ihnen bei 33 (33 Stiche aus einer einzigen
+Füllfläche in einem Quadratmillimeter).
+
+**Das reicht noch nicht.** STUTTGART 80 mm meldet `DENSITY_HIGH` jetzt als **Fehler** —
+nicht wegen der Spitze (33 liegt unter 40), sondern wegen der Fläche: **2,4 % der Zellen**
+liegen über 18 Stiche/mm², erlaubt sind 2 % (§11). Vorher war das Motiv fehlerfrei. Die
+dichten Zellen gehören zu vier Fünfteln zu einem einzigen Objekt, der großen grauen
+Schildfläche, deren Wege sich in den schmalen Stegen zwischen den ausgeschnittenen
+Buchstaben sammeln — dort muss jeder Weg durch.
+
+Die Abwägung gehört auf den Tisch: vorher 55 mm Faden quer über blanken Stoff, jetzt 2,4 %
+dichte Zellen. Das erste ist auf dem Stoff sichtbar, das zweite eine Warnschwelle. Die
+Möglichkeiten (Wege streuen, Sektionen in Bändern füllen, Reisestichlänge von 2,0 auf 3,0)
+stehen im Backlog — die letzte wäre eine Spec-Änderung.
 
 **Laufzeit.** Der Wächter prüft jedes Stichsegment eines Fills. STUTTGART 250 mm braucht
 damit 20 s statt 6 s. Für den Batch-Lauf hinnehmbar, für den Editor nicht — im Backlog.
