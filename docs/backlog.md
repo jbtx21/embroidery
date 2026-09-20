@@ -3,6 +3,29 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Aus der Abnahme vor dem ersten Probestick (21.09.2026)
+
+- **61 Warnungen für ein Logo sind für den Editor zu viel.** Nach Code gruppieren, mit
+  Anzahl, Details aufklappbar — STUTTGART 80 mm sind 34 × `SATIN_TOO_NARROW`, 15 ×
+  `SELF_INTERSECTING_RAILS` und vier weitere Codes, das sind sechs Zeilen statt sechzig.
+  **Gehört in Phase 2 (Editor), nicht in die Engine:** die Engine meldet jeden Fall einzeln,
+  weil jeder Fall ein Objekt hat; das Zusammenfassen ist Darstellung.
+- **Importierte Buchstabenformen unter 5 mm bekommen keine Warnung.** `TEXT_TOO_SMALL`
+  (§9) greift nur bei Textobjekten, nicht bei Buchstaben, die als Pfade im SVG ankommen.
+  „CYS SPORTS" im STUTTGART-Logo ist 3,5 mm hoch und wird als Satin gestickt — in der
+  Vorschau klumpig, auf Stoff nicht lesbar. Ein Puncher würde die Schrift vergrößern oder
+  weglassen. **Vorschlag:** `SATIN_GROUP_SMALL`, wenn eine Gruppe von Satinspalten aus einer
+  Form unter 5 mm Ausdehnung kommt. Voraussetzung ist der nächste Punkt — ohne gemeinsames
+  `sequence` gibt es keine Gruppe, nur einzelne Spalten.
+- **Der Import gibt den Spalten einer Form kein gemeinsames `sequence`.** §10.1 sagt: „auch
+  die Spalten eines Auto-Satin-Vorschlags sind bereits geordnet". `expand` setzt es für
+  Texte (`sequence: obj.id`), der SVG-Import und `autoSatin` setzen es nicht — gemessen an
+  STUTTGART 80 mm: 74 Spalten, keine einzige mit `sequence`. Folge: **sechs von 47 Formen
+  werden von `autoOrder` auseinandergerissen**, eine viermal; ihre Spalten werden nicht
+  hintereinander gestickt. Kandidat für Ansätze an Buchstabenecken, siehe
+  `docs/probesticks.md`. Das ist eine Abweichung zwischen Code und Spec, also ein Fehler,
+  keine Frage — aber erst nach dem Probestick anzufassen, damit die Messung nicht wandert.
+
 ## Offen nach der vierten Welle (21.09.2026)
 
 - ~~**Die Ausdehnungs-Schranke aus §5.1 ist von 2,0 auf 4,0 gelockert.** Ganz streichen?~~
