@@ -4,3 +4,7 @@ out/
 coverage/
 pnpm-lock.yaml
 docs/Engine-Spezifikation.md
+
+# Fonts as they come from the Ink/Stitch repo — kept byte-identical as the
+# record of what was imported. Our own README next to them stays checked.
+packages/fonts/src/inkstitch/*/
