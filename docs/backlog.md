@@ -20,27 +20,33 @@ Neue Einträge oben in den passenden Abschnitt.
 
 ## Abgleich mit der Punch-Praxis (19.09.2026)
 
-Vollständig mit Messungen in `docs/profi-abgleich.md`. **Drei der acht Punkte sind
-entschieden und umgesetzt** (§14 Industriewerte, §11 `FILL_TOO_NARROW`, §10.1 Mitte →
-außen in Ringen) — Zahlen in `docs/messung-echte-logos.md`. Offen bleiben:
+Vollständig mit Messungen in `docs/profi-abgleich.md`. **Sieben der neun Punkte sind
+entschieden und umgesetzt**, Zahlen in `docs/messung-echte-logos.md`:
+
+| #   | Punkt                                  | Wo                                                                  |
+| --- | -------------------------------------- | ------------------------------------------------------------------- |
+| 1   | §14 Reihenabstände auf Industriewerte  | erledigt, 1. Welle                                                  |
+| 3   | §11 Breitenkriterium `FILL_TOO_NARROW` | erledigt, 1. Welle                                                  |
+| 4   | Kontur-Überlappung gegen Blitzer       | erledigt als §8.1.2 `underlapMm` + §8.1.3 `EDGE_GAP_RISK`           |
+| 5   | Push-Ausgleich                         | erledigt **für Fill** (§8.1.1) — §7.2 Satin fehlt noch, siehe unten |
+| 6   | §10.1 Mitte → außen, unten → oben      | erledigt, auf Cap eingegrenzt                                       |
+| 8   | §6 krümmungsadaptive Stichlänge        | erledigt als §6.1                                                   |
+| 9   | Preset für dünne Jersey-Ware           | erledigt, §14                                                       |
+
+Offen bleiben:
 
 2. **§11 Dichtemaß.** Das Maximum über alle 1-mm-Zellen lässt eine einzige Stelle die ganze
    Datei abstempeln (STUTTGART: 9 von 4.047 Zellen lösen den Fehler aus, 92 % liegen bei
-   höchstens 8/mm²). Fläche über dem Grenzwert wäre aussagekräftiger.
-3. **§11 Breitenkriterium.** `FILL_TINY` misst Fläche < 4 mm². Eine 114-mm²-Sichel mit 79 %
-   Reihenstücken unter 1 mm fällt durch. 35–42 % aller Reihenstücke eines Motivs liegen
-   unter 1 mm und tragen zusammen 3–4 % der Deckung.
-4. **§7/§8 Kontur-Überlappung** gegen Blitzer: existiert nicht. Aus SVG importierte Kontur
-   und Fläche liegen exakt auf Kante.
-5. **§7.2 Push-Ausgleich** ist auf „für später" gesetzt. Cap-Zugausgleich 0,15 mm liegt
-   unter dem Praxisminimum 0,2 mm.
-6. **§10.1 Mitte → außen, unten → oben** ist nicht umgesetzt — obwohl §14 es im Hinweis des
-   Cap-Presets verspricht. `autoOrder` sortiert nach nächster Entfernung.
-7. **§8 Stichwinkel.** Der Import setzt für jede Fläche 0°. Gleiche Winkel überall wirken
-   flach.
-8. **§6 krümmungsabhängige Stichlänge** im Laufstich: nicht vorhanden.
-9. **Kein Preset für dünne Jersey-Ware.** Die Praxis nennt 0,45 mm für dünne Shirts; §14
-   hat dafür keinen Platz. Ein sechstes Preset wäre eine Spec-Änderung.
+   höchstens 8/mm²). Fläche über dem Grenzwert wäre aussagekräftiger. Seit der
+   Mindeststichlänge von 0,6 mm ist der Druck geringer — zwei der vier Logos melden nur
+   noch `warn` —, die Frage bleibt.
+3. **§8 Stichwinkel.** Der Import setzt für jede Fläche 0°. Gleiche Winkel überall wirken
+   flach; die Praxis variiert sie für Tiefe.
+   5b. **§7.2 Push-Ausgleich beim Satin.** §8.1.1 trennt Zug und Schub für den Fill. Beim
+   Satin steht Push weiterhin nur als „für später" in §7.2, zusammen mit dem asymmetrischen
+   Ausgleich (`pullCompA`, `pullCompB`).
+   5c. **Cap-Zugausgleich 0,15 mm** liegt unter dem Praxisminimum 0,2 mm. Bewusst nicht
+   mitgeändert: die Frage war auf die Reihenabstände gestellt, nicht auf den Zug.
 
 ## Aus der Messung an echten Kundenlogos (19.09.2026)
 
