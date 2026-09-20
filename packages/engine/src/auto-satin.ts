@@ -16,12 +16,16 @@
 import type { MedialBranch, Point, Polygon, Polyline } from "@texma-stitch/geometry";
 import {
   boundarySampleMm,
+  closeRing,
   cross,
+  cumulativeLengths,
   dedupe,
   dist,
+  distSq,
   medialAxis,
+  pointAt,
   polygonBbox,
-  samplePolygonBoundary,
+  rings,
   simplify,
 } from "@texma-stitch/geometry";
 import { PRESETS } from "./presets.js";
@@ -59,58 +63,245 @@ export type AutoSatinResult = { objects: StitchObject[]; warnings: Warning[] };
 
 export type BranchRails = { railA: Polyline; railB: Polyline; widths: number[] };
 
-/** Direction of the branch at point i, from its neighbours. */
-function tangentAtIndex(points: Polyline, i: number): Point {
-  const before = points[Math.max(0, i - 1)]!;
-  const after = points[Math.min(points.length - 1, i + 1)]!;
-  const dx = after.x - before.x;
-  const dy = after.y - before.y;
-  const l = Math.hypot(dx, dy);
-  return l < 1e-12 ? { x: 1, y: 0 } : { x: dx / l, y: dy / l };
-}
-
 /**
  * The two rails of a branch: for every point on the axis the nearest sample of
  * the outline on each side. Which side is which follows the branch direction, so
  * the two rails stay apart instead of swapping halfway along.
  */
-export function railsForBranch(branch: MedialBranch, boundary: Point[]): BranchRails {
-  const railA: Polyline = [];
-  const railB: Polyline = [];
-  const widths: number[] = [];
+/** How far past its own radius a boundary point may sit and still belong to a branch. */
+const BELONGS_FACTOR = 1.4;
+/**
+ * A branch shorter than this multiple of its own clearance is a corner, not a
+ * column (spec §7.7.1).
+ *
+ * The medial axis of a rectangle is a roof with a spur running into each corner
+ * — five branches for a plain bar, nine for a T. Every spur would cut its own
+ * pair of rails out of the same outline, and the columns would stitch each
+ * other. The corners stay covered: the rails of the long branch run the whole
+ * ring anyway.
+ */
+const SPUR_FACTOR = 1.5;
 
-  for (let i = 0; i < branch.points.length; i++) {
-    const p = branch.points[i]!;
-    const t = tangentAtIndex(branch.points, i);
-    let left: Point | undefined;
-    let leftDist = Infinity;
-    let right: Point | undefined;
-    let rightDist = Infinity;
+/**
+ * Is this branch a column of its own, or a corner of a bigger one?
+ *
+ * Measured against the WIDEST point of the branch, not the average: a spur
+ * running from a junction into a corner lies inside the clearance disc of that
+ * junction, so it is shorter than the radius it starts from.
+ */
+export function isColumnBranch(branch: MedialBranch): boolean {
+  if (branch.points.length < 2) return false;
+  const length = cumulativeLengths(branch.points).slice(-1)[0] ?? 0;
+  const widest = Math.max(0, ...branch.radii);
+  return length >= Math.max(widest, 1e-6) * SPUR_FACTOR;
+}
 
-    for (const q of boundary) {
-      const to = { x: q.x - p.x, y: q.y - p.y };
-      const side = cross(t, to);
-      const d = Math.hypot(to.x, to.y);
-      if (side > 0) {
-        if (d < leftDist) {
-          leftDist = d;
-          left = q;
-        }
-      } else if (side < 0) {
-        if (d < rightDist) {
-          rightDist = d;
-          right = q;
-        }
-      }
+/** Sampled boundary of one ring, with its cumulative lengths. */
+type Ring = { points: Polyline; cum: number[]; total: number };
+
+/** Every ring of the shape, sampled at the same spacing as the skeleton. */
+export function sampledRings(poly: Polygon, spacingMm: number): Ring[] {
+  const out: Ring[] = [];
+  for (const ring of rings(poly)) {
+    if (ring.length < 3) continue;
+    const closed = closeRing(ring);
+    const cum = cumulativeLengths(closed);
+    const total = cum[cum.length - 1]!;
+    if (total < spacingMm) continue;
+    const n = Math.max(3, Math.round(total / spacingMm));
+    const points: Polyline = [];
+    for (let i = 0; i < n; i++) points.push(pointAt(closed, (i * total) / n, cum));
+    const rc = cumulativeLengths([...points, points[0]!]);
+    out.push({ points, cum: rc, total: rc[rc.length - 1]! });
+  }
+  return out;
+}
+
+/** Index of the ring point nearest to p. */
+function nearestIndex(ring: Ring, p: Point): number {
+  let best = 0;
+  let bestD = Infinity;
+  for (const [i, q] of ring.points.entries()) {
+    const d = distSq(p, q);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
     }
+  }
+  return best;
+}
 
-    if (!left || !right) continue;
-    railA.push({ ...left });
-    railB.push({ ...right });
-    widths.push(dist(left, right));
+/** Rotate a closed chain so it begins at the point nearest `p`. */
+function alignStart(chain: Polyline, p: Point): Polyline {
+  let best = 0;
+  let bestD = Infinity;
+  for (const [i, q] of chain.entries()) {
+    const d = distSq(p, q);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  }
+  return [...chain.slice(best), ...chain.slice(0, best)];
+}
+
+/**
+ * Nearest position on the branch, as a fraction of its length, plus the
+ * distance to it and the radius there.
+ */
+function projectOnBranch(
+  branch: MedialBranch,
+  p: Point,
+): { t: number; distance: number; radius: number; foot: Point; tangent: Point } {
+  let best = {
+    t: 0,
+    distance: Infinity,
+    radius: 0,
+    foot: branch.points[0]!,
+    tangent: { x: 1, y: 0 },
+  };
+  const pts = branch.points;
+  const cum = cumulativeLengths(pts);
+  const total = cum[cum.length - 1] ?? 0;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i]!;
+    const b = pts[i + 1]!;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const l2 = dx * dx + dy * dy;
+    const u = l2 < 1e-12 ? 0 : Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+    const q = { x: a.x + dx * u, y: a.y + dy * u };
+    const d = dist(p, q);
+    if (d < best.distance) {
+      const along = (cum[i]! + u * Math.hypot(dx, dy)) / (total || 1);
+      const len = Math.hypot(dx, dy) || 1;
+      best = {
+        t: along,
+        distance: d,
+        radius: (branch.radii[i] ?? 0) * (1 - u) + (branch.radii[i + 1] ?? 0) * u,
+        foot: q,
+        tangent: { x: dx / len, y: dy / len },
+      };
+    }
+  }
+  return best;
+}
+
+/**
+ * Widths sampled at matching arc-length fractions — the same pairing the satin
+ * itself uses without rungs (spec §7.1).
+ */
+function withWidths(railA: Polyline, railB: Polyline): BranchRails {
+  const cumA = cumulativeLengths(railA);
+  const cumB = cumulativeLengths(railB);
+  const lenA = cumA[cumA.length - 1] ?? 0;
+  const lenB = cumB[cumB.length - 1] ?? 0;
+  const widths: number[] = [];
+  const steps = Math.max(4, Math.min(64, Math.max(railA.length, railB.length)));
+  for (let i = 0; i <= steps; i++) {
+    const f = i / steps;
+    widths.push(dist(pointAt(railA, f * lenA, cumA), pointAt(railB, f * lenB, cumB)));
+  }
+  return { railA, railB, widths };
+}
+
+/**
+ * Rails for one branch, cut out of the outline (spec §7.7.1).
+ *
+ * The outline IS the rail. Every boundary point is projected onto the branch:
+ * the ones within their own clearance belong to it, and the sign of the cross
+ * product with the LOCAL tangent says which side. Sorted along the branch, each
+ * side is a rail.
+ *
+ * Reading it the other way round — for each axis point the nearest boundary
+ * point on each side — is what made the rail wind: on a curve the side flips
+ * between neighbouring axis points, and the column stitches the same spot
+ * twice. Measured on a letter of 10 x 13 mm: rails 38 mm long, 92 stitches in
+ * one square millimetre.
+ */
+export function railsForBranch(branch: MedialBranch, boundary: Ring[]): BranchRails {
+  const empty: BranchRails = { railA: [], railB: [], widths: [] };
+  const pts = branch.points;
+  if (pts.length < 2 || boundary.length === 0) return empty;
+
+  const head = pts[0]!;
+  const tail = pts[pts.length - 1]!;
+
+  // A closed branch — the axis of a ring — has no two ends. Its rails are two
+  // different rings of the shape: the outline and the hole.
+  if (dist(head, tail) < 1e-6) {
+    if (boundary.length < 2) return empty;
+    const byDistance = [...boundary].sort(
+      (a, b) =>
+        distSq(head, a.points[nearestIndex(a, head)]!) -
+        distSq(head, b.points[nearestIndex(b, head)]!),
+    );
+    const outer = byDistance[0]!.points.map((p) => ({ ...p }));
+    const inner = byDistance[1]!.points.map((p) => ({ ...p })).reverse();
+    return withWidths(outer, alignStart(inner, outer[0]!));
   }
 
-  return { railA, railB, widths };
+  return railsForBranches([branch], boundary)[0] ?? empty;
+}
+
+type Claim = { t: number; p: Point; side: number };
+
+/**
+ * How well a boundary point fits a branch, and on which side (spec §7.7.1).
+ *
+ * `undefined` where it does not belong at all: too far for the clearance there,
+ * or BEHIND an end of the branch — that stretch belongs to whatever comes next,
+ * the neighbouring branch at a junction or nothing at all at a tip.
+ */
+function claimFor(branch: MedialBranch, p: Point): { score: number; claim: Claim } | undefined {
+  const pr = projectOnBranch(branch, p);
+  const toPoint = { x: p.x - pr.foot.x, y: p.y - pr.foot.y };
+  const ahead = toPoint.x * pr.tangent.x + toPoint.y * pr.tangent.y;
+  if (pr.t <= 1e-9 && ahead < 0) return undefined;
+  if (pr.t >= 1 - 1e-9 && ahead > 0) return undefined;
+  const side = cross(pr.tangent, toPoint);
+  if (Math.abs(side) < 1e-12) return undefined;
+  return {
+    score: pr.distance / Math.max(pr.radius, 1e-6),
+    claim: { t: pr.t, p: { ...p }, side },
+  };
+}
+
+/**
+ * Rails for every branch at once (spec §7.7.1).
+ *
+ * Each boundary point goes to ONE branch — the one whose clearance fits it
+ * best. That way the branches divide the outline between them instead of
+ * fighting over it at the junctions, and the rails of a shape can never add up
+ * to more than its outline.
+ */
+export function railsForBranches(branches: MedialBranch[], boundary: Ring[]): BranchRails[] {
+  const empty: BranchRails = { railA: [], railB: [], widths: [] };
+  const claims: Claim[][] = branches.map(() => []);
+
+  for (const ring of boundary) {
+    for (const p of ring.points) {
+      let best = -1;
+      let bestScore = BELONGS_FACTOR;
+      let bestClaim: Claim | undefined;
+      for (const [i, branch] of branches.entries()) {
+        const c = claimFor(branch, p);
+        if (!c || c.score >= bestScore) continue;
+        bestScore = c.score;
+        best = i;
+        bestClaim = c.claim;
+      }
+      if (best >= 0 && bestClaim) claims[best]!.push(bestClaim);
+    }
+  }
+
+  return claims.map((list) => {
+    const left = list.filter((c) => c.side > 0);
+    const right = list.filter((c) => c.side < 0);
+    if (left.length < 2 || right.length < 2) return empty;
+    const along = (xs: Claim[]): Polyline => [...xs].sort((a, b) => a.t - b.t).map((x) => x.p);
+    return withWidths(along(left), along(right));
+  });
 }
 
 export function medianWidth(widths: number[]): number {
@@ -127,8 +318,13 @@ export function medianWidth(widths: number[]): number {
  * the rails to cut them into sections (spec §7.1); one that stops exactly on a
  * rail point misses as soon as the rail is simplified, and the pairing falls
  * back to plain arc length — which is what the rungs were there to prevent.
+ *
+ * Auto-satin itself no longer needs them since 21.09.2026: its rails are cut
+ * from the outline and run the same way, so the arc-length pairing of §7.1 is
+ * already right (spec §7.7.1). The function stays for the editor, where the
+ * user pins a pairing by hand.
  */
-function rungsFrom(railA: Polyline, railB: Polyline): [Point, Point][] {
+export function rungsFrom(railA: Polyline, railB: Polyline): [Point, Point][] {
   const out: [Point, Point][] = [];
   let since = Infinity;
   for (let i = 0; i < railA.length && i < railB.length; i++) {
@@ -234,10 +430,21 @@ export function autoSatin(shape: Polygon, opts: AutoSatinOptions = {}): AutoSati
     return { objects: [fillProposal(shape, opts)], warnings };
   }
 
-  const boundary = samplePolygonBoundary(shape, sampleMm);
-  const rails = axis.branches
-    .map((branch) => railsForBranch(branch, boundary))
-    .filter((r) => r.railA.length >= 2 && r.railB.length >= 2);
+  const boundary = sampledRings(shape, sampleMm);
+  const branches = axis.branches.filter(isColumnBranch);
+  if (branches.length === 0) {
+    warnings.push(
+      warn(
+        WARNING.SATIN_TOO_NARROW,
+        "Every branch of the skeleton is shorter than its own width — this is a blob, not a column. Proposed as a fill.",
+        "info",
+      ),
+    );
+    return { objects: [fillProposal(shape, opts)], warnings };
+  }
+  const rails = railsForBranches(branches, boundary).filter(
+    (r) => r.railA.length >= 2 && r.railB.length >= 2,
+  );
 
   if (rails.length === 0) {
     warnings.push(
@@ -289,7 +496,7 @@ export function autoSatin(shape: Polygon, opts: AutoSatinOptions = {}): AutoSati
     return { objects: [], warnings };
   }
 
-  const objects: StitchObject[] = usable.map(({ railA, railB, raw: r }, i): SatinObject => {
+  const objects: StitchObject[] = usable.map(({ railA, railB }, i): SatinObject => {
     return {
       id: `${idPrefix}-${i}`,
       type: "satin",
@@ -299,7 +506,9 @@ export function autoSatin(shape: Polygon, opts: AutoSatinOptions = {}): AutoSati
       trimAfter: "auto",
       railA,
       railB,
-      rungs: rungsFrom(r.railA, r.railB),
+      // No rungs: both rails were cut from the outline and run the same way, so
+      // the arc-length pairing of §7.1 is already the right one (spec §7.7.1).
+      rungs: [],
       spacingMm: opts.spacingMm ?? preset.satinSpacingMm,
       pullCompMm: opts.pullCompMm ?? preset.pullCompMm,
       maxWidthMm,

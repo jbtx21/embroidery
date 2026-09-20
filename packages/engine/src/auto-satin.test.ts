@@ -1,5 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import {
+  arcLength,
+  bbox,
   boundarySampleMm,
   closeRing,
   dist,
@@ -8,11 +10,27 @@ import {
   nearestPoint,
   pointInPolygon,
   rings,
-  samplePolygonBoundary,
 } from "@texma-stitch/geometry";
 import type { Point, Polygon } from "@texma-stitch/geometry";
-import { annulus, circle, lShape, polygonOf, pt, rect } from "../test/fixtures/shapes.js";
-import { autoSatin, medianWidth, orderBranches, railsForBranch } from "./auto-satin.js";
+import {
+  annulus,
+  circle,
+  LETTER_R,
+  LETTER_S,
+  LETTER_T,
+  lShape,
+  polygonOf,
+  pt,
+  rect,
+} from "../test/fixtures/shapes.js";
+import {
+  autoSatin,
+  isColumnBranch,
+  medianWidth,
+  orderBranches,
+  railsForBranch,
+  sampledRings,
+} from "./auto-satin.js";
 import type { BranchRails } from "./auto-satin.js";
 import { generateSatin } from "./satin.js";
 import type { SatinObject } from "./types.js";
@@ -42,22 +60,22 @@ describe("medianWidth", () => {
 describe("railsForBranch", () => {
   it("reads one rail off each side of the axis", () => {
     const sampleMm = boundarySampleMm(bar);
-    const boundary = samplePolygonBoundary(bar, sampleMm);
+    const boundary = sampledRings(bar, sampleMm);
     const branch = medialAxis(bar, { sampleMm }).branches.reduce((a, b) =>
       a.points.length >= b.points.length ? a : b,
     );
     const rails = railsForBranch(branch, boundary);
 
     expect(rails.railA.length).toBeGreaterThan(2);
-    expect(rails.railA).toHaveLength(rails.railB.length);
+    expect(rails.railB.length).toBeGreaterThan(2);
     // The long branch of a 40 x 4 bar runs between the two long edges.
     expect(medianWidth(rails.widths)).toBeCloseTo(4, 1);
-    for (let i = 0; i < rails.railA.length; i++) {
-      expect(outsideBy(bar, rails.railA[i]!)).toBeLessThan(1e-6);
-      expect(outsideBy(bar, rails.railB[i]!)).toBeLessThan(1e-6);
-      // The two rails really are on opposite sides, never the same point.
-      expect(dist(rails.railA[i]!, rails.railB[i]!)).toBeGreaterThan(0.5);
+    // The rails ARE the outline, so they sit on it (spec §7.7.1).
+    for (const p of [...rails.railA, ...rails.railB]) {
+      expect(outsideBy(bar, p)).toBeLessThan(1e-6);
     }
+    // Both start at the same end of the bar and run the same way.
+    expect(dist(rails.railA[0]!, rails.railB[0]!)).toBeLessThan(6);
   });
 });
 
@@ -127,11 +145,19 @@ describe("autoSatin (spec §7.7)", () => {
   });
 
   it("proposes a fill when a branch is wider than maxWidthMm", () => {
-    const plate = polygonOf(rect(0, 0, 20, 20));
+    // A long bar, so there IS a column branch — only far too wide for satin.
+    const plate = polygonOf(rect(0, 0, 40, 12));
     const r = autoSatin(plate);
     expect(r.objects[0]!.type).toBe("fill");
     const warning = r.warnings.find((w) => w.code === "SATIN_TOO_WIDE")!;
     expect(warning.message).toMatch(/7 mm/);
+  });
+
+  it("calls a blob a blob instead of cutting rails out of it", () => {
+    // A square has nothing but corner spurs — no column branch at all.
+    const r = autoSatin(polygonOf(rect(0, 0, 20, 20)));
+    expect(r.objects[0]!.type).toBe("fill");
+    expect(r.warnings.map((w) => w.code)).toContain("SATIN_TOO_NARROW");
   });
 
   it("accepts the same shape once maxWidthMm allows it", () => {
@@ -141,16 +167,11 @@ describe("autoSatin (spec §7.7)", () => {
     expect(satins(wider.objects).length).toBeGreaterThan(0);
   });
 
-  it("puts rungs across the rails so the pairing cannot twist", () => {
-    const columns = satins(autoSatin(bar).objects);
-    // Pick by rung count, not by rail points: a straight rail simplifies down
-    // to its two endpoints, so the longest column has the fewest of those.
-    const longest = columns.reduce((a, b) => (a.rungs.length >= b.rungs.length ? a : b));
-    expect(longest.rungs.length).toBeGreaterThan(2);
-    for (const [a, b] of longest.rungs) {
-      // A rung has to reach past both rails to cut them (spec §7.1).
-      expect(outsideBy(bar, a)).toBeGreaterThan(0);
-      expect(outsideBy(bar, b)).toBeGreaterThan(0);
+  it("needs no rungs, because both rails run the same way (spec §7.7.1)", () => {
+    // Since 21.09.2026 the rails are cut out of the outline, so the arc-length
+    // pairing of §7.1 is already the right one.
+    for (const c of satins(autoSatin(bar).objects)) {
+      expect(c.rungs).toHaveLength(0);
     }
   });
 
@@ -181,10 +202,17 @@ describe("autoSatin (spec §7.7)", () => {
     expect(c.maxWidthMm).toBe(9);
   });
 
-  it("gives fewer, longer columns with a larger prune factor", () => {
-    const many = satins(autoSatin(bar).objects).length;
-    const few = satins(autoSatin(bar, { pruneFactor: 1.5 }).objects).length;
-    expect(few).toBeLessThan(many);
+  it("makes one column out of a plain bar, not one per corner (spec §7.7.1)", () => {
+    // The medial axis of a rectangle is a roof with a spur into each corner —
+    // five branches. Only the long one is a column.
+    expect(satins(autoSatin(bar).objects)).toHaveLength(1);
+  });
+
+  it("drops the corner spurs but keeps the long branch", () => {
+    const sampleMm = boundarySampleMm(bar);
+    const branches = medialAxis(bar, { sampleMm }).branches;
+    expect(branches.length).toBeGreaterThan(1);
+    expect(branches.filter(isColumnBranch)).toHaveLength(1);
   });
 
   it("reports a degenerate shape instead of proposing something", () => {
@@ -215,5 +243,63 @@ describe("collapsed branches (spec §7.7)", () => {
       expect(o.railA.length).toBeGreaterThanOrEqual(2);
       expect(o.railB.length).toBeGreaterThanOrEqual(2);
     }
+  });
+});
+
+describe("rails cut from the outline (spec §7.7.1)", () => {
+  /** Total rail length of a proposal against the outline it was cut from. */
+  const budget = (shape: Polygon, r: ReturnType<typeof autoSatin>): number => {
+    let outline = 0;
+    for (const ring of rings(shape)) outline += arcLength([...ring, ring[0]!]);
+    let rails = 0;
+    for (const o of r.objects) {
+      if (o.type !== "satin") continue;
+      rails += arcLength(o.railA) + arcLength(o.railB);
+    }
+    return rails / outline;
+  };
+
+  const letters: [string, Polygon][] = [
+    ["T", LETTER_T],
+    ["S", LETTER_S],
+    ["R", LETTER_R],
+  ];
+
+  it.each(letters)("cuts %s into columns that follow the shape", (_name, shape) => {
+    const r = autoSatin(shape);
+    const cols = r.objects.filter((o) => o.type === "satin");
+    expect(cols.length).toBeGreaterThan(0);
+    // The rails ARE the outline, so together they cannot be longer than it.
+    expect(budget(shape, r)).toBeLessThanOrEqual(1.3);
+  });
+
+  it.each(letters)("keeps every column of %s inside its own extent", (_name, shape) => {
+    for (const o of autoSatin(shape).objects) {
+      if (o.type !== "satin") continue;
+      const pts = [...o.railA, ...o.railB];
+      const b = bbox(pts);
+      const diag = Math.hypot(b.maxX - b.minX, b.maxY - b.minY);
+      // A wound rail measures several times its own extent.
+      expect((arcLength(o.railA) + arcLength(o.railB)) / (2 * diag)).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it.each(letters)("pairs the rails of %s along the shape, not across it", (_name, shape) => {
+    for (const o of autoSatin(shape).objects) {
+      if (o.type !== "satin") continue;
+      // Both rails run the same way: their ends are near each other, not crossed.
+      const a0 = o.railA[0]!;
+      const aN = o.railA[o.railA.length - 1]!;
+      const b0 = o.railB[0]!;
+      const bN = o.railB[o.railB.length - 1]!;
+      expect(dist(a0, b0) + dist(aN, bN)).toBeLessThanOrEqual(dist(a0, bN) + dist(aN, b0) + 1e-6);
+    }
+  });
+
+  it("still finds the straight bar it always found", () => {
+    const r = autoSatin(polygonOf(rect(0, 0, 40, 3)));
+    const cols = r.objects.filter((o) => o.type === "satin");
+    expect(cols.length).toBeGreaterThan(0);
+    expect(budget(polygonOf(rect(0, 0, 40, 3)), r)).toBeLessThanOrEqual(1.3);
   });
 });

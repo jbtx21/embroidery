@@ -204,3 +204,103 @@ export const L_SHAPE = lShape();
 
 /** Flatten a fixture path to a polyline — the Bezier and polygon forms should agree. */
 export const flattenFixture = (p: BezierPath): Polyline => flattenPath(p.start, p.segments);
+
+// ---------------------------------------------------------------------------
+// Letter shapes — the case auto-satin has to survive (spec §7.7.1)
+// ---------------------------------------------------------------------------
+
+/** Outline of a stroke of constant width along a polyline, as a closed ring. */
+function strokeRing(centre: Polyline, widthMm: number, closed = false): Polyline {
+  const h = widthMm / 2;
+  const normalAt = (i: number): Point => {
+    const a = centre[Math.max(0, i - 1)]!;
+    const b = centre[Math.min(centre.length - 1, i + 1)]!;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    return { x: -dy / len, y: dx / len };
+  };
+  const left = centre.map((p, i) => {
+    const n = normalAt(i);
+    return pt(p.x + n.x * h, p.y + n.y * h);
+  });
+  const right = centre.map((p, i) => {
+    const n = normalAt(i);
+    return pt(p.x - n.x * h, p.y - n.y * h);
+  });
+  return closed ? left.concat(right.reverse()) : left.concat(right.reverse());
+}
+
+/** "T": a crossbar and a stem, one shape, two branches meeting in a junction. */
+export function letterT(h = 14, w = 10, stroke = 2.4): Polygon {
+  const half = stroke / 2;
+  return {
+    outer: orient(
+      [
+        pt(0, 0),
+        pt(w, 0),
+        pt(w, stroke),
+        pt(w / 2 + half, stroke),
+        pt(w / 2 + half, h),
+        pt(w / 2 - half, h),
+        pt(w / 2 - half, stroke),
+        pt(0, stroke),
+      ],
+      true,
+    ),
+    holes: [],
+  };
+}
+
+/** "S": one stroke that curves back on itself — the case that broke the old rails. */
+export function letterS(h = 14, w = 10, stroke = 2.2, segments = 14): Polygon {
+  const spine: Polyline = [];
+  // Two half circles stacked, the classic S spine.
+  const r = h / 4;
+  for (let i = 0; i <= segments; i++) {
+    const a = Math.PI * (0.25 + i / segments); // upper bowl, opening right
+    spine.push(pt(w / 2 + r * Math.cos(a), h - r + r * Math.sin(a)));
+  }
+  for (let i = 0; i <= segments; i++) {
+    const a = Math.PI * (1.25 + i / segments); // lower bowl, opening left
+    spine.push(pt(w / 2 + r * Math.cos(a), r + r * Math.sin(a)));
+  }
+  return { outer: orient(strokeRing(spine, stroke), true), holes: [] };
+}
+
+/** "R": a stem, a bowl and a leg — three branches and a hole. */
+export function letterR(h = 14, w = 10, stroke = 2.4): Polygon {
+  const half = stroke / 2;
+  return {
+    outer: orient(
+      [
+        pt(0, 0),
+        pt(stroke, 0),
+        pt(stroke, h / 2 - half),
+        pt(w - stroke, h / 2 - half),
+        pt(w, 0),
+        pt(w + stroke, 0),
+        pt(w - stroke + half, h / 2),
+        pt(w, h / 2 + half),
+        pt(w, h),
+        pt(0, h),
+      ],
+      true,
+    ),
+    holes: [
+      orient(
+        [
+          pt(stroke, h - stroke),
+          pt(w - stroke, h - stroke),
+          pt(w - stroke, h / 2 + half),
+          pt(stroke, h / 2 + half),
+        ],
+        false,
+      ),
+    ],
+  };
+}
+
+export const LETTER_T = letterT();
+export const LETTER_S = letterS();
+export const LETTER_R = letterR();
