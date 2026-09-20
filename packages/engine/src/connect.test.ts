@@ -240,8 +240,8 @@ describe("documented thresholds (spec §11)", () => {
   it("matches the numbers from the spec", () => {
     expect(DENSITY_WARN).toBe(12);
     expect(DENSITY_ERROR).toBe(18);
-    expect(DENSITY_ERROR_PEAK).toBe(30);
-    expect(DENSITY_ERROR_SHARE).toBe(0.01);
+    expect(DENSITY_ERROR_PEAK).toBe(40);
+    expect(DENSITY_ERROR_SHARE).toBe(0.02);
     expect(MAX_COLOR_CHANGES).toBe(8);
     expect(LONG_JUMP_MM).toBe(30);
   });
@@ -273,17 +273,23 @@ describe("density verdict (spec §11)", () => {
   });
 
   it("keeps a lone hot spot a warning", () => {
-    // One cell of 20 among 1000 is 0,1 % — far under the one per cent.
+    // One cell of 20 among 1000 is 0,1 % — far under the two per cent.
     expect(codes(plan(1000, 5, 1, 20))[0]!.severity).toBe("warn");
   });
 
-  it("makes it an error when more than one per cent is overfilled", () => {
+  it("still keeps one per cent a warning since 21.09.2026", () => {
+    // 1 cell of 20 among 100 is exactly 1 %.
+    expect(codes(plan(100, 5, 1, 20))[0]!.severity).toBe("warn");
+  });
+
+  it("makes it an error when more than two per cent is overfilled", () => {
     // 5 cells of 20 among 100 is 5 %.
     expect(codes(plan(100, 5, 5, 20))[0]!.severity).toBe("error");
   });
 
-  it("makes a single cell over 30 an error on its own", () => {
-    expect(codes(plan(1000, 5, 1, 31))[0]!.severity).toBe("error");
+  it("makes a single cell over 40 an error on its own", () => {
+    expect(codes(plan(1000, 5, 1, 41))[0]!.severity).toBe("error");
+    expect(codes(plan(1000, 5, 1, 35))[0]!.severity).toBe("warn");
   });
 });
 

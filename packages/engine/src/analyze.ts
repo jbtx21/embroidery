@@ -7,9 +7,9 @@ import { warn, WARNING } from "./warnings.js";
 export const DENSITY_WARN = 12;
 export const DENSITY_ERROR = 18;
 /** A single cell this hot is an error on its own (spec §11). */
-export const DENSITY_ERROR_PEAK = 30;
+export const DENSITY_ERROR_PEAK = 40;
 /** Share of occupied cells above DENSITY_ERROR that makes it an error (spec §11). */
-export const DENSITY_ERROR_SHARE = 0.01;
+export const DENSITY_ERROR_SHARE = 0.02;
 export const MAX_COLOR_CHANGES = 8;
 export const LONG_JUMP_MM = 30;
 
