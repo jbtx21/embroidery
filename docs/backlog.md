@@ -18,9 +18,14 @@ Neue Einträge oben in den passenden Abschnitt.
 - **Die Unterlappung summiert sich an Knotenpunkten.** Wo acht Flächen zusammenstoßen,
   legt jede ihre 0,8 mm übereinander. **Frage:** soll `resolveOverlaps` die Unterlappung
   an Mehrfachnähten begrenzen?
-- **Fonts fehlen weiterhin.** `packages/fonts/src/inkstitch/` existiert nicht; im Repo
-  liegt keine Ink/Stitch-Fontdatei. Der Konverter und der Test „TEXMA" in 8 mm mit
-  `caffeine_tiny` sind damit nicht baubar, ohne das Format zu raten.
+- **`SATIN_TOO_NARROW` misst das Minimum und trifft damit jede Schrift.** §7.4 warnt unter
+  1 mm Spaltenbreite, gemessen über die schmalste Sprosse. Eine Schriftspalte läuft am
+  Buchstabenende spitz zu — „TEXMA" in 8 mm erzeugt deshalb 23 Warnungen, die kleinste über
+  0,08 mm. Das ist Schriftgestaltung, kein Fehler. **Frage an die Spec:** soll das Kriterium
+  auf die mediane Breite oder auf einen Anteil der Spalte gehen?
+- **Nur `caffeine_tiny` liegt im Repo.** Das Ink/Stitch-Repo hat 142 Schriften; hereingeholt
+  ist die eine, die der Test braucht (820 KB). Weitere kommen einzeln dazu, jede mit ihrer
+  `LICENSE` — siehe `packages/fonts/src/inkstitch/README.md`.
 
 ## Offen nach der zweiten Welle (19.09.2026)
 

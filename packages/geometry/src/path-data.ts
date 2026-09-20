@@ -5,7 +5,8 @@
  * cubics with the endpoint-to-centre parameterisation from the SVG spec, so the
  * rest of the engine only ever sees lines and cubics.
  */
-import type { PathSegment, Point } from "@texma-stitch/geometry";
+import type { Point } from "./types.js";
+import type { PathSegment } from "./flatten.js";
 
 export type SubPath = { start: Point; segments: PathSegment[]; closed: boolean };
 

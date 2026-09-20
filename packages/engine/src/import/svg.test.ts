@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { bbox } from "@texma-stitch/geometry";
 import { SVG_ARC, SVG_FILLED, SVG_PIXELS, SVG_TWO_PATHS } from "../../test/fixtures/svg.js";
 import { applyMatrix, IDENTITY, multiply, parseTransform } from "./matrix.js";
-import { parsePathData } from "./path-data.js";
+
 import {
   AUTOSATIN_MAX_WIDTH_MM,
   DEFAULT_ANGLE_DEG,
@@ -20,7 +20,7 @@ import { autoSatin } from "../auto-satin.js";
 import { PRESETS } from "../presets.js";
 import { polygonOf, pt, rect } from "../../test/fixtures/shapes.js";
 import type { FillObject, RunningObject, SatinObject } from "../types.js";
-import { initGeometry, polygonArea } from "@texma-stitch/geometry";
+import { initGeometry, parsePathData, polygonArea } from "@texma-stitch/geometry";
 
 beforeAll(async () => {
   await initGeometry();

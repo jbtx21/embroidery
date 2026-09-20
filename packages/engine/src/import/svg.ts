@@ -13,9 +13,11 @@
  * that already exist.
  */
 import type { Point, Polygon } from "@texma-stitch/geometry";
+import type { SubPath } from "@texma-stitch/geometry";
 import {
   dist,
   flattenPath,
+  parsePathData,
   intersect,
   medialAxis,
   offset,
@@ -31,8 +33,6 @@ import { PRESETS } from "../presets.js";
 import { warn, WARNING } from "../warnings.js";
 import type { Matrix } from "./matrix.js";
 import { applyMatrix, IDENTITY, multiply, parseTransform } from "./matrix.js";
-import type { SubPath } from "./path-data.js";
-import { parsePathData } from "./path-data.js";
 
 /** CSS reference: 96 user units per inch. */
 const MM_PER_PX = 25.4 / 96;

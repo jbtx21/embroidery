@@ -2,6 +2,7 @@
 export type { Point, Polyline, Polygon, Rect } from "./types.js";
 export * from "./vec.js";
 export * from "./flatten.js";
+export * from "./path-data.js";
 export * from "./simplify.js";
 export * from "./measure.js";
 export * from "./resample.js";

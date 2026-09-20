@@ -479,6 +479,28 @@ Logos: längster Stich 3,0 mm bei einer Stichlänge von 3,0.
 
 - Schriftformat: JSON, ein Glyph = Liste von `SatinObject` (Rails + Sprossen) in Einheiten der Versalhöhe 1,0, plus `advance`, `kerning`.
 - Quelle: Ink/Stitch-Fonts (SVG mit Satin-Spalten), viele unter OFL. Konverter `fonts/import-inkstitch.ts` liest deren SVG und schreibt JSON.
+
+### 9.1 Aufbau einer Ink/Stitch-Schrift *(20.09.2026)*
+
+Eine Schrift sind zwei Dateien aus `inkstitch/embroidery-fonts`, Ordner `src/<name>/`:
+
+| Datei | Inhalt |
+|---|---|
+| `font.json` | `name`, `horiz_adv_x` je Zeichen, `horiz_adv_x_default`, `horiz_adv_x_space`, `units_per_em`, `size` (Höhe des Gevierts in mm bei Maßstab 1), `min_scale`, `kerning_pairs` |
+| `ltr.svg` | die Glyphen, je eine Inkscape-Ebene `inkscape:label="GlyphLayer-X"` |
+
+In einer Glyph-Ebene stehen die Pfade **in Stickreihenfolge**:
+
+- `inkstitch:satin_column="True"` → eine Satin-Spalte. Die Unterpfade eines `d` sind **Rail A, Rail B, dann die Sprossen** — eine Sprosse wird auf ihre beiden Enden reduziert.
+- jeder andere Pfad → Laufstich; das sind die Wege, die Ink/Stitch zwischen die Spalten legt.
+
+**Normierung.** Unser Format will die Grundlinie bei y = 0 und die Versalhöhe bei −1. Beides steht als Inkscape-Hilfslinie im SVG: `baseline` und `caps`. Ihr **Abstand** ist die Versalhöhe in Dokumenteinheiten und hängt nicht davon ab, wo der Seitenursprung liegt; die Lage der Grundlinie selbst braucht zusätzlich die Dokumenthöhe, weil Hilfslinien mit y nach **oben** gespeichert werden. Vorschübe und Kerning werden durch dieselbe Versalhöhe geteilt.
+
+**`minHeightMm`** = `min_scale · size · (Versalhöhe / units_per_em)`. `min_scale` begrenzt das Geviert, unsere Höhe ist die Versalhöhe. Für `caffeine_tiny`: 0,25 · 16,2 mm · 0,641 = **2,6 mm**.
+
+`rtl.svg` wird nicht gelesen — §9 setzt von links nach rechts.
+
+**Lizenz je Schrift.** Nicht jede Schrift im Ink/Stitch-Repo darf weitergegeben werden. Die `LICENSE` des Ordners gehört mit ins Repo, und ohne sie kommt keine Schrift herein. `caffeine_tiny` steht unter der SIL Open Font License 1.1.
 - `expand()`: Glyphen auf Grundlinie oder Pfad setzen, auf `heightMm` skalieren, Satin-Parameter aus Preset. Reihenfolge: Buchstabe für Buchstabe, Verbindung zwischen Buchstaben als Running unter dem nächsten Buchstaben, sonst Trim.
 - Jede Schrift hat `minHeightMm` (typisch 5). Darunter Warnung `TEXT_TOO_SMALL`.
 - Phase 1: eine Schrift (serifenlos, Versalhöhe 5–15 mm). Phase 3: 5–10.
