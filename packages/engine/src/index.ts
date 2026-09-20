@@ -13,6 +13,7 @@ export * from "./tie.js";
 export * from "./post.js";
 export * from "./analyze.js";
 export * from "./validate.js";
+export * from "./resolve-overlaps.js";
 export * from "./expand.js";
 export * from "./hash.js";
 export * from "./pipeline.js";

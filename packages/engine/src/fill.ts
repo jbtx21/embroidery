@@ -399,14 +399,28 @@ export function generateFill(obj: FillObject): FillResult {
 
   // Pull acts along the thread direction, push across it (spec §8.1.1), and the
   // underlap goes outwards on top of that (spec §8.1.2).
-  const compensated = offsetDirectional(obj.shape, obj.pullCompMm, obj.pushCompMm, obj.angleDeg);
+  let compensated = offsetDirectional(obj.shape, obj.pullCompMm, obj.pushCompMm, obj.angleDeg);
+  if (compensated.length === 0) {
+    // A sliver narrower than twice the push compensation disappears under it.
+    // Stitching it without compensation is better than not stitching it at all
+    // — but it is said out loud, not done quietly (rule 8).
+    warnings.push(
+      warn(
+        WARNING.INVALID_GEOMETRY,
+        `The compensation of ${obj.pushCompMm} mm makes this area vanish — stitched without it.`,
+        "warn",
+        obj.id,
+      ),
+    );
+    compensated = [obj.shape];
+  }
   const parts =
     obj.underlapMm === 0
       ? compensated
       : compensated.flatMap((part) => offset(part, obj.underlapMm));
   if (parts.length === 0) {
     warnings.push(
-      warn(WARNING.INVALID_GEOMETRY, "Compensation makes the area vanish.", "error", obj.id),
+      warn(WARNING.INVALID_GEOMETRY, "The underlap makes the area vanish.", "error", obj.id),
     );
     return { stitches: [], warnings };
   }

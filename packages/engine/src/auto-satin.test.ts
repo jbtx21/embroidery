@@ -197,3 +197,23 @@ describe("autoSatin (spec §7.7)", () => {
     expect(JSON.stringify(autoSatin(bar))).toBe(JSON.stringify(autoSatin(bar)));
   });
 });
+
+describe("collapsed branches (spec §7.7)", () => {
+  it("never proposes a column whose rail is a single point", () => {
+    // A star-ish outline produces many very short branches.
+    const spiky: Polygon = {
+      outer: Array.from({ length: 24 }, (_, i) => {
+        const a = (2 * Math.PI * i) / 24;
+        const r = i % 2 === 0 ? 6 : 2.2;
+        return { x: r * Math.cos(a), y: r * Math.sin(a) };
+      }),
+      holes: [],
+    };
+    const r = autoSatin(spiky);
+    for (const o of r.objects) {
+      if (o.type !== "satin") continue;
+      expect(o.railA.length).toBeGreaterThanOrEqual(2);
+      expect(o.railB.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+});

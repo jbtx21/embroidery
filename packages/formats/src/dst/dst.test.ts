@@ -23,7 +23,7 @@ import {
 import { DST_HEADER_SIZE, headerText, readHeader, writeHeader } from "./header.js";
 import type { DstStitch } from "./write.js";
 import { planToUnits, prepareUnits, writeDst, writeDstFromUnits } from "./write.js";
-import { readDst, unitsToMm } from "./read.js";
+import { FOREIGN_TRIM_JUMPS, readDst, unitsToMm } from "./read.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const script = resolve(here, "../../scripts/pyembroidery-dst.py");
@@ -369,5 +369,44 @@ describe.skipIf(!withPy)("cross-check against pyembroidery (spec §13.2)", () =>
         Buffer.from(pyembroideryDst(units, "Kreis")),
       ),
     ).toBe(true);
+  });
+});
+
+describe("foreign files (spec §13.1.1)", () => {
+  /** A file with a run of jumps between two stitches, as foreign software writes it. */
+  const withJumpRun = (jumps: number): Uint8Array => {
+    const units: DstStitch[] = [{ x: 0, y: 0, cmd: "stitch" }];
+    for (let i = 1; i <= jumps; i++) units.push({ x: i * 10, y: 0, cmd: "jump" });
+    units.push({ x: (jumps + 1) * 10, y: 0, cmd: "stitch" });
+    units.push({ x: (jumps + 1) * 10, y: 0, cmd: "end" });
+    return writeDstFromUnits(units, { label: "Fremd" });
+  };
+
+  it("reads a run of jumps as jumps by default", () => {
+    const r = readDst(withJumpRun(4));
+    expect(r.stitches.filter((s) => s.cmd === "jump")).toHaveLength(4);
+    expect(r.stitches.filter((s) => s.cmd === "trim")).toHaveLength(0);
+  });
+
+  it("reads it as a trim when asked", () => {
+    const r = readDst(withJumpRun(4), { interpretJumpsAsTrim: true });
+    expect(r.stitches.filter((s) => s.cmd === "trim")).toHaveLength(1);
+    expect(r.stitches.filter((s) => s.cmd === "jump")).toHaveLength(0);
+  });
+
+  it("leaves a short run of jumps alone even then", () => {
+    // Two jumps are a split long jump, not a trim signal.
+    const r = readDst(withJumpRun(2), { interpretJumpsAsTrim: true });
+    expect(r.stitches.filter((s) => s.cmd === "trim")).toHaveLength(0);
+    expect(r.stitches.filter((s) => s.cmd === "jump")).toHaveLength(2);
+    expect(FOREIGN_TRIM_JUMPS).toBe(3);
+  });
+
+  it("keeps the round trip byte-identical with the default", () => {
+    // The guarantee of §15 rests on the option staying off.
+    const units = prepareUnits(planToUnits(samplePlan().blocks));
+    const bytes = writeDstFromUnits(units, { label: "Plan" });
+    const again = writeDstFromUnits(readDst(bytes).stitches, { label: "Plan" });
+    expect(Buffer.from(again).equals(Buffer.from(bytes))).toBe(true);
   });
 });

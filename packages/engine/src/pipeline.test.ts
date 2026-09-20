@@ -75,36 +75,6 @@ describe("validate", () => {
   });
 });
 
-describe("edge gap risk (spec §8.1.3)", () => {
-  // A 10 x 10 fill and a satin column whose rails hug its right edge.
-  const fill = (over = {}) => fillObject("area", polygonOf(rect(0, 0, 10, 10)), over);
-  const rail = (x: number) =>
-    satinObject("outline", [pt(x, 0), pt(x, 10)], [pt(x + 1, 0), pt(x + 1, 10)]);
-
-  it("warns when a rail hugs the fill edge without overlapping", () => {
-    const w = validate(design([fill(), rail(10.2)])).warnings;
-    const hit = w.find((x) => x.code === "EDGE_GAP_RISK")!;
-    expect(hit).toBeDefined();
-    expect(hit.severity).toBe("warn");
-    expect(hit.message).toContain("outline");
-  });
-
-  it("stays quiet when the two overlap", () => {
-    const w = validate(design([fill(), rail(9)])).warnings;
-    expect(w.map((x) => x.code)).not.toContain("EDGE_GAP_RISK");
-  });
-
-  it("stays quiet when they are far apart", () => {
-    const w = validate(design([fill(), rail(40)])).warnings;
-    expect(w.map((x) => x.code)).not.toContain("EDGE_GAP_RISK");
-  });
-
-  it("counts the underlap as overlap", () => {
-    const w = validate(design([fill({ underlapMm: 0.5 }), rail(10.2)])).warnings;
-    expect(w.map((x) => x.code)).not.toContain("EDGE_GAP_RISK");
-  });
-});
-
 describe("text (spec §9)", () => {
   const fonts = fontRegistry([TEST_FONT]);
 
@@ -277,16 +247,26 @@ describe("pipeline (spec §4)", () => {
     expect(JSON.stringify(planDesign(d).blocks)).toBe(JSON.stringify(planDesign(d).blocks));
   });
 
-  it("takes the auto order when asked", () => {
+  it("orders automatically unless told otherwise (spec §10.1)", () => {
     const d = design([
       runningObject("outline", [pt(0, 0), pt(10, 0)]),
       fillObject("area", polygonOf(rect(0, 0, 10, 10))),
     ]);
+    // Auto is the default since 20.09.2026 (spec §10.1).
+    expect(planDesign(d).blocks.map((b) => b.objectId)).toEqual(["area", "outline"]);
     expect(planDesign(d, { order: "auto" }).blocks.map((b) => b.objectId)).toEqual([
       "area",
       "outline",
     ]);
-    expect(planDesign(d).blocks.map((b) => b.objectId)).toEqual(["outline", "area"]);
+    // The design order is what `orderMode: "manual"` or an explicit option asks for.
+    expect(planDesign({ ...d, orderMode: "manual" }).blocks.map((b) => b.objectId)).toEqual([
+      "outline",
+      "area",
+    ]);
+    expect(planDesign(d, { order: "design" }).blocks.map((b) => b.objectId)).toEqual([
+      "outline",
+      "area",
+    ]);
   });
 
   it("uses the cache for unchanged objects", () => {

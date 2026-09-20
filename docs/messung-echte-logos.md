@@ -148,3 +148,54 @@ Der auffälligste Einzeleffekt ist die Mindeststichlänge: Köln und Eislingen f
 `DENSITY_HIGH` als **Fehler** auf **Warnung** (19 → 14 bzw. 21 → 15 Stiche/mm²). Was da
 wegfällt, sind Nadeleinstiche unter 0,6 mm, die den Zähler füllten, ohne zu decken.
 STUTTGART bleibt beim Fehler — dort liegen die Flächen wirklich übereinander.
+
+## Nach der dritten Welle (20.09.2026)
+
+Reisewege im Fill (§8.7), Knockdown (§4.1), Import mit Satin-Erkennung, Ausgleich und 45°
+(§5.1), `autoOrder` als Standard mit Z-Ordnungs-Bedingung (§10.1), neues Dichtekriterium
+(§11). Preset Piqué, Standardweg:
+
+| Motiv                      |        Objekte |              Stiche |    Sprünge |    Trims | Farbw. | Dichte max |
+| -------------------------- | -------------: | ------------------: | ---------: | -------: | -----: | ---------: |
+| STUTTGART 80 mm            |   46 → **130** | 12.563 → **18.473** |   99 → 190 |  34 → 48 |  1 → 6 |    19 → 32 |
+| STUTTGART 250 mm           |    47 → **92** | 93.001 → **87.086** |  251 → 575 | 45 → 143 |  1 → 6 |    19 → 29 |
+| Berufsfeuerwehr Köln 90 mm |  117 → **316** | 19.012 → **30.437** |  162 → 358 |  61 → 87 | 5 → 13 |    14 → 37 |
+| Eislingen Print 200 mm     | 136 → **2408** | 30.484 → **52.430** | 294 → 1963 | 95 → 156 |  5 → 5 |    15 → 37 |
+
+**Das ist in den Zahlen ein Rückschritt und im Ergebnis keiner** — mit einer Ausnahme, die
+unten steht. Was die Zahlen treiben:
+
+- **Der Knockdown kostet Farbwechsel.** Wer später stickt, liegt oben; die Reihenfolge darf
+  überdeckende Objekte deshalb nicht mehr vertauschen (§10.1). STUTTGART kommt damit auf 6
+  statt 1 Farbwechsel. Ohne die Bedingung schnitt der Knockdown beim ersten Lauf **das
+  Pferd aus dem Wappen** — die Farbgruppierung hatte das schwarze Schild hinter das graue
+  Pferd geschoben, und der Schnitt tat genau, was ihm gesagt war.
+- **Die Unterlappung von 0,8 mm erhöht die Dichte an jeder Naht.** Das ist ihr Zweck: sie
+  verhindert Blitzer. Bei STUTTGART sitzt die Spitze dort, wo acht Flächen zusammenstoßen
+  und jede ihre 0,8 mm beisteuert.
+- **Auto-Satin beim Import erhöht Objektzahl und Sprünge.** Bei Eislingen von 136 auf 2408
+  Objekte und von 294 auf 1963 Sprünge. Die Vorlage besteht dort aus über 2000
+  Vektorisierungsfragmenten; jedes schmale wird jetzt eine Satinspalte.
+
+**Gegenprobe ohne Auto-Satin** (STUTTGART 80 mm, Schwelle auf 0): 46 Objekte, 13.576
+Stiche, Dichte 35. Der Import mit Ausgleich und Knockdown allein liegt also nah am alten
+Stand; die Objektzahl kommt vollständig aus der Satin-Erkennung.
+
+### Was unterwegs schiefging und behoben wurde
+
+1. **Das Pferd verschwand.** Siehe oben — `autoOrder` ist jetzt eine topologische
+   Sortierung über die Überdeckungen.
+2. **92 Stiche in einem Quadratmillimeter.** `railsForBranch` legte für einen Buchstaben
+   von 10 × 13 mm Rails von 38 mm Länge. Zwei Schranken prüfen den Vorschlag jetzt, bevor
+   er übernommen wird (§5.1). Dichte damit von 98 auf 32.
+3. **`EMPTY_OBJECT`: Satin needs two rails.** Eine Rail kann beim Vereinfachen auf einen
+   Punkt zusammenfallen. Solche Spalten werden mit Warnung ausgelassen, nicht still.
+4. **Der Schub löschte kleine Flächen.** Eine Sichel schmaler als der doppelte Schub
+   verschwand ganz. Sie wird jetzt ohne Ausgleich gestickt, mit Warnung.
+
+### Offen
+
+`railsForBranch` ist die eigentliche Baustelle: die Rail wird punktweise als nächster
+Nachbar je Seite gelesen, was auf gekrümmten Formen umschlägt. Richtig wäre, die Kontur in
+zwei Ketten zwischen den Astenden zu teilen. Bis dahin sind die beiden Schranken aus §5.1
+eine Notbremse, und ein Teil der schmalen Formen wird weiterhin als Fill gestickt.

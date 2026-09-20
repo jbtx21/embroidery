@@ -107,7 +107,7 @@ export const PRESETS: Record<PresetId, Preset> = {
     fillStitchLengthMm: 3.0,
     fillStaggerRows: 4,
     satinSpacingMm: 0.35,
-    pullCompMm: 0.15,
+    pullCompMm: 0.2,
     pushCompMm: 0.1,
     underlapMm: 0.2,
     fillUnderlay: fillUnderlayOf("single"),

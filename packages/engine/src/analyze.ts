@@ -6,11 +6,25 @@ import { warn, WARNING } from "./warnings.js";
 
 export const DENSITY_WARN = 12;
 export const DENSITY_ERROR = 18;
+/** A single cell this hot is an error on its own (spec §11). */
+export const DENSITY_ERROR_PEAK = 30;
+/** Share of occupied cells above DENSITY_ERROR that makes it an error (spec §11). */
+export const DENSITY_ERROR_SHARE = 0.01;
 export const MAX_COLOR_CHANGES = 8;
 export const LONG_JUMP_MM = 30;
 
-/** Stitches per cell on a 1 mm grid; the maximum is returned. */
-export function maxDensity(stitches: Stitch[]): number {
+/**
+ * Stitches per cell on a 1 mm grid (spec §11).
+ *
+ * The peak alone does not carry the verdict: on the STUTTGART logo 9 cells out
+ * of 4047 sat above the error limit while 92 % of them were at 8 or below. So
+ * the share above the limit is counted too.
+ */
+export function densityProfile(stitches: Stitch[]): {
+  max: number;
+  cells: number;
+  overError: number;
+} {
   const cells = new Map<string, number>();
   let max = 0;
   for (const s of stitches) {
@@ -20,7 +34,14 @@ export function maxDensity(stitches: Stitch[]): number {
     cells.set(key, n);
     if (n > max) max = n;
   }
-  return max;
+  let overError = 0;
+  for (const n of cells.values()) if (n > DENSITY_ERROR) overError++;
+  return { max, cells: cells.size, overError };
+}
+
+/** Stitches per cell on a 1 mm grid; the maximum is returned. */
+export function maxDensity(stitches: Stitch[]): number {
+  return densityProfile(stitches).max;
 }
 
 export function analyze(
@@ -75,7 +96,8 @@ export function analyze(
   }
 
   const empty = !Number.isFinite(minX);
-  const densityMax = maxDensity(all);
+  const density = densityProfile(all);
+  const densityMax = density.max;
   const stats: Stats = {
     stitches,
     jumps,
@@ -86,16 +108,26 @@ export function analyze(
     densityMax,
   };
 
-  if (densityMax >= DENSITY_ERROR) {
+  // Error only when a whole area is overfilled, or one cell is far past the
+  // limit — a single hot spot is worth a warning, not a refusal (spec §11).
+  const share = density.cells === 0 ? 0 : density.overError / density.cells;
+  if (densityMax > DENSITY_ERROR_PEAK || share > DENSITY_ERROR_SHARE) {
     warnings.push(
       warn(
         WARNING.DENSITY_HIGH,
-        `Up to ${densityMax} stitches per mm² — the fabric will not take that.`,
+        `Up to ${densityMax} stitches per mm², ${density.overError} of ${density.cells} cells ` +
+          `over ${DENSITY_ERROR} — the fabric will not take that.`,
         "error",
       ),
     );
-  } else if (densityMax >= DENSITY_WARN) {
-    warnings.push(warn(WARNING.DENSITY_HIGH, `Up to ${densityMax} stitches per mm².`, "warn"));
+  } else if (densityMax > DENSITY_WARN) {
+    warnings.push(
+      warn(
+        WARNING.DENSITY_HIGH,
+        `Up to ${densityMax} stitches per mm² in ${density.overError} of ${density.cells} cells.`,
+        "warn",
+      ),
+    );
   }
   if (colorChanges > MAX_COLOR_CHANGES) {
     warnings.push(warn(WARNING.MANY_COLOR_CHANGES, `${colorChanges} colour changes.`, "warn"));

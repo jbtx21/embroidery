@@ -66,6 +66,7 @@ type Design = {
   id: string;
   widthMm: number; heightMm: number;
   preset: PresetId;
+  orderMode: 'auto' | 'manual';  // Standard 'auto' (§10.1)           (20.09.2026)
   objects: StitchObject[];   // Reihenfolge = Stickreihenfolge
   threads: Thread[];
 };
@@ -90,6 +91,7 @@ type FillObject = Base & {
   pullCompMm: number;          // Ausgleich ENTLANG angleDeg, nach außen (+)   (19.09.2026)
   pushCompMm: number;          // Ausgleich QUER zu angleDeg, nach innen (−)   (19.09.2026)
   underlapMm: number;          // Überlappung unter die Nachbarkontur           (19.09.2026)
+  cutsBelow: 'auto' | 'never' | 'always';  // schneidet aus tieferen Fills       (20.09.2026)
   underlay: { contour: boolean; fill: 'none' | 'single' | 'double'; spacingMm: number; insetMm: number };
   startPoint?: Point; endPoint?: Point;
 };
@@ -156,8 +158,9 @@ type Warning = { objectId?: string; code: string; message: string; severity: 'in
 ```
 Design
   → validate()      Geometrie prüfen, Objekte reparieren oder markieren
-  → expand()        Text → Satin-Objekte, Auto-Satin-Kandidaten auflösen
+  → expand()        Text → Satin-Objekte
   → order()         Reihenfolge übernehmen oder Vorschlag berechnen
+  → resolveOverlaps()  überdeckte Flächen ausschneiden, Unterlappung setzen (§4.1)
   → generate()      je Objekt: Unterlage → Deckstiche (gecacht per Hash)
   → connect()       Verbindungen zwischen Objekten: Laufstich, Sprung, Trim, Farbwechsel
   → tie()           Verriegelung an Anfang und Ende jedes getrimmten Blocks
@@ -168,6 +171,52 @@ StitchPlan
 ```
 
 Cache: `hash(objekt.params + objekt.geometrie + preset)` → Stichblock. Nur geänderte Objekte werden neu gerechnet, `connect()` bis `analyze()` laufen immer (billig).
+
+**Auto-Satin ist kein Pipeline-Schritt** *(20.09.2026 — `expand()` hieß vorher „Text →
+Satin-Objekte, Auto-Satin-Kandidaten auflösen")*. §3 kennt keinen Objekttyp, der einen
+Kandidaten markiert, und bekommt auch keinen. Auto-Satin entsteht beim **Import** (§5.1)
+und ist sonst ein Werkzeug des Editors, dessen Vorschlag der Nutzer korrigiert (§7.7
+Punkt 5).
+
+### 4.1 `resolveOverlaps()` — Knockdown *(20.09.2026)*
+
+Druckvorlagen legen den Untergrund als volle Fläche unter das Motiv. Gedruckt deckt die
+obere Farbe die untere ab; gestickt wird beides, und die Stelle bekommt doppelte Deckung.
+An den vier Testlogos war das die Ursache für `DENSITY_HIGH` als Fehler (gemessen: zwei
+Flächen mit 86 % Überdeckung).
+
+Die Stufe läuft **nach `order()`** — erst dann steht fest, was oben und was unten liegt —
+und **vor `generate()`**, damit der Cache die geänderte Geometrie sieht.
+
+Daraus folgt eine Bedingung an `order()`: **die Stickreihenfolge darf zwei einander
+überdeckende Objekte nicht vertauschen.** Wer später stickt, liegt oben — und wird damit
+zum Schneidenden. Beim STUTTGART-Logo hat die Farbgruppierung das schwarze Schild hinter
+das graue Pferd geschoben, worauf der Knockdown das Pferd wegschnitt, genau wie ihm gesagt.
+§10.1 hält die Reihenfolge deshalb als topologische Sortierung über die Überdeckungen.
+
+Regeln:
+
+1. **Nur Fill schneidet, und nur aus Fill.** Satin, Running und Text schneiden nie und
+   werden nie geschnitten. Sie sind Linien und Spalten; was sie abdecken, ist eine Frage
+   der Kontur, nicht der Fläche.
+2. **Später schneidet aus früher, farbunabhängig.** Wer später gestickt wird, liegt oben.
+   Die Farbe spielt keine Rolle — es geht um Deckung, nicht um Farbgleichheit.
+3. **Schwelle 20 mm².** Unter dieser überdeckten Fläche wird nicht geschnitten. Darunter
+   ist der Schnitt teurer (zusätzliche Kanten, zusätzliche Sektionen) als der doppelte
+   Stich.
+4. **Die untere Fläche bleibt 0,8 mm unter der oberen.** Ausgeschnitten wird nicht auf
+   Kante, sondern um 0,8 mm nach innen versetzt — sonst reißt der Stoffzug genau dort eine
+   Lücke auf (§8.1.2). Umgesetzt, indem die obere Form vor dem Abziehen um 0,8 mm
+   geschrumpft wird; `underlapMm` der unteren Fläche bleibt unberührt, weil es die Form
+   rundum vergrößern würde und nicht nur an der Schnittkante.
+5. **Angrenzende Flächen ohne Überdeckung** bekommen dasselbe: berühren sich zwei Fills,
+   ohne sich zu überdecken, wird die **frühere** um 0,8 mm unter die spätere erweitert.
+6. **`cutsBelow` am oberen Objekt** steuert es je Objekt: `'auto'` (Standard, Regeln oben),
+   `'never'` (schneidet nie), `'always'` (schneidet auch unter 20 mm²).
+
+Nichts wird verworfen: eine untere Fläche, die vollständig verschwindet, wird nicht
+gestickt und meldet `FILL_COVERED` als `info` — das ist eine Aussage, keine stille
+Reparatur (Regel 8).
 
 ---
 
@@ -187,6 +236,55 @@ Cache: `hash(objekt.params + objekt.geometrie + preset)` → Stichblock. Nur ge�
 | `medialAxis(polygon)` | Skelett für Auto-Satin (Voronoi der Kontur, Zweige geschnitten) | Phase 1 Woche 4 |
 
 Polygone werden beim Import normiert: Außenring im Uhrzeigersinn, Löcher gegen, Selbstschnitte mit Clipper-Union aufgelöst.
+
+### 5.1 Import aus SVG *(20.09.2026)*
+
+Der Import ist die Stelle, an der aus Grafik ein Stickobjekt wird. Bis zum 20.09.2026 hat
+er alles Gefüllte zu einem Fill mit 0° und ohne Ausgleich gemacht — beides war eine
+Auslassung, keine Entscheidung.
+
+**Stichart nach der Breite.** Für jede gefüllte Form wird die **mediane Breite** über die
+Mittelachse (`medialAxis`, doppelter Radius, nach Astlänge gewichtet) bestimmt:
+
+| mediane Breite | Stichart |
+|---|---|
+| < 5 mm | **Satin** über `autoSatin` (§7.7) |
+| ≥ 5 mm | **Fill** |
+
+**Der Vorschlag wird geprüft, bevor er übernommen wird** *(20.09.2026)*. `railsForBranch`
+liest eine Rail Punkt für Punkt vom Skelett ab und kann auf einer gekrümmten Form
+aufeinanderfolgende Punkte auf gegenüberliegende Seiten legen — die Rail windet sich, und
+die Spalte stickt denselben Quadratmillimeter wieder und wieder. Gemessen an einem
+Buchstaben von 10 × 13 mm: Rails von 38 mm und **92 Stiche in einem Quadratmillimeter**.
+Zwei Schranken:
+
+- **Rail-Budget:** beide Rails aller Spalten zusammen dürfen die Kontur der Form nicht
+  überschreiten (Faktor 1,3 für Abtastung und Endkappen). Die Rails werden von der Kontur
+  abgelesen, können zusammen also nicht länger sein als sie — es sei denn, ein Stück wird
+  mehrfach benutzt.
+- **Ausdehnung je Spalte:** die Rails einer Spalte dürfen höchstens das Doppelte der
+  Ausdehnung dieser Spalte messen. Das Budget allein ist blind für eine gewundene Spalte
+  zwischen gesunden, weil eine Form mit Löchern genug Kontur hat, sie zu verstecken.
+
+Reißt eine der beiden Schranken, wird die Form ein Fill und meldet `AUTOSATIN_MIXED`.
+**Das ist eine Notbremse, keine Lösung** — `railsForBranch` gehört überarbeitet (Kontur in
+zwei Ketten zwischen den Astenden teilen statt punktweise nächster Nachbar je Seite). Steht
+in `docs/backlog.md`.
+
+Ist ein Ast der Form breiter als `maxWidthMm` (§7.4), wird die **ganze** Form ein Fill und
+meldet `AUTOSATIN_MIXED` als `info` mit der Zahl der betroffenen Äste. Die Form je Ast in
+Satin und Fill zu zerlegen steht nirgends und wäre geraten; ein Entwurf aus Spalten plus
+nicht zugeordneter Restfläche ist außerdem nicht stickbar.
+
+**Zugausgleich aus dem Preset.** `pullCompMm` und `pushCompMm` kommen aus dem Preset (§14).
+Sie gehören zum Stoff, und der steht mit dem Preset fest. `underlapMm` bleibt **0** — es
+kommt aus `resolveOverlaps()` (§4.1), das als Einziges weiß, was neben und unter der Fläche
+liegt.
+
+**Stichwinkel.** Standard **45°**. Alle Flächen im gleichen Winkel wirken flach; 45° ist
+zudem der Winkel, der am wenigsten mit den Maschen des Gewirkes fluchtet. Eine Fläche, die
+eine frühere überdeckt oder an sie grenzt, bekommt **−45°** — so kreuzen sich die
+Richtungen an jeder Naht, statt parallel zu laufen.
 
 ---
 
@@ -288,6 +386,11 @@ null gesetzt, sondern `a/K` mit **K = 40** — der Rest auf der Gegenachse liegt
 Standard ist `pushCompMm` 0: ohne Probestick ist der Schub nicht beziffert. Die Presets
 setzen ihn (§14), die Spec schreibt ihn nicht vor.
 
+**Verschwindet eine Form unter dem Ausgleich**, wird sie ohne Ausgleich gestickt und meldet
+`INVALID_GEOMETRY` als `warn` *(20.09.2026)*. Eine Sichel, die schmaler ist als der doppelte
+Schub, gehört trotzdem zum Motiv; sie gar nicht zu sticken wäre der größere Fehler. Gesagt
+wird es trotzdem (Regel 8).
+
 #### 8.1.2 Überlappung unter die Nachbarkontur *(19.09.2026)*
 
 `underlapMm` vergrößert die Form **isotrop** nach außen, bevor gefüllt wird. Das ist nicht
@@ -299,15 +402,23 @@ zwischen Fläche und darüberliegender Kontur, sonst reißt der Stoffzug dort ei
 #### 8.1.3 Warnung `EDGE_GAP_RISK` *(19.09.2026)*
 
 Die Engine kann nicht wissen, welche Kontur zu welcher Fläche gehört — sie sieht aber, wenn
-beide gefährlich nah beieinander liegen, ohne sich zu überlappen. Kriterium je Paar aus
-einem Fill F und einem Satin S:
+beide gefährlich nah beieinander liegen, ohne sich zu überlappen. Geprüft wird je Paar aus
+einem Fill F und einem **Satin oder einem zweiten Fill** N *(20.09.2026 — vorher nur gegen
+Satin; bei importierten Logos ist die Kontur meist selbst eine Fläche, dort griff die
+Prüfung nie)*:
 
-- der kleinste Abstand zwischen einer Rail von S und der Kontur von F ist kleiner als **0,3 mm**, **und**
-- die von S überdeckte Fläche schneidet die wirksame Fläche von F (also nach `underlapMm`) nicht.
+- der kleinste Abstand zwischen der Kontur von N (beim Satin: den Rails) und der Kontur von F ist kleiner als **0,3 mm**, **und**
+- die von N überdeckte Fläche schneidet die wirksame Fläche von F (also nach `underlapMm`) nicht.
 
 Dann `EDGE_GAP_RISK` als `warn`, mit beiden Objekt-IDs in der Meldung. Geprüft wird auf der
 Objektliste, nicht auf den Stichen, und nur für Paare, deren Bounding-Boxen sich bis auf
-0,3 mm nähern. Nichts wird verändert — die Überlappung setzt der Nutzer (Regel 8).
+0,3 mm nähern.
+
+**Nach `resolveOverlaps()` feuert die Warnung nur noch bei `cutsBelow: 'never'`**
+*(20.09.2026)*. In jedem anderen Fall setzt §4.1 die Unterlappung selbst; die Warnung wäre
+dann ein Hinweis auf etwas, das die Engine bereits erledigt hat. Bei `'never'` hat der
+Nutzer den Schnitt ausdrücklich abgelehnt — dann ist der Hinweis berechtigt und nichts wird
+verändert (Regel 8).
 
 ### 8.2 Scanlines
 - Reihen im Abstand `rowSpacingMm` von unten nach oben.
@@ -377,8 +488,20 @@ Logos: längster Stich 3,0 mm bei einer Stichlänge von 3,0.
 ## 10. Reihenfolge und Verbindungen
 
 ### 10.1 Reihenfolge
-- Standard: Objektliste wie im Design.
+- **Standard: `autoOrder()`** *(20.09.2026 — vorher „Objektliste wie im Design")*. `Design.orderMode` steuert es: `'auto'` (Standard) rechnet den Vorschlag, `'manual'` nimmt die Objektliste, wie sie ist. Grund: mit der Designreihenfolge braucht das STUTTGART-Logo zwölf Farbwechsel für zwei Farben, mit `auto` einen; beim Köln-Logo 21 statt 5. Eine Voreinstellung, die man in jedem einzelnen Fall ändern muss, ist die falsche Voreinstellung. Wer die Reihenfolge selbst gelegt hat, setzt `'manual'`.
 - Vorschlag `autoOrder()`: nach Farbe gruppieren (Farbwechsel minimieren), innerhalb einer Farbe in drei Stufen, danach nach dem kürzesten Weg. Der Nutzer kann den Vorschlag annehmen oder überschreiben.
+
+**Überdeckung bindet die Reihenfolge** *(20.09.2026)*. Zwei Objekte, deren gestickte
+Flächen sich überdecken, behalten ihre Reihenfolge aus dem Design — alles andere darf
+umgruppiert werden. Umgesetzt als topologische Sortierung: Kanten aus der Designreihenfolge
+für jedes überdeckende Paar, dann Kahn mit Vorzug für die Farbe in der Nadel, danach Stufe,
+Ring und Weg. Objekte ohne Fläche (Laufstich, Text) binden nichts. Bleibt am Ende ein
+Zyklus — Geometrie, die sich gegenseitig überdeckt —, gilt für den Rest die
+Designreihenfolge.
+
+Das kostet Farbwechsel: STUTTGART kommt damit auf 6 statt 1. Der Preis ist nicht
+verhandelbar, denn ohne die Bedingung schneidet der Knockdown aus §4.1 Teile des Motivs
+weg.
 
 **Hintergrund → Details → Konturen** *(19.09.2026)*. Die Stufe geht dem Weg vor, immer:
 
@@ -437,8 +560,8 @@ Entscheidung zwischen Blockende A und Blockanfang B:
 - **Rundung: kaufmännisch-symmetrisch** (`roundHalfEven`, halbe Werte zur geraden Zahl), überall dort, wo Millimeter zu ganzen Formateinheiten werden. Grund: die Kreuzprüfung aus §13.2 läuft gegen Python, dessen `round()` genauso rundet. Bei Reihenabstand 0,25 mm liegt jede zweite Koordinate exakt auf der halben DST-Einheit — mit `Math.round` wäre die Datei nicht byte-identisch. *(19.09.2026)*
 - Stats:
   - `runtimeSec = stitches / (rpm/60) + trims * 3 + colorChanges * 12`, `rpm` aus Maschinenprofil (Standard 800).
-  - Dichte: Raster 1 × 1 mm, Stiche pro Zelle zählen. Warnung ab 12/mm², Fehler ab 18/mm².
-- Warnungen (Auswahl): `SATIN_TOO_NARROW`, `SATIN_TOO_WIDE`, `FILL_TINY` (Fläche < 4 mm²), `FILL_TOO_NARROW`, `EDGE_GAP_RISK`, `TEXT_TOO_SMALL`, `DENSITY_HIGH`, `MANY_COLOR_CHANGES` (> 8), `LONG_JUMP` (> 30 mm), `SELF_INTERSECTING_RAILS`, `OBJECT_OUTSIDE_HOOP`, `SHAPE_SPLIT` (Fläche zerfällt beim Normieren in n Teile; die Teilanzahl steht in der Meldung, jedes Teil wird gestickt — nichts wird verworfen). *(19.09.2026)*
+  - Dichte: Raster 1 × 1 mm, Stiche pro Zelle zählen. **Warnung**, sobald das Maximum über 12/mm² liegt. **Fehler** erst, wenn mehr als **1 % der belegten Zellen** über 18/mm² liegen **oder** eine einzelne Zelle über **30/mm²**. *(20.09.2026 — vorher „Fehler ab 18/mm²" auf den Spitzenwert.)* Der Spitzenwert allein taugt nicht: beim STUTTGART-Logo lösten **9 von 4.047 Zellen** den Fehler aus, während 92 % der Zellen bei höchstens 8/mm² lagen. Eine einzelne heiße Stelle ist eine Warnung wert, keine Ablehnung — eine Zelle über 30 dagegen schon, und eine Fläche, die zu einem Prozent überfüllt ist, erst recht.
+- Warnungen (Auswahl): `SATIN_TOO_NARROW`, `SATIN_TOO_WIDE`, `FILL_TINY` (Fläche < 4 mm²), `FILL_TOO_NARROW`, `EDGE_GAP_RISK`, `FILL_COVERED`, `AUTOSATIN_MIXED`, `TEXT_TOO_SMALL`, `DENSITY_HIGH`, `MANY_COLOR_CHANGES` (> 8), `LONG_JUMP` (> 30 mm), `SELF_INTERSECTING_RAILS`, `OBJECT_OUTSIDE_HOOP`, `SHAPE_SPLIT` (Fläche zerfällt beim Normieren in n Teile; die Teilanzahl steht in der Meldung, jedes Teil wird gestickt — nichts wird verworfen). *(19.09.2026)*
 - **`FILL_TOO_NARROW`**: eine Fläche kann groß sein und trotzdem überall zu schmal zum Füllen. `FILL_TINY` misst die Fläche und sieht das nicht — eine Sichel von 114 mm² kommt durch, obwohl 79 % ihrer Reihenstücke kürzer als 1 mm sind. Die Praxis sagt: ein Stich unter 1 mm perforiert den Stoff, statt ihn zu decken. Kriterium: Fläche ≥ 4 mm² (darunter greift `FILL_TINY`), mindestens 8 Reihenstücke, und **mehr als die Hälfte davon kürzer als 1 mm**. Gemeldet als `warn` mit dem Anteil und dem Vorschlag Satin oder Laufstich — die Fläche wird trotzdem gestickt, nichts wird still geändert (Regel 8). Die Zahlen fallen in `scanlines` ohnehin an. *(19.09.2026)*
 
 ---
@@ -462,6 +585,22 @@ Entscheidung zwischen Blockende A und Blockanfang B:
 - **Zentrierung:** das Motiv wird vor dem Schreiben auf die Mitte seiner Bounding-Box verschoben, ganzzahlig in DST-Einheiten. Die Maschine startet im Nullpunkt; eine Datei mit durchweg positiven Koordinaten fährt aus dem Rahmen. Abschaltbar über `center: false`, wenn eine Datei bewusst im Absolutkoordinatensystem bleiben soll. *(19.09.2026)*
 - **Nullpunkt-Anfahrt:** der Weg vom Nullpunkt zum ersten Stich ist selbst ein Delta und unterliegt dem 121-Einheiten-Limit. Er wird als Folge von `jump`-Datensätzen gefahren, danach folgt der erste Stich an seiner Position. Dasselbe gilt für jede andere Bewegung, die das Limit überschreitet — die Engine teilt sie bereits in §11, der Writer prüft es für fremde Stichlisten erneut. *(19.09.2026)*
 
+#### 13.1.1 Fremde Dateien lesen *(20.09.2026)*
+
+`readDst` bekommt die Option **`interpretJumpsAsTrim`**, Standard **`false`**.
+
+Unser Writer signalisiert einen Trim als drei Sprünge `+2/+2`, `-4/-4`, `+2/+2`; genau das
+sammelt der Reader wieder ein. Fremde Software signalisiert anders, meist als Lauf mehrerer
+Sprünge — pyembroidery meldet in fünf geprüften Fremddateien 2 bis 11 Trims, wo unser
+Reader Sprünge sieht.
+
+Die Regel „ein Lauf von drei oder mehr Sprüngen ist ein Trim" darf **nicht** Standard
+werden: `post()` teilt lange Sprünge selbst in mehrere Sprung-Datensätze (§11), und die
+Regel würde die eigenen geteilten Sprünge als Trim lesen. Damit wäre der byte-identische
+Roundtrip aus §15 hin. Der **Roundtrip-Test läuft deshalb unverändert mit dem Standard
+`false`**; die Option ist für §17 gedacht, wo fremde Dateien nur angezeigt werden und ein
+Trim als Kreuz statt als gestrichelte Linie gehört.
+
 ### 13.2 Weitere Formate
 - Neutrales JSON (`StitchPlan`) → `apps/api` → pyembroidery → PES, JEF, VP3, EXP.
 - PES: Farben auf Brother-Palette mappen (nächste Farbe), echte Garnnummern als Sidecar-JSON und im Stichbericht.
@@ -482,7 +621,7 @@ Startwerte, in Phase 5 gegen Probesticks justieren.
 | Jersey | 0,45 | 0,40 | 0,25 | 0,15 | 0,25 | contour + single | contour + zigzag | dünne Shirtware, Schneidvlies |
 | Softshell | 0,35 | 0,40 | 0,25 | 0,10 | 0,20 | contour + single | contour + zigzag | |
 | Fleece | 0,35 | 0,40 | 0,30 | 0,15 | 0,25 | contour + double | contour + zigzag, Inset 0,3 | Topping empfohlen |
-| Cap | 0,35 | 0,35 | 0,15 | 0,10 | 0,20 | contour + single | center + contour | Reihenfolge Mitte → außen, unten → oben (§10.1) |
+| Cap | 0,35 | 0,35 | 0,20 | 0,10 | 0,20 | contour + single | center + contour | Reihenfolge Mitte → außen, unten → oben (§10.1) |
 | Frottee | 0,35 | 0,35 | 0,20 | 0,15 | 0,30 | contour + double | contour + zigzag | Knockdown-Fill unter Motiv, Topping |
 
 **Jersey** *(19.09.2026)*: dünne, dehnbare Shirtware. Die Praxis nennt dafür 0,45 mm — die
@@ -491,6 +630,9 @@ zugleich mehr Zugausgleich und ein tragendes Schneidvlies.
 
 **Cap-Satin 0,35 statt 0,38** *(19.09.2026)*: auf der Kappe steht das Gewebe unter
 Spannung und der Rahmen dreht unter der Nadel; die dichtere Spalte deckt das ab.
+
+**Cap-Zugausgleich 0,20 statt 0,15** *(20.09.2026)*: 0,15 lag unter dem Praxisminimum von
+0,2 mm. Der **Schub beim Satin** (§7.2) bleibt offen — dort steht weiterhin nur der Zug.
 
 **Schub und Überlappung** *(19.09.2026)*: neue Spalten zu §8.1.1 und §8.1.2. Der Schub
 liegt bei rund der Hälfte des Zugs — er wirkt quer und fällt kleiner aus. Beides sind

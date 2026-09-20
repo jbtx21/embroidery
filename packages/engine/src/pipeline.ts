@@ -27,6 +27,7 @@ import { generateRunning } from "./running.js";
 import { generateSatin } from "./satin.js";
 import { tieBlocks } from "./tie.js";
 import type { Design, StitchObject, StitchPlan, Warning } from "./types.js";
+import { edgeGapRisks, resolveOverlaps } from "./resolve-overlaps.js";
 import { validate } from "./validate.js";
 import { warn, WARNING } from "./warnings.js";
 
@@ -109,14 +110,21 @@ export function planDesign(design: Design, opts: PlanOptions = {}): StitchPlan {
   const expanded = expand(validated.objects, { preset, fonts: opts.fonts, machine });
   warnings.push(...expanded.warnings);
 
-  // The cap rule travels with the preset, not with the machine (spec §10.1).
+  // `autoOrder` is the default since 20.09.2026 (spec §10.1); `orderMode` or an
+  // explicit option turns it off. The cap rule travels with the preset.
+  const mode = opts.order ?? (design.orderMode === "manual" ? "design" : "auto");
   const ordered =
-    opts.order === "auto"
+    mode === "auto"
       ? autoOrder(expanded.objects, { centreOut: design.preset === "cap" })
       : expanded.objects;
 
+  // Knockdown: what lies on top cuts out of what lies below (spec §4.1).
+  const resolved = resolveOverlaps(ordered);
+  warnings.push(...resolved.warnings);
+  warnings.push(...edgeGapRisks(resolved.objects));
+
   const raw: RawBlock[] = [];
-  for (const obj of ordered) {
+  for (const obj of resolved.objects) {
     const key = stableHash(obj, design.preset);
     let points = opts.cache?.get(key);
     if (!points) {

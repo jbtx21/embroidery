@@ -1,11 +1,30 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { bbox } from "@texma-stitch/geometry";
 import { SVG_ARC, SVG_FILLED, SVG_PIXELS, SVG_TWO_PATHS } from "../../test/fixtures/svg.js";
 import { applyMatrix, IDENTITY, multiply, parseTransform } from "./matrix.js";
 import { parsePathData } from "./path-data.js";
-import { importSvg, lengthToMm, unitScale } from "./svg.js";
-import type { FillObject, RunningObject } from "../types.js";
-import { polygonArea } from "@texma-stitch/geometry";
+import {
+  AUTOSATIN_MAX_WIDTH_MM,
+  DEFAULT_ANGLE_DEG,
+  importSvg,
+  lengthToMm,
+  medianShapeWidthMm,
+  RAIL_BUDGET_SLACK,
+  RAIL_EXTENT_MAX,
+  railBudgetRatio,
+  touchesOrCovers,
+  unitScale,
+  worstRailExtent,
+} from "./svg.js";
+import { autoSatin } from "../auto-satin.js";
+import { PRESETS } from "../presets.js";
+import { polygonOf, pt, rect } from "../../test/fixtures/shapes.js";
+import type { FillObject, RunningObject, SatinObject } from "../types.js";
+import { initGeometry, polygonArea } from "@texma-stitch/geometry";
+
+beforeAll(async () => {
+  await initGeometry();
+});
 
 describe("matrix", () => {
   it("parses the transform functions", () => {
@@ -224,7 +243,7 @@ describe("filled paths", () => {
 
   it("falls back to the preset where no attribute says otherwise", () => {
     const ring = byId("ring") as FillObject;
-    expect(ring.angleDeg).toBe(0);
+    expect(ring.angleDeg).toBe(45); // default since 20.09.2026, spec §5.1
     expect(ring.rowSpacingMm).toBe(0.4); // Piqué
     const fleece = importSvg(SVG_FILLED, { preset: "fleece" });
     const ringFleece = fleece.design.objects.find((o) => o.id === "ring") as FillObject;
@@ -262,5 +281,94 @@ describe("filled paths", () => {
   it("keeps the document order, which is the stacking order", () => {
     const ids = imported().design.objects.map((o) => o.id);
     expect(ids.indexOf("ring")).toBeLessThan(ids.indexOf("mit-parametern"));
+  });
+});
+
+describe("import decisions (spec §5.1)", () => {
+  const svg = (body: string, w = 60, h = 60): string =>
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" ` +
+    `viewBox="0 0 ${w} ${h}">${body}</svg>`;
+
+  it("measures the median width over the medial axis", () => {
+    // A 40 x 3 mm bar is 3 mm wide, a 40 x 20 mm plate is not narrow.
+    expect(medianShapeWidthMm(polygonOf(rect(0, 0, 40, 3)))).toBeLessThan(AUTOSATIN_MAX_WIDTH_MM);
+    expect(medianShapeWidthMm(polygonOf(rect(0, 0, 40, 20)))).toBeGreaterThan(
+      AUTOSATIN_MAX_WIDTH_MM,
+    );
+  });
+
+  it("makes a satin out of a narrow shape and a fill out of a wide one", () => {
+    const narrow = importSvg(svg('<path d="M5 5 H45 V8 H5 Z" fill="#000"/>'));
+    expect(narrow.design.objects.every((o) => o.type === "satin")).toBe(true);
+    const wide = importSvg(svg('<path d="M5 5 H45 V35 H5 Z" fill="#000"/>'));
+    expect(wide.design.objects[0]!.type).toBe("fill");
+  });
+
+  it("takes the compensation from the preset and leaves the underlap to the knockdown", () => {
+    const r = importSvg(svg('<path d="M5 5 H45 V35 H5 Z" fill="#000"/>'));
+    const f = r.design.objects[0] as FillObject;
+    expect(f.pullCompMm).toBe(PRESETS.pique.pullCompMm);
+    expect(f.pushCompMm).toBe(PRESETS.pique.pushCompMm);
+    expect(f.underlapMm).toBe(0);
+    expect(f.cutsBelow).toBe("auto");
+  });
+
+  it("stitches at 45 degrees, and crosses where areas meet", () => {
+    const r = importSvg(
+      svg(
+        '<path d="M5 5 H45 V35 H5 Z" fill="#000"/>' +
+          '<path d="M10 10 H40 V30 H10 Z" fill="#c00"/>' +
+          '<path d="M5 45 H20 V55 H5 Z" fill="#00c"/>',
+      ),
+    );
+    const fills = r.design.objects.filter((o): o is FillObject => o.type === "fill");
+    expect(fills[0]!.angleDeg).toBe(DEFAULT_ANGLE_DEG);
+    // Lies on top of the first one.
+    expect(fills[1]!.angleDeg).toBe(-DEFAULT_ANGLE_DEG);
+    // Stands on its own, so back to the default.
+    expect(fills[2]!.angleDeg).toBe(DEFAULT_ANGLE_DEG);
+  });
+
+  it("keeps an explicit Ink/Stitch angle", () => {
+    const r = importSvg(svg('<path d="M5 5 H45 V35 H5 Z" fill="#000" inkstitch:angle="10"/>'));
+    expect((r.design.objects[0] as FillObject).angleDeg).toBe(10);
+  });
+
+  it("measures the rail budget against the outline", () => {
+    const bar = polygonOf(rect(0, 0, 40, 3));
+    const sound = autoSatin(bar, { idPrefix: "b" }).objects;
+    // Both rails together are the two long sides — at most the whole outline.
+    expect(railBudgetRatio(bar, sound)).toBeLessThanOrEqual(RAIL_BUDGET_SLACK);
+    expect(worstRailExtent(sound)).toBeLessThanOrEqual(RAIL_EXTENT_MAX);
+    // A column whose rails wind blows both bounds.
+    const wound = [
+      {
+        ...(sound[0] as SatinObject),
+        railA: [pt(0, 0), pt(40, 0), pt(0, 1), pt(40, 1), pt(0, 2)],
+        railB: [pt(0, 3), pt(40, 3), pt(0, 2.5), pt(40, 2.5), pt(0, 2.2)],
+      },
+    ];
+    expect(railBudgetRatio(bar, wound)).toBeGreaterThan(RAIL_BUDGET_SLACK);
+    expect(worstRailExtent(wound)).toBeGreaterThan(RAIL_EXTENT_MAX);
+  });
+
+  it("falls back to a fill when the proposal does not fit", () => {
+    // The columns of this crescent wind; the importer must not take them.
+    const r = importSvg(
+      svg(
+        '<path d="M30 5 A25 25 0 1 1 29.9 5 L29.9 12 A18 18 0 1 0 30 12 Z" fill="#000"/>',
+        60,
+        60,
+      ),
+    );
+    const mixed = r.warnings.filter((w) => w.code === "AUTOSATIN_MIXED");
+    if (mixed.length > 0) expect(r.design.objects.every((o) => o.type === "fill")).toBe(true);
+  });
+
+  it("sees an overlap and a shared edge, but not a distant shape", () => {
+    const a = polygonOf(rect(0, 0, 10, 10));
+    expect(touchesOrCovers(a, polygonOf(rect(5, 5, 10, 10)))).toBe(true);
+    expect(touchesOrCovers(a, polygonOf(rect(10, 0, 10, 10)))).toBe(true);
+    expect(touchesOrCovers(a, polygonOf(rect(40, 0, 10, 10)))).toBe(false);
   });
 });

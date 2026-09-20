@@ -12,9 +12,21 @@
  * Vectorisation is NOT part of the engine (spec §1). This importer takes paths
  * that already exist.
  */
-import type { Point } from "@texma-stitch/geometry";
-import { flattenPath, ringsToPolygons } from "@texma-stitch/geometry";
+import type { Point, Polygon } from "@texma-stitch/geometry";
+import {
+  dist,
+  flattenPath,
+  intersect,
+  medialAxis,
+  offset,
+  polygonArea,
+  polygonBbox,
+  rings,
+  ringsToPolygons,
+  arcLength,
+} from "@texma-stitch/geometry";
 import type { Design, PresetId, StitchObject, Thread, Warning } from "../types.js";
+import { autoSatin } from "../auto-satin.js";
 import { PRESETS } from "../presets.js";
 import { warn, WARNING } from "../warnings.js";
 import type { Matrix } from "./matrix.js";
@@ -228,6 +240,127 @@ function ringInMm(sub: SubPath, matrix: Matrix, mmPerUnit: number): Point[] {
   return ring;
 }
 
+/** Below this median width a shape is a satin column, not an area (spec §5.1). */
+export const AUTOSATIN_MAX_WIDTH_MM = 5;
+/** Default stitch angle on import (spec §5.1). */
+export const DEFAULT_ANGLE_DEG = 45;
+
+/** Only the part of the axis at least this wide counts as the spine (spec §5.1). */
+const SPINE_FRACTION = 0.5;
+
+/**
+ * Median width of a shape, over the SPINE of its medial axis (spec §5.1).
+ *
+ * The radii of a skeleton always run to zero where a branch ends, so taking the
+ * median over the whole axis makes every shape look narrower than it is: an
+ * 8 x 8 mm square comes out at 4 mm, because its axis is the two diagonals and
+ * half of their length sits in the tapering corners. Only the stretch at least
+ * half as wide as the widest point is measured — for a bar that is nearly the
+ * whole axis, for a blob it is the middle.
+ *
+ * A shape without a skeleton — a disc, or anything too small to sample — has no
+ * median width and counts as wide, so it stays a fill.
+ */
+export function medianShapeWidthMm(shape: Polygon): number {
+  const axis = medialAxis(shape);
+  const all: { w: number; len: number }[] = [];
+  let widest = 0;
+  for (const branch of axis.branches) {
+    for (let i = 1; i < branch.points.length; i++) {
+      const len = dist(branch.points[i - 1]!, branch.points[i]!);
+      if (len <= 0) continue;
+      const w = branch.radii[i - 1]! + branch.radii[i]!;
+      all.push({ w, len });
+      if (w > widest) widest = w;
+    }
+  }
+  const spine = all.filter((x) => x.w >= widest * SPINE_FRACTION);
+  const total = spine.reduce((sum, x) => sum + x.len, 0);
+  if (total === 0) return Infinity;
+  spine.sort((a, b) => a.w - b.w);
+  let acc = 0;
+  for (const x of spine) {
+    acc += x.len;
+    if (acc >= total / 2) return x.w;
+  }
+  return spine[spine.length - 1]!.w;
+}
+
+/** Do the two shapes overlap, or lie close enough to share a seam (spec §5.1)? */
+export function touchesOrCovers(a: Polygon, b: Polygon): boolean {
+  const ba = polygonBbox(a);
+  const bb = polygonBbox(b);
+  const gap = 0.1;
+  if (ba.minX - gap > bb.maxX || bb.minX - gap > ba.maxX) return false;
+  if (ba.minY - gap > bb.maxY || bb.minY - gap > ba.maxY) return false;
+  if (intersect([a], [b]).some((p) => polygonArea(p) > 1e-6)) return true;
+  // Touching without overlapping: grow one a hair and try again.
+  return offset(a, gap).some((grown) => intersect([grown], [b]).some((p) => polygonArea(p) > 1e-6));
+}
+
+/**
+ * Slack on the rail budget (spec §5.1).
+ *
+ * The budget itself is an argument: the rails are read off the boundary, so
+ * together they cannot be longer than it. The slack is not — the rails are
+ * SAMPLED boundary points and the polyline through them cuts corners and
+ * doubles back a little at the end caps. A clean 40 x 3 mm bar measures 1,08,
+ * so 1,3 leaves room without letting a wound proposal through.
+ */
+export const RAIL_BUDGET_SLACK = 1.3;
+/**
+ * How long one column's rails may be against the extent of that column
+ * (spec §5.1). A column that follows a shape runs roughly the length of it; a
+ * curve stretches that, a wound rail multiplies it. Measured on the test logos:
+ * sound columns land at 1,0, wound ones at 2,5.
+ */
+export const RAIL_EXTENT_MAX = 2.0;
+
+/**
+ * Rail length of a proposal against the outline it was read from (spec §5.1).
+ *
+ * `railsForBranch` picks its rail points off the BOUNDARY of the shape, so both
+ * rails of all columns together cannot be longer than that boundary — unless
+ * the same stretch is used more than once. That is exactly what happens on a
+ * shape whose branches curve: successive rail points land on opposite sides, the
+ * rail winds, and the column stitches the same millimetre over and over. A
+ * letter of 10 x 13 mm came out with rails 38 mm long and 92 stitches in one
+ * square millimetre.
+ *
+ * Returns rail length divided by the outline length. At most 1 for a sound
+ * proposal; well over it for a wound one.
+ */
+export function railBudgetRatio(shape: Polygon, columns: StitchObject[]): number {
+  let outline = 0;
+  for (const ring of rings(shape)) outline += arcLength([...ring, ring[0]!]);
+  if (outline <= 0) return Infinity;
+  let rails = 0;
+  for (const o of columns) {
+    if (o.type !== "satin") continue;
+    rails += arcLength(o.railA) + arcLength(o.railB);
+  }
+  return rails / outline;
+}
+
+/**
+ * The worst single column of a proposal, measured against its own extent
+ * (spec §5.1). The budget above is provable but blind to one wound column among
+ * sound ones: a shape with holes has outline enough to hide it.
+ */
+export function worstRailExtent(columns: StitchObject[]): number {
+  let worst = 0;
+  for (const o of columns) {
+    if (o.type !== "satin") continue;
+    const pts = [...o.railA, ...o.railB];
+    if (pts.length === 0) continue;
+    const b = polygonBbox({ outer: pts, holes: [] });
+    const diag = Math.hypot(b.maxX - b.minX, b.maxY - b.minY);
+    if (diag <= 0) continue;
+    worst = Math.max(worst, (arcLength(o.railA) + arcLength(o.railB)) / (2 * diag));
+  }
+  return worst;
+}
+
 export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport {
   const warnings: Warning[] = [];
   const { root, paths } = scan(text);
@@ -244,6 +377,8 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
   };
 
   const objects: StitchObject[] = [];
+  /** Shapes already placed — needed for the crossing angle rule (spec §5.1). */
+  const placed: Polygon[] = [];
   for (const [pi, el] of paths.entries()) {
     const id = el.attrs["id"] ?? `path${pi}`;
     const subpaths = parsePathData(el.attrs["d"]!);
@@ -282,15 +417,63 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
       }
 
       polygons.forEach((shape, si) => {
+        const objId = polygons.length === 1 ? id : `${id}:${si}`;
+
+        // Narrow shapes are satin columns, not areas (spec §5.1).
+        if (!Number.isFinite(angle) && medianShapeWidthMm(shape) < AUTOSATIN_MAX_WIDTH_MM) {
+          const r = autoSatin(shape, {
+            idPrefix: objId,
+            threadIndex,
+            spacingMm: preset.satinSpacingMm,
+            pullCompMm: preset.pullCompMm,
+            underlay: preset.satinUnderlay,
+          });
+          const mixed = r.warnings.some((w) => w.code === WARNING.SATIN_TOO_WIDE);
+          const columns = r.objects.filter((o) => o.type === "satin");
+          const fit = mixed || columns.length === 0 ? Infinity : railBudgetRatio(shape, columns);
+          const worst = mixed || columns.length === 0 ? Infinity : worstRailExtent(columns);
+          if (
+            !mixed &&
+            columns.length > 0 &&
+            fit <= RAIL_BUDGET_SLACK &&
+            worst <= RAIL_EXTENT_MAX
+          ) {
+            for (const o of r.objects) objects.push({ ...o, trimAfter });
+            placed.push(shape);
+            return;
+          }
+          warnings.push(
+            warn(
+              WARNING.AUTOSATIN_MIXED,
+              mixed
+                ? `"${objId}" has branches wider than the satin limit — stitched as a fill.`
+                : `Auto-satin rails wind instead of following "${objId}": ` +
+                    `${(fit * 100).toFixed(0)} % of its outline, worst column ${worst.toFixed(1)}x ` +
+                    `its own extent. Stitched as a fill.`,
+              "info",
+              objId,
+            ),
+          );
+        }
+
+        // 45 degrees by default; a shape that covers or touches an earlier one
+        // gets -45 so the directions cross at the seam (spec §5.1).
+        const crosses = placed.some((p) => touchesOrCovers(p, shape));
+        placed.push(shape);
+
         objects.push({
-          id: polygons.length === 1 ? id : `${id}:${si}`,
+          id: objId,
           type: "fill",
           threadIndex,
           visible: true,
           locked: false,
           trimAfter,
           shape,
-          angleDeg: Number.isFinite(angle) ? angle : 0,
+          angleDeg: Number.isFinite(angle)
+            ? angle
+            : crosses
+              ? -DEFAULT_ANGLE_DEG
+              : DEFAULT_ANGLE_DEG,
           rowSpacingMm:
             Number.isFinite(rowSpacing) && rowSpacing > 0 ? rowSpacing : preset.fillRowSpacingMm,
           stitchLengthMm:
@@ -299,13 +482,13 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
               : preset.fillStitchLengthMm,
           staggerRows:
             Number.isFinite(staggers) && staggers >= 1 ? staggers : preset.fillStaggerRows,
-          // Compensation and underlap stay at zero on import, as pull already
-          // did before them: they belong to the fabric and to what lies next to
-          // the area, and the SVG says nothing about either. The preset carries
-          // the values (§14), the editor applies them. See docs/backlog.md.
-          pullCompMm: 0,
-          pushCompMm: 0,
+          // Pull and push belong to the fabric, and the fabric is settled with
+          // the preset (spec §5.1). The underlap is NOT: it depends on what lies
+          // next to the area, which only `resolveOverlaps` knows (§4.1).
+          pullCompMm: preset.pullCompMm,
+          pushCompMm: preset.pushCompMm,
           underlapMm: 0,
+          cutsBelow: "auto",
           underlay: preset.fillUnderlay,
         });
       });

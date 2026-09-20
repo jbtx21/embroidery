@@ -3,6 +3,25 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Offen nach der dritten Welle (20.09.2026)
+
+- **`railsForBranch` überarbeiten.** Die Rail wird punktweise als nächster Nachbar je Seite
+  vom Skelett gelesen. Auf einer gekrümmten Form schlägt die Seitenzuordnung um, die Rail
+  windet sich, und die Spalte stickt dieselbe Stelle mehrfach — gemessen 92 Stiche in einem
+  Quadratmillimeter bei einem Buchstaben von 10 × 13 mm. Richtig wäre, die Kontur zwischen
+  den beiden Astenden in zwei Ketten zu teilen und nach Bogenlänge zu paaren. Die beiden
+  Schranken in §5.1 sind bis dahin eine Notbremse. **Eigene Sitzung.**
+- **Auto-Satin auf Vektorisierungsfragmenten.** Beim Eislingen-Logo macht §5.1 aus 136
+  Objekten 2408 und aus 294 Sprüngen 1963, weil die Vorlage aus über 2000 Fragmenten
+  besteht. **Frage:** soll die Satin-Erkennung eine Mindestfläche oder Mindestlänge
+  bekommen, oder gehört das in die Vorbereitung der Vorlage?
+- **Die Unterlappung summiert sich an Knotenpunkten.** Wo acht Flächen zusammenstoßen,
+  legt jede ihre 0,8 mm übereinander. **Frage:** soll `resolveOverlaps` die Unterlappung
+  an Mehrfachnähten begrenzen?
+- **Fonts fehlen weiterhin.** `packages/fonts/src/inkstitch/` existiert nicht; im Repo
+  liegt keine Ink/Stitch-Fontdatei. Der Konverter und der Test „TEXMA" in 8 mm mit
+  `caffeine_tiny` sind damit nicht baubar, ohne das Format zu raten.
+
 ## Offen nach der zweiten Welle (19.09.2026)
 
 - **Der Import setzt Zug, Schub und Überlappung auf 0.** `pullCompMm` war das schon vorher;

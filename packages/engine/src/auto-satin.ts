@@ -208,6 +208,7 @@ function fillProposal(shape: Polygon, opts: AutoSatinOptions): FillObject {
     pullCompMm: 0,
     pushCompMm: 0,
     underlapMm: 0,
+    cutsBelow: "auto",
     underlay: preset.fillUnderlay,
   };
 }
@@ -260,29 +261,53 @@ export function autoSatin(shape: Polygon, opts: AutoSatinOptions = {}): AutoSati
 
   const box = polygonBbox(shape);
   const preset = PRESETS.pique;
-  const objects: StitchObject[] = orderBranches(rails, { x: box.minX, y: box.maxY }).map(
-    (r, i): SatinObject => {
-      const railA = dedupe(simplify(r.railA, RAIL_SIMPLIFY_MM), 1e-6);
-      const railB = dedupe(simplify(r.railB, RAIL_SIMPLIFY_MM), 1e-6);
-      return {
-        id: `${idPrefix}-${i}`,
-        type: "satin",
-        threadIndex: opts.threadIndex ?? 0,
-        visible: true,
-        locked: false,
-        trimAfter: "auto",
-        railA,
-        railB,
-        rungs: rungsFrom(r.railA, r.railB),
-        spacingMm: opts.spacingMm ?? preset.satinSpacingMm,
-        pullCompMm: opts.pullCompMm ?? preset.pullCompMm,
-        maxWidthMm,
-        underlay: opts.underlay ?? preset.satinUnderlay,
-        shortStitches: true,
-        reverse: false,
-      };
-    },
-  );
+  // Simplifying can collapse a rail that still had two points on the skeleton —
+  // a branch so short that both its rail points land on the same spot. Such a
+  // column is not stitchable, and it is dropped WITH a warning, not silently
+  // (rule 8).
+  const usable = orderBranches(rails, { x: box.minX, y: box.maxY })
+    .map((r) => ({
+      railA: dedupe(simplify(r.railA, RAIL_SIMPLIFY_MM), 1e-6),
+      railB: dedupe(simplify(r.railB, RAIL_SIMPLIFY_MM), 1e-6),
+      raw: r,
+    }))
+    .filter((r) => r.railA.length >= 2 && r.railB.length >= 2);
+
+  const collapsed = rails.length - usable.length;
+  if (collapsed > 0) {
+    warnings.push(
+      warn(
+        WARNING.SATIN_TOO_NARROW,
+        `${collapsed} of ${rails.length} branches collapse to a point once simplified — ` +
+          `they are left out of the proposal.`,
+        "warn",
+      ),
+    );
+  }
+  if (usable.length === 0) {
+    warnings.push(warn(WARNING.INVALID_GEOMETRY, "No rails survive simplification.", "error"));
+    return { objects: [], warnings };
+  }
+
+  const objects: StitchObject[] = usable.map(({ railA, railB, raw: r }, i): SatinObject => {
+    return {
+      id: `${idPrefix}-${i}`,
+      type: "satin",
+      threadIndex: opts.threadIndex ?? 0,
+      visible: true,
+      locked: false,
+      trimAfter: "auto",
+      railA,
+      railB,
+      rungs: rungsFrom(r.railA, r.railB),
+      spacingMm: opts.spacingMm ?? preset.satinSpacingMm,
+      pullCompMm: opts.pullCompMm ?? preset.pullCompMm,
+      maxWidthMm,
+      underlay: opts.underlay ?? preset.satinUnderlay,
+      shortStitches: true,
+      reverse: false,
+    };
+  });
 
   return { objects, warnings };
 }

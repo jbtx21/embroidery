@@ -1,10 +1,15 @@
 /**
  * Stitching order (spec §10.1).
  *
- * The default is the object list of the design. `autoOrder` is a SUGGESTION:
- * group by colour (minimising colour changes), then background before details
- * before outlines, and within a stage the shortest path. The user accepts it or
- * not — the engine never reorders on its own.
+ * `autoOrder` is the default since 20.09.2026 (spec §10.1): group by colour
+ * (minimising colour changes), then background before details before outlines,
+ * and within a stage the shortest path.
+ *
+ * What it may NOT do is turn two overlapping objects around. Stitched later
+ * means lying on top, which is what the knockdown of §4.1 builds on — grouping
+ * the colours of the STUTTGART logo put the black shield after the grey horse,
+ * and the knockdown then cut the horse away. So the grouping runs as a
+ * topological sort over the overlaps, and regroups only what is free to move.
  *
  * `centreOut` turns on the cap rule: from the centre outwards and from the
  * bottom up. Stitching pushes the fabric ahead of itself, and on the round cap
@@ -12,9 +17,47 @@
  * to right shifts under the design. It costs jumps, so on flat goods the
  * shortest path wins instead (spec §10.1).
  */
-import { dist } from "@texma-stitch/geometry";
-import { objectStart, orderRank } from "./object.js";
+import type { Polygon } from "@texma-stitch/geometry";
+import { dist, intersect, polygonArea, polygonBbox } from "@texma-stitch/geometry";
+import { coverPolygon, objectStart, orderRank } from "./object.js";
 import type { Point, StitchObject } from "./types.js";
+
+/** Overlap smaller than this is not worth a constraint (mm²). */
+const OVERLAP_EPS_MM2 = 1e-6;
+
+/**
+ * Who must stay under whom (spec §10.1).
+ *
+ * Stitched later means lying on top — that is the whole basis of the knockdown
+ * in §4.1. So the order may not turn two OVERLAPPING objects around: grouping
+ * the colours of the STUTTGART logo put the black shield after the grey horse,
+ * and the knockdown then cut the horse away, exactly as it was told to.
+ * Objects that do not overlap may be reordered freely.
+ */
+export function precedence(objects: StitchObject[]): number[][] {
+  const covers = objects.map((o) => coverPolygon(o));
+  const boxes = covers.map((c) => (c === undefined ? undefined : polygonBbox(c)));
+  const after: number[][] = objects.map(() => []);
+
+  for (let i = 0; i < objects.length; i++) {
+    const ci = covers[i];
+    const bi = boxes[i];
+    if (ci === undefined || bi === undefined) continue;
+    for (let j = i + 1; j < objects.length; j++) {
+      const cj = covers[j];
+      const bj = boxes[j];
+      if (cj === undefined || bj === undefined) continue;
+      if (bi.maxX < bj.minX || bj.maxX < bi.minX) continue;
+      if (bi.maxY < bj.minY || bj.maxY < bi.minY) continue;
+      const shared = intersect([ci as Polygon], [cj as Polygon]).reduce(
+        (sum, p) => sum + polygonArea(p),
+        0,
+      );
+      if (shared > OVERLAP_EPS_MM2) after[i]!.push(j);
+    }
+  }
+  return after;
+}
 
 /**
  * How wide a ring counts as "the same distance from the centre".
@@ -53,14 +96,13 @@ export type OrderOptions = {
 };
 
 export function autoOrder(objects: StitchObject[], opts: OrderOptions = {}): StitchObject[] {
-  // Colour groups in order of first appearance — that keeps the suggestion close
-  // to what the user already sees.
-  const groups = new Map<number, StitchObject[]>();
-  for (const obj of objects) {
-    const list = groups.get(obj.threadIndex);
-    if (list) list.push(obj);
-    else groups.set(obj.threadIndex, [obj]);
-  }
+  const n = objects.length;
+  if (n === 0) return [];
+
+  // Overlapping objects keep their order; everything else may be regrouped.
+  const after = precedence(objects);
+  const indegree = new Array<number>(n).fill(0);
+  for (const list of after) for (const j of list) indegree[j]!++;
 
   const centre = designCentre(objects);
   const entries = objects.map((obj) => {
@@ -69,49 +111,82 @@ export function autoOrder(objects: StitchObject[], opts: OrderOptions = {}): Sti
   });
   const bandMm = bandWidth(Math.max(0, ...entries.map((e) => e.radius)));
 
+  const done = new Array<boolean>(n).fill(false);
   const out: StitchObject[] = [];
-  for (const [, list] of groups) {
-    const open = list.map((obj) => entries.find((e) => e.obj === obj)!);
-    // Each colour starts afresh: after a trim the machine may begin anywhere,
-    // so every colour begins at the bottom of its innermost band.
-    let cursor: Point | undefined;
-    while (open.length > 0) {
-      // Rank first: underlays and areas before outlines (§10.1).
-      const rank = Math.min(...open.map((e) => e.rank));
-      const inRank = open.filter((e) => e.rank === rank);
-      // Then the innermost band that still has something in it.
-      const inner = Math.min(...inRank.map((e) => e.radius));
-      // Without the cap rule the whole stage is one band: the path decides.
-      const band = opts.centreOut ? inRank.filter((e) => e.radius <= inner + bandMm) : inRank;
+  let colour: number | undefined;
+  let cursor: Point | undefined;
 
-      let best = band[0]!;
-      if (cursor === undefined && opts.centreOut) {
-        // "From the bottom up": start at the lowest object of the band, and at
-        // equal height the one nearest the centre. y points down (§1).
-        for (const e of band) {
-          if (e.start.y > best.start.y || (e.start.y === best.start.y && e.radius < best.radius)) {
-            best = e;
-          }
-        }
-      } else {
-        // Inside the band the travel path decides — at equal distance again the
-        // lower object first. With no cursor yet, the first object of the list
-        // is where the machine already stands.
-        const from = cursor ?? best.start;
-        let bestDist = dist(from, best.start);
-        for (const e of band) {
-          const d = dist(from, e.start);
-          if (d < bestDist - 1e-9 || (Math.abs(d - bestDist) <= 1e-9 && e.start.y > best.start.y)) {
-            best = e;
-            bestDist = d;
-          }
+  while (out.length < n) {
+    const ready: number[] = [];
+    for (let i = 0; i < n; i++) if (!done[i] && indegree[i] === 0) ready.push(i);
+    if (ready.length === 0) {
+      // A cycle can only come from geometry that overlaps both ways. Keeping the
+      // design order for the rest is the honest answer.
+      for (let i = 0; i < n; i++) if (!done[i]) out.push(objects[i]!);
+      break;
+    }
+
+    // Stay on the colour in the needle for as long as the constraints allow.
+    let pool =
+      colour === undefined ? ready : ready.filter((i) => objects[i]!.threadIndex === colour);
+    if (pool.length === 0) {
+      colour = undefined;
+      cursor = undefined;
+      pool = ready;
+    }
+    if (colour === undefined) {
+      // A fresh colour: take the one the design would have reached first.
+      let first = pool[0]!;
+      for (const i of pool) {
+        if (
+          entries[i]!.rank < entries[first]!.rank ||
+          (entries[i]!.rank === entries[first]!.rank && i < first)
+        ) {
+          first = i;
         }
       }
-
-      open.splice(open.indexOf(best), 1);
-      out.push(best.obj);
-      cursor = best.start;
+      colour = objects[first]!.threadIndex;
+      pool = pool.filter((i) => objects[i]!.threadIndex === colour);
     }
+
+    // Background before details before outlines (§10.1).
+    const rank = Math.min(...pool.map((i) => entries[i]!.rank));
+    const inRank = pool.filter((i) => entries[i]!.rank === rank);
+    // The cap rule works in rings; on flat goods the whole stage is one ring.
+    const inner = Math.min(...inRank.map((i) => entries[i]!.radius));
+    const band = opts.centreOut
+      ? inRank.filter((i) => entries[i]!.radius <= inner + bandMm)
+      : inRank;
+
+    let best = band[0]!;
+    if (cursor === undefined && opts.centreOut) {
+      // "From the bottom up": the lowest object of the ring, and at equal height
+      // the one nearest the centre. y points down (§1).
+      for (const i of band) {
+        const e = entries[i]!;
+        const b = entries[best]!;
+        if (e.start.y > b.start.y || (e.start.y === b.start.y && e.radius < b.radius)) best = i;
+      }
+    } else {
+      const from = cursor ?? entries[best]!.start;
+      let bestDist = dist(from, entries[best]!.start);
+      for (const i of band) {
+        const d = dist(from, entries[i]!.start);
+        if (
+          d < bestDist - 1e-9 ||
+          (Math.abs(d - bestDist) <= 1e-9 && entries[i]!.start.y > entries[best]!.start.y)
+        ) {
+          best = i;
+          bestDist = d;
+        }
+      }
+    }
+
+    done[best] = true;
+    out.push(objects[best]!);
+    cursor = entries[best]!.start;
+    for (const j of after[best]!) indegree[j]!--;
   }
+
   return out;
 }

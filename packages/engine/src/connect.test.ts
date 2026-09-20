@@ -1,11 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { initGeometry } from "@texma-stitch/geometry";
 import { polygonOf, pt, rect } from "../test/fixtures/shapes.js";
 import { fillObject, runningObject, satinObject } from "../test/fixtures/designs.js";
 import { CONNECT_DEFAULTS, connectBlocks, decideConnection } from "./connect.js";
 import type { RawBlock } from "./connect.js";
+import type { Stitch } from "./types.js";
+
+beforeAll(async () => {
+  await initGeometry();
+});
 import {
   analyze,
   DENSITY_ERROR,
+  DENSITY_ERROR_PEAK,
+  DENSITY_ERROR_SHARE,
   DENSITY_WARN,
   LONG_JUMP_MM,
   MAX_COLOR_CHANGES,
@@ -232,8 +240,50 @@ describe("documented thresholds (spec §11)", () => {
   it("matches the numbers from the spec", () => {
     expect(DENSITY_WARN).toBe(12);
     expect(DENSITY_ERROR).toBe(18);
+    expect(DENSITY_ERROR_PEAK).toBe(30);
+    expect(DENSITY_ERROR_SHARE).toBe(0.01);
     expect(MAX_COLOR_CHANGES).toBe(8);
     expect(LONG_JUMP_MM).toBe(30);
+  });
+});
+
+describe("density verdict (spec §11)", () => {
+  /** n cells with `per` stitches each, plus `hot` cells with `hotCount`. */
+  const plan = (n: number, per: number, hot = 0, hotCount = 0): Stitch[] => {
+    const out: Stitch[] = [];
+    for (let i = 0; i < n; i++) {
+      for (let k = 0; k < per; k++) out.push({ x: i + 0.5, y: 0.5, cmd: "stitch" });
+    }
+    for (let i = 0; i < hot; i++) {
+      for (let k = 0; k < hotCount; k++) out.push({ x: i + 0.5, y: 10.5, cmd: "stitch" });
+    }
+    return out;
+  };
+  const codes = (s: Stitch[]) =>
+    analyze([{ objectId: "a", threadIndex: 0, stitches: s }]).warnings.filter(
+      (w) => w.code === "DENSITY_HIGH",
+    );
+
+  it("says nothing below the warning limit", () => {
+    expect(codes(plan(100, 10))).toHaveLength(0);
+  });
+
+  it("warns above 12 per mm²", () => {
+    expect(codes(plan(100, 13))[0]!.severity).toBe("warn");
+  });
+
+  it("keeps a lone hot spot a warning", () => {
+    // One cell of 20 among 1000 is 0,1 % — far under the one per cent.
+    expect(codes(plan(1000, 5, 1, 20))[0]!.severity).toBe("warn");
+  });
+
+  it("makes it an error when more than one per cent is overfilled", () => {
+    // 5 cells of 20 among 100 is 5 %.
+    expect(codes(plan(100, 5, 5, 20))[0]!.severity).toBe("error");
+  });
+
+  it("makes a single cell over 30 an error on its own", () => {
+    expect(codes(plan(1000, 5, 1, 31))[0]!.severity).toBe("error");
   });
 });
 
@@ -286,6 +336,29 @@ describe("order (spec §10.1)", () => {
     ]);
   });
 
+  it("never puts an overlapping object above one it was below (spec §10.1)", () => {
+    // The STUTTGART case: a black shield, a grey horse on it, a black band
+    // beside it. Grouping the blacks would bury the horse.
+    const objects = [
+      fillObject("shield", polygonOf(rect(0, 0, 40, 40))),
+      fillObject("horse", polygonOf(rect(10, 10, 20, 20)), { threadIndex: 1 }),
+      fillObject("band", polygonOf(rect(60, 0, 20, 20))),
+    ];
+    const ids = autoOrder(objects).map((o) => o.id);
+    expect(ids.indexOf("shield")).toBeLessThan(ids.indexOf("horse"));
+  });
+
+  it("still groups colours where nothing overlaps", () => {
+    const objects = [
+      fillObject("a", polygonOf(rect(0, 0, 10, 10))),
+      fillObject("b", polygonOf(rect(30, 0, 10, 10)), { threadIndex: 1 }),
+      fillObject("c", polygonOf(rect(60, 0, 10, 10))),
+    ];
+    // a and c share a colour and touch nothing, so they run together.
+    const ids = autoOrder(objects).map((o) => o.id);
+    expect(Math.abs(ids.indexOf("a") - ids.indexOf("c"))).toBe(1);
+  });
+
   it("takes the shortest path by default, not the centre", () => {
     // Without centreOut the machine simply works its way along (spec §10.1).
     const objects = [
@@ -297,9 +370,11 @@ describe("order (spec §10.1)", () => {
   });
 
   it("puts background before details before outlines", () => {
+    // Apart from each other, so nothing constrains the order (spec §10.1) and
+    // the stage is free to decide.
     const objects = [
       runningObject("outline", [pt(0, 0), pt(1, 0)]),
-      satinObject("detail", [pt(0, 0), pt(1, 0)], [pt(0, 2), pt(1, 2)]),
+      satinObject("detail", [pt(30, 0), pt(31, 0)], [pt(30, 2), pt(31, 2)]),
       fillObject("background", polygonOf(rect(0, 0, 10, 10))),
     ];
     for (const opts of [undefined, { centreOut: true }]) {

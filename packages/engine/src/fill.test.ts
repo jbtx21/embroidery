@@ -267,8 +267,20 @@ describe("generation", () => {
     expect(bl.maxY - bl.minY).toBeGreaterThan(bp.maxY - bp.minY + 0.8);
   });
 
-  it("reports an area that vanishes under pull compensation", () => {
-    const r = generateFill(fillObject("f", polygonOf(rect(0, 0, 2, 2)), { pullCompMm: -5 }));
+  it("stitches without compensation rather than losing the area (spec §8.1.1)", () => {
+    // A 0,3 mm sliver disappears under a 0,2 mm push, but it is still part of
+    // the design — it gets stitched, and the warning says why.
+    const r = generateFill(
+      fillObject("f", polygonOf(rect(0, 0, 20, 0.3)), { pushCompMm: 0.2, pullCompMm: 0 }),
+    );
+    expect(r.stitches.length).toBeGreaterThan(0);
+    expect(r.warnings.find((w) => w.code === "INVALID_GEOMETRY")?.severity).toBe("warn");
+  });
+
+  it("reports an area that vanishes under the underlap", () => {
+    const r = generateFill(
+      fillObject("f", polygonOf(rect(0, 0, 2, 2)), { pullCompMm: 0, underlapMm: -5 }),
+    );
     expect(r.stitches).toHaveLength(0);
     expect(r.warnings.find((w) => w.code === "INVALID_GEOMETRY")?.severity).toBe("error");
   });

@@ -44,6 +44,7 @@ export function fillObject(id: string, shape: Polygon, over: Partial<FillObject>
     pullCompMm: 0,
     pushCompMm: 0,
     underlapMm: 0,
+    cutsBelow: "auto" as const,
     underlay: { contour: false, fill: "none", spacingMm: 2, insetMm: 0.4 },
     ...over,
   };

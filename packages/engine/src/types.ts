@@ -50,6 +50,8 @@ export type FillObject = Base & {
   pushCompMm: number;
   /** Overlap under the neighbouring outline, outwards — spec §8.1.2. */
   underlapMm: number;
+  /** Does this fill cut out of the fills below it? Spec §4.1. */
+  cutsBelow: "auto" | "never" | "always";
   underlay: FillUnderlay;
   startPoint?: Point;
   endPoint?: Point;
@@ -108,6 +110,8 @@ export type Design = {
   widthMm: number;
   heightMm: number;
   preset: PresetId;
+  /** "auto" (default) runs `autoOrder`, "manual" keeps the object list — spec §10.1. */
+  orderMode?: "auto" | "manual";
   /** Order of the list is the stitching order. */
   objects: StitchObject[];
   threads: Thread[];
