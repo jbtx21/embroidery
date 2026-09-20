@@ -8,7 +8,7 @@ import type { Font, InkstitchMeta } from "@texma-stitch/fonts";
 import { columnsOf, fontRegistry, importInkstitchFont, strokesOf } from "@texma-stitch/fonts";
 import { design, textObject } from "../test/fixtures/designs.js";
 import { expand } from "./expand.js";
-import { FONT_SWITCH_MM, fontForHeight, fontIdForHeight } from "./font-choice.js";
+import { FONT_SMALL_ID, FONT_SWITCH_MM, fontForHeight, fontIdForHeight } from "./font-choice.js";
 import { planDesign } from "./pipeline.js";
 import { PRESETS } from "./presets.js";
 
@@ -83,14 +83,28 @@ describe("font choice by height (spec §9.4)", () => {
     expect(fontForHeight(registry, 14, fonts)!.id).toBe("caffeine_KOR");
   });
 
-  it("warns when the house rule leaves what the font declares (spec §9.4)", () => {
-    // caffeine_tiny tops out at 5,7 mm, so 8 mm is past its own range.
+  it("says it as info when the house rule scales past what the font declares (spec §9.4)", () => {
+    // caffeine_tiny tops out at 5,7 mm, so 8 mm is past its own range. Scaling a
+    // satin font up widens the columns, so this is a note, not a complaint.
     const id = fontIdForHeight(8);
     const r = expand([textObject("t", "TEX", { x: 0, y: 30 }, { heightMm: 8, fontId: id })], {
       preset: PRESETS.pique,
       fonts: registry,
     });
-    expect(r.warnings.map((w) => w.code)).toContain("TEXT_TOO_LARGE");
+    const above = r.warnings.find((w) => w.code === "TEXT_ABOVE_FONT_MAX");
+    expect(above).toBeDefined();
+    expect(above!.severity).toBe("info");
+  });
+
+  it("keeps scaling below min_scale a warning (spec §9.4)", () => {
+    // Down there the columns get too narrow — that one stays a complaint.
+    const r = expand(
+      [textObject("t", "TEX", { x: 0, y: 30 }, { heightMm: 1.5, fontId: FONT_SMALL_ID })],
+      { preset: PRESETS.pique, fonts: registry },
+    );
+    const below = r.warnings.find((w) => w.code === "TEXT_TOO_SMALL");
+    expect(below).toBeDefined();
+    expect(below!.severity).toBe("warn");
   });
 
   it("plans a line in the large font all the way through", () => {
@@ -102,7 +116,7 @@ describe("font choice by height (spec §9.4)", () => {
     );
     const plan = planDesign(design([text]), { fonts: registry });
     expect(plan.stats.stitches).toBeGreaterThan(500);
-    expect(plan.warnings.map((w) => w.code)).not.toContain("TEXT_TOO_LARGE");
+    expect(plan.warnings.map((w) => w.code)).not.toContain("TEXT_ABOVE_FONT_MAX");
     expect(plan.warnings.map((w) => w.code)).not.toContain("TEXT_TOO_SMALL");
   });
 });

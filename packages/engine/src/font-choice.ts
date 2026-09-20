@@ -2,8 +2,9 @@
  * Which font to set a text in (spec §9.4).
  *
  * The default pair is `caffeine_tiny` up to 9 mm and `caffeine_KOR` above it.
- * That is a house rule, not a property of the fonts — `expand` warns when the
- * height leaves what the chosen font itself declares (§9.4).
+ * The 9 mm are a house rule, not a font limit: scaling a satin font past its own
+ * maximum widens the columns rather than thinning them, so `expand` notes it as
+ * `info TEXT_ABOVE_FONT_MAX`. Below `min_scale` it stays a warning (§9.4).
  */
 import type { Font, FontRegistry } from "@texma-stitch/fonts";
 

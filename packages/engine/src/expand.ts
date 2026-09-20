@@ -121,15 +121,17 @@ function expandText(
   }
 
   // A font also has an upper limit — the glyphs were drawn for a size range
-  // (spec §9.4). Scaling past it is said out loud, not silently allowed.
+  // (spec §9.4). Scaling a satin font past it widens the columns rather than
+  // thinning them, so this is a note, not a complaint: said out loud (rule 8),
+  // but as `info`. The warning that bites is TEXT_TOO_SMALL above.
   const maxHeightMm = font.maxHeightMm;
   if (maxHeightMm !== undefined && obj.heightMm > maxHeightMm) {
     warnings.push(
       warn(
-        WARNING.TEXT_TOO_LARGE,
+        WARNING.TEXT_ABOVE_FONT_MAX,
         `${obj.heightMm} mm is above the maximum height ${maxHeightMm.toFixed(1)} mm of ` +
-          `"${font.name}".`,
-        "warn",
+          `"${font.name}". The columns get wider, not thinner.`,
+        "info",
         obj.id,
       ),
     );
