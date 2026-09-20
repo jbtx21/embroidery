@@ -79,6 +79,7 @@ type Base = {
   visible: boolean;
   locked: boolean;
   trimAfter: 'auto' | 'always' | 'never';
+  sequence?: string;           // gleiche Folge = Reihenfolge steht fest (§10.1)  (20.09.2026)
 };
 
 type FillObject = Base & {
@@ -501,7 +502,31 @@ In einer Glyph-Ebene stehen die Pfade **in Stickreihenfolge**:
 `rtl.svg` wird nicht gelesen — §9 setzt von links nach rechts.
 
 **Lizenz je Schrift.** Nicht jede Schrift im Ink/Stitch-Repo darf weitergegeben werden. Die `LICENSE` des Ordners gehört mit ins Repo, und ohne sie kommt keine Schrift herein. `caffeine_tiny` steht unter der SIL Open Font License 1.1.
-- `expand()`: Glyphen auf Grundlinie oder Pfad setzen, auf `heightMm` skalieren, Satin-Parameter aus Preset. Reihenfolge: Buchstabe für Buchstabe, Verbindung zwischen Buchstaben als Running unter dem nächsten Buchstaben, sonst Trim.
+- `expand()`: Glyphen auf Grundlinie oder Pfad setzen, auf `heightMm` skalieren. Reihenfolge: Buchstabe für Buchstabe, Verbindung zwischen Buchstaben als Running unter dem nächsten Buchstaben, sonst Trim.
+
+### 9.2 Die Schrift bringt ihre Stichparameter mit *(20.09.2026 — vorher „Satin-Parameter aus Preset")*
+
+Ein Glyph ist mit bestimmten Parametern gezeichnet worden, und die Seitenabstände der
+Schrift sind darauf abgestimmt. `caffeine_tiny` nennt an jeder Spalte
+`pull_compensation_mm="0.05"` und `zigzag_spacing_mm="0.25"`. Werden stattdessen die
+Preset-Werte genommen (Piqué: 0,20 und 0,38), wächst jeder Buchstabe um 0,4 mm in der
+Breite — gemessen an „TEXMA" in 8 mm bleiben von 0,48 mm Abstand noch 0,08 mm, und mit
+0,4 mm Fadenbreite sticken die Buchstaben ineinander.
+
+Also: **was die Schrift sagt, gilt.** Der Zugausgleich, der Zickzack-Abstand und der
+Kurzstich-Abstand kommen aus der Schrift. Das Preset füllt, was die Schrift nicht sagt, und
+behält die **Unterlage** — die gehört zum Stoff, nicht zum Buchstaben.
+
+### 9.3 Die Reihenfolge der Schrift steht fest *(20.09.2026)*
+
+In einer Glyph-Ebene stehen Spalten und Laufstich-Verbinder **abwechselnd**: Spalte, Weg
+zur nächsten Spalte, Spalte. Genau dafür sind die Verbinder da. `autoOrder` sortierte sie
+nach §10.1 auseinander — erst alle 25 Spalten von „TEXMA", dann alle 22 Verbinder — und
+stickte die Wege zuletzt über die fertigen Buchstaben, mit 23 Trims.
+
+Die Objekte eines Textes bekommen deshalb dasselbe `sequence` (§3) und behalten damit ihre
+Reihenfolge. Dasselbe gilt für die Spalten eines Auto-Satin-Vorschlags: auch die sind
+bereits geordnet (§7.7).
 - Jede Schrift hat `minHeightMm` (typisch 5). Darunter Warnung `TEXT_TOO_SMALL`.
 - Phase 1: eine Schrift (serifenlos, Versalhöhe 5–15 mm). Phase 3: 5–10.
 
@@ -512,6 +537,12 @@ In einer Glyph-Ebene stehen die Pfade **in Stickreihenfolge**:
 ### 10.1 Reihenfolge
 - **Standard: `autoOrder()`** *(20.09.2026 — vorher „Objektliste wie im Design")*. `Design.orderMode` steuert es: `'auto'` (Standard) rechnet den Vorschlag, `'manual'` nimmt die Objektliste, wie sie ist. Grund: mit der Designreihenfolge braucht das STUTTGART-Logo zwölf Farbwechsel für zwei Farben, mit `auto` einen; beim Köln-Logo 21 statt 5. Eine Voreinstellung, die man in jedem einzelnen Fall ändern muss, ist die falsche Voreinstellung. Wer die Reihenfolge selbst gelegt hat, setzt `'manual'`.
 - Vorschlag `autoOrder()`: nach Farbe gruppieren (Farbwechsel minimieren), innerhalb einer Farbe in drei Stufen, danach nach dem kürzesten Weg. Der Nutzer kann den Vorschlag annehmen oder überschreiben.
+
+**Eine Folge bindet die Reihenfolge** *(20.09.2026)*. Objekte mit demselben `sequence` (§3)
+behalten ihre Reihenfolge untereinander. Das ist nicht dasselbe wie eine Überdeckung: hier
+weiß der Erzeuger — `expand` für einen Text, `autoSatin` für einen Vorschlag —, in welcher
+Reihenfolge seine Objekte gestickt gehören, und diese Reihenfolge ist Teil des Ergebnisses.
+Zwischen verschiedenen Folgen darf weiter umgruppiert werden.
 
 **Überdeckung bindet die Reihenfolge** *(20.09.2026)*. Zwei Objekte, deren gestickte
 Flächen sich überdecken, behalten ihre Reihenfolge aus dem Design — alles andere darf

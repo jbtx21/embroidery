@@ -8,7 +8,7 @@
  */
 import type { Point, Polyline } from "@texma-stitch/geometry";
 import { cumulativeLengths, pointAt, tangentAt } from "@texma-stitch/geometry";
-import type { Font, FontRegistry } from "@texma-stitch/fonts";
+import type { Font, FontRegistry, GlyphColumn } from "@texma-stitch/fonts";
 import { kerningOf } from "@texma-stitch/fonts";
 import type { MachineProfile, Preset } from "./presets.js";
 import { MACHINE_DEFAULT, textMinFactor } from "./presets.js";
@@ -49,7 +49,7 @@ function satinFrom(
   obj: TextObject,
   preset: Preset,
   id: string,
-  column: { railA: Polyline; railB: Polyline; rungs: [Point, Point][] },
+  column: GlyphColumn,
   place: Placement,
   trimAfter: SatinObject["trimAfter"],
 ): SatinObject {
@@ -60,11 +60,14 @@ function satinFrom(
     visible: true,
     locked: false,
     trimAfter,
+    sequence: obj.id,
     railA: column.railA.map(place),
     railB: column.railB.map(place),
     rungs: column.rungs.map((r) => [place(r[0]), place(r[1])] as [Point, Point]),
-    spacingMm: preset.satinSpacingMm,
-    pullCompMm: preset.pullCompMm,
+    // What the font states beats the preset (spec §9.2) — the glyph was drawn
+    // with these values and its side bearings are cut to match.
+    spacingMm: column.spacingMm ?? preset.satinSpacingMm,
+    pullCompMm: column.pullCompMm ?? preset.pullCompMm,
     maxWidthMm: TEXT_MAX_WIDTH_MM,
     underlay: preset.satinUnderlay,
     shortStitches: true,
@@ -86,6 +89,7 @@ function runningFrom(
     visible: true,
     locked: false,
     trimAfter,
+    sequence: obj.id,
     path: stroke.map(place),
     closed: false,
     stitchLengthMm: 2.5,
@@ -154,11 +158,16 @@ function expandText(
       ? (p) => pathPlacement({ x: p.x + advance, y: p.y })
       : baseline(obj.origin, scale, advance);
 
-    glyph.columns.forEach((column, k) => {
-      objects.push(satinFrom(obj, ctx.preset, `${obj.id}:${i}:s${k}`, column, place, trimAfter));
-    });
-    (glyph.strokes ?? []).forEach((stroke, k) => {
-      objects.push(runningFrom(obj, `${obj.id}:${i}:r${k}`, stroke, place, trimAfter));
+    // In stitch order — column, way to the next column, column (spec §9.3).
+    // The cut belongs after the LAST piece of the letter; a trim after every
+    // column would cut the thread inside the letter.
+    glyph.parts.forEach((part, k) => {
+      const cut = k === glyph.parts.length - 1 ? trimAfter : "auto";
+      objects.push(
+        part.kind === "column"
+          ? satinFrom(obj, ctx.preset, `${obj.id}:${i}:s${k}`, part, place, cut)
+          : runningFrom(obj, `${obj.id}:${i}:r${k}`, part.path, place, cut),
+      );
     });
 
     pen += glyph.advance + obj.letterSpacing;

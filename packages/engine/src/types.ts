@@ -25,6 +25,12 @@ export type Base = {
   visible: boolean;
   locked: boolean;
   trimAfter: TrimAfter;
+  /**
+   * Objects sharing a sequence keep their order relative to each other — the
+   * maker knew it (spec §10.1). Set by `expand` for a text and by `autoSatin`
+   * for a proposal.
+   */
+  sequence?: string;
 };
 
 export type FillUnderlay = {

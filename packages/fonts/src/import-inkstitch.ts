@@ -14,7 +14,7 @@
  */
 import type { Point, Polyline } from "@texma-stitch/geometry";
 import { flattenPath, parsePathData } from "@texma-stitch/geometry";
-import type { Font, Glyph, GlyphColumn } from "./types.js";
+import type { Font, Glyph, GlyphPart } from "./types.js";
 
 /** What we read out of `font.json`; everything else there is ignored. */
 export type InkstitchMeta = {
@@ -126,31 +126,41 @@ function subpathsOf(d: string, toleranceUnits: number): Polyline[] {
 }
 
 function glyphFrom(body: string, toleranceUnits: number, place: (p: Point) => Point): Glyph {
-  const columns: GlyphColumn[] = [];
-  const strokes: Polyline[] = [];
+  // Document order IS stitch order (spec §9.1), so one list keeps it.
+  const parts: GlyphPart[] = [];
 
   for (const tag of body.match(/<path\b[\s\S]*?\/>/g) ?? []) {
     const d = attr(tag, "d");
     if (!d) continue;
-    const parts = subpathsOf(d, toleranceUnits).map((line) => line.map(place));
-    if (parts.length === 0) continue;
+    const lines = subpathsOf(d, toleranceUnits).map((line) => line.map(place));
+    if (lines.length === 0) continue;
 
     const isSatin = (attr(tag, "inkstitch:satin_column") ?? "").toLowerCase() === "true";
-    if (isSatin && parts.length >= 2) {
-      // Rails first, then the rungs — a rung is read as its two ends.
-      columns.push({
-        railA: parts[0]!,
-        railB: parts[1]!,
-        rungs: parts.slice(2).map((r) => [r[0]!, r[r.length - 1]!] as [Point, Point]),
+    if (isSatin && lines.length >= 2) {
+      // Rails first, then the rungs — a rung is read as its two ends. The stitch
+      // parameters belong to the glyph, not to the fabric (spec §9.2).
+      const mm = (name: string): number | undefined => {
+        const v = Number(attr(tag, `inkstitch:${name}`));
+        return Number.isFinite(v) && v > 0 ? v : undefined;
+      };
+      const spacingMm = mm("zigzag_spacing_mm");
+      const pullCompMm = mm("pull_compensation_mm");
+      const shortStitchMm = mm("short_stitch_distance_mm");
+      parts.push({
+        kind: "column",
+        railA: lines[0]!,
+        railB: lines[1]!,
+        rungs: lines.slice(2).map((r) => [r[0]!, r[r.length - 1]!] as [Point, Point]),
+        ...(spacingMm === undefined ? {} : { spacingMm }),
+        ...(pullCompMm === undefined ? {} : { pullCompMm }),
+        ...(shortStitchMm === undefined ? {} : { shortStitchMm }),
       });
       continue;
     }
-    for (const line of parts) strokes.push(line);
+    for (const line of lines) parts.push({ kind: "stroke", path: line });
   }
 
-  const glyph: Glyph = { columns, advance: 0 };
-  if (strokes.length > 0) glyph.strokes = strokes;
-  return glyph;
+  return { parts, advance: 0 };
 }
 
 export function importInkstitchFont(svg: string, meta: InkstitchMeta, id: string): Font {
@@ -179,7 +189,7 @@ export function importInkstitchFont(svg: string, meta: InkstitchMeta, id: string
     glyphs[ch] = { ...glyphFrom(body, toleranceUnits, place), advance: advanceOf(ch) };
   }
   // A space carries no geometry, so it has no layer of its own.
-  if (!glyphs[" "]) glyphs[" "] = { columns: [], advance: advanceOf(" ") };
+  if (!glyphs[" "]) glyphs[" "] = { parts: [], advance: advanceOf(" ") };
 
   const font: Font = {
     id,

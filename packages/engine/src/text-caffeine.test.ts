@@ -11,6 +11,7 @@ import { planDesign } from "./pipeline.js";
 import { PRESETS } from "./presets.js";
 import { MAX_STITCH_MM } from "./post.js";
 import { expand } from "./expand.js";
+import { autoOrder } from "./order.js";
 import type { SatinObject } from "./types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -70,6 +71,59 @@ describe('"TEXMA" in 8 mm with caffeine_tiny (spec §9)', () => {
       prev = s;
     }
     expect(worst).toBeLessThanOrEqual(MAX_STITCH_MM);
+  });
+
+  it("keeps the columns and the connectors interleaved (spec §9.3)", () => {
+    const r = expand([text], { preset: PRESETS.pique, fonts });
+    // Every object of one text carries the same sequence.
+    expect(new Set(r.objects.map((o) => o.sequence))).toEqual(new Set(["t"]));
+    const kinds = r.objects.map((o) => (o.type === "satin" ? "S" : "r")).join("");
+    expect(kinds).toMatch(/S+r+S/); // the font interleaves them
+    // autoOrder must not pull them apart.
+    expect(autoOrder(r.objects).map((o) => o.id)).toEqual(r.objects.map((o) => o.id));
+  });
+
+  it("uses the pull compensation of the font, not of the preset (spec §9.2)", () => {
+    const r = expand([text], { preset: PRESETS.pique, fonts });
+    const col = r.objects.find((o): o is SatinObject => o.type === "satin")!;
+    expect(col.pullCompMm).toBeCloseTo(0.05, 6);
+    expect(col.spacingMm).toBeCloseTo(0.25, 6);
+    expect(PRESETS.pique.pullCompMm).toBe(0.2); // the preset would be four times as much
+  });
+
+  it("leaves a gap between the letters once they are stitched", () => {
+    const plan = planDesign(design([text]), { fonts });
+    // Per letter: the widest x the stitches reach.
+    const bounds = new Map<string, { x0: number; x1: number }>();
+    for (const b of plan.blocks) {
+      const letter = b.objectId.split(":")[1] ?? "";
+      const cur = bounds.get(letter) ?? { x0: Infinity, x1: -Infinity };
+      for (const s of b.stitches) {
+        if (s.cmd !== "stitch") continue;
+        cur.x0 = Math.min(cur.x0, s.x);
+        cur.x1 = Math.max(cur.x1, s.x);
+      }
+      bounds.set(letter, cur);
+    }
+    const ordered = [...bounds.entries()].sort((a, c) => Number(a[0]) - Number(c[0]));
+    for (let i = 1; i < ordered.length; i++) {
+      const gap = ordered[i]![1].x0 - ordered[i - 1]![1].x1;
+      // Thread is about 0,4 mm wide, so anything under that touches.
+      expect(gap).toBeGreaterThan(0.4);
+    }
+  });
+
+  it("cuts after a letter, not inside one (spec §9)", () => {
+    const r = expand([text], { preset: PRESETS.pique, fonts });
+    const perLetter = new Map<string, number>();
+    for (const o of r.objects) {
+      if (o.trimAfter !== "always") continue;
+      const letter = o.id.split(":")[1]!;
+      perLetter.set(letter, (perLetter.get(letter) ?? 0) + 1);
+    }
+    // At most one forced cut per letter, and only at the end of the word.
+    for (const n of perLetter.values()) expect(n).toBe(1);
+    expect(perLetter.size).toBe(1);
   });
 
   it("warns below the minimum height of the font", () => {

@@ -36,8 +36,19 @@ const OVERLAP_EPS_MM2 = 1e-6;
  */
 export function precedence(objects: StitchObject[]): number[][] {
   const covers = objects.map((o) => coverPolygon(o));
-  const boxes = covers.map((c) => (c === undefined ? undefined : polygonBbox(c)));
   const after: number[][] = objects.map(() => []);
+
+  // A sequence is the maker's own order — a text knows where its connectors go,
+  // an auto-satin proposal knows the way through its columns (spec §10.1).
+  const lastOf = new Map<string, number>();
+  for (const [i, o] of objects.entries()) {
+    if (o.sequence === undefined) continue;
+    const prev = lastOf.get(o.sequence);
+    if (prev !== undefined) after[prev]!.push(i);
+    lastOf.set(o.sequence, i);
+  }
+
+  const boxes = covers.map((c) => (c === undefined ? undefined : polygonBbox(c)));
 
   for (let i = 0; i < objects.length; i++) {
     const ci = covers[i];

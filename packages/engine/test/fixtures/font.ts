@@ -12,8 +12,9 @@ export const TEST_FONT: Font = {
   minHeightMm: 5,
   glyphs: {
     I: {
-      columns: [
+      parts: [
         {
+          kind: "column",
           railA: [
             { x: 0.1, y: 0 },
             { x: 0.1, y: -1 },
@@ -28,12 +29,14 @@ export const TEST_FONT: Font = {
       advance: 0.5,
     },
     ".": {
-      columns: [],
-      strokes: [
-        [
-          { x: 0.1, y: 0 },
-          { x: 0.2, y: 0 },
-        ],
+      parts: [
+        {
+          kind: "stroke",
+          path: [
+            { x: 0.1, y: 0 },
+            { x: 0.2, y: 0 },
+          ],
+        },
       ],
       advance: 0.3,
     },

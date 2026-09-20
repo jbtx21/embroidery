@@ -3,7 +3,8 @@
  *
  * A glyph is a list of satin columns (rails plus rungs) in units of a cap height
  * of 1.0, together with `advance` and optional kerning. Laying out scales to
- * `heightMm`; the satin parameters come from the preset.
+ * `heightMm`; the satin parameters come from the font where it states them and
+ * from the preset otherwise (spec §9.2).
  */
 import type { Point, Polyline } from "@texma-stitch/geometry";
 
@@ -11,16 +12,42 @@ export type GlyphColumn = {
   railA: Polyline;
   railB: Polyline;
   rungs: [Point, Point][];
+  /**
+   * What the font says about this column (spec §9.2). The glyph was drawn with
+   * these values and its side bearings are cut to match, so they beat the
+   * preset. Absent where the font says nothing.
+   */
+  spacingMm?: number;
+  pullCompMm?: number;
+  shortStitchMm?: number;
 };
 
+/** A thin part stitched as a running stitch — a dot, an accent, a connector. */
+export type GlyphStroke = { kind: "stroke"; path: Polyline };
+
+/** One piece of a glyph. */
+export type GlyphPart = ({ kind: "column" } & GlyphColumn) | GlyphStroke;
+
 export type Glyph = {
-  /** Satin columns of the letter. */
-  columns: GlyphColumn[];
-  /** Thin parts stitched as a running stitch (dots, accents). */
-  strokes?: Polyline[];
+  /**
+   * The pieces of the letter IN STITCH ORDER (spec §9.3).
+   *
+   * Columns and connectors alternate in a real font — column, way to the next
+   * column, column. Two separate lists would lose exactly that, and the
+   * connectors would end up stitched over the finished letter.
+   */
+  parts: GlyphPart[];
   /** Advance to the next letter, in cap heights. */
   advance: number;
 };
+
+/** The satin columns of a glyph, in order. */
+export const columnsOf = (g: Glyph): GlyphColumn[] =>
+  g.parts.filter((p): p is { kind: "column" } & GlyphColumn => p.kind === "column");
+
+/** The running-stitch pieces of a glyph, in order. */
+export const strokesOf = (g: Glyph): Polyline[] =>
+  g.parts.filter((p): p is GlyphStroke => p.kind === "stroke").map((p) => p.path);
 
 export type Font = {
   id: string;

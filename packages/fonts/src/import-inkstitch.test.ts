@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { capHeightUnits, importInkstitchFont, parseGlyphLayers } from "./import-inkstitch.js";
+import { columnsOf, strokesOf } from "./types.js";
 import type { InkstitchMeta } from "./import-inkstitch.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -46,15 +47,17 @@ describe("importInkstitchFont (spec §9)", () => {
 
   it("puts the baseline at y = 0 and the cap height at -1", () => {
     const I = font.glyphs["I"]!;
-    const ys = I.columns.flatMap((c) => [...c.railA, ...c.railB]).map((p) => p.y);
+    const ys = columnsOf(I)
+      .flatMap((c) => [...c.railA, ...c.railB])
+      .map((p) => p.y);
     expect(Math.max(...ys)).toBeCloseTo(0, 1);
     expect(Math.min(...ys)).toBeCloseTo(-1, 1);
   });
 
   it("reads the satin columns with their rungs", () => {
     const I = font.glyphs["I"]!;
-    expect(I.columns.length).toBeGreaterThanOrEqual(2);
-    for (const c of I.columns) {
+    expect(columnsOf(I).length).toBeGreaterThanOrEqual(2);
+    for (const c of columnsOf(I)) {
       expect(c.railA.length).toBeGreaterThanOrEqual(2);
       expect(c.railB.length).toBeGreaterThanOrEqual(2);
       for (const r of c.rungs) expect(r).toHaveLength(2);
@@ -62,7 +65,21 @@ describe("importInkstitchFont (spec §9)", () => {
   });
 
   it("keeps the running stitches that connect the columns", () => {
-    expect(font.glyphs["I"]!.strokes?.length).toBeGreaterThan(0);
+    expect(strokesOf(font.glyphs["I"]!).length).toBeGreaterThan(0);
+  });
+
+  it("carries the stitch parameters the font states (spec §9.2)", () => {
+    const col = columnsOf(font.glyphs["I"]!)[0]!;
+    // caffeine_tiny states 0,05 mm pull and 0,25 mm zigzag at every column.
+    expect(col.pullCompMm).toBeCloseTo(0.05, 6);
+    expect(col.spacingMm).toBeCloseTo(0.25, 6);
+    expect(col.shortStitchMm).toBeCloseTo(0.17, 6);
+  });
+
+  it("leaves the parameters out where the font says nothing", () => {
+    const stripped = svg.replace(/inkstitch:pull_compensation_mm="[^"]*"/g, "");
+    const f = importInkstitchFont(stripped, meta, "x");
+    expect(columnsOf(f.glyphs["I"]!)[0]!.pullCompMm).toBeUndefined();
   });
 
   it("takes the advance from the metadata, in cap heights", () => {
@@ -80,5 +97,15 @@ describe("importInkstitchFont (spec §9)", () => {
     expect(JSON.stringify(importInkstitchFont(svg, meta, "a"))).toBe(
       JSON.stringify(importInkstitchFont(svg, meta, "a")),
     );
+  });
+});
+
+describe("glyph order (spec §9.3)", () => {
+  it("keeps columns and connectors interleaved, as the font draws them", () => {
+    const font = importInkstitchFont(svg, meta, "c");
+    const kinds = font.glyphs["I"]!.parts.map((p) => (p.kind === "column" ? "S" : "r")).join("");
+    // The font walks in: run, column, run, column — not all columns first.
+    expect(kinds).toMatch(/rS/);
+    expect(kinds).not.toBe("S".repeat(kinds.length));
   });
 });

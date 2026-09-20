@@ -18,6 +18,12 @@ Neue Einträge oben in den passenden Abschnitt.
 - **Die Unterlappung summiert sich an Knotenpunkten.** Wo acht Flächen zusammenstoßen,
   legt jede ihre 0,8 mm übereinander. **Frage:** soll `resolveOverlaps` die Unterlappung
   an Mehrfachnähten begrenzen?
+- **Die Dichtegrenzen aus §11 kennen die Garnstärke nicht.** `caffeine_tiny` schreibt
+  60er Garn vor und setzt seinen Zickzack auf 0,25 mm; „TEXMA" in 8 mm kommt damit auf
+  19 Stiche/mm² und meldet `DENSITY_HIGH`. Mit 60er Garn ist das richtig gestickt, mit 40er
+  wäre es zu dicht — die Meldung ist also nicht falsch, aber sie misst gegen 40er.
+  §14 hat für die Abstände längst einen Dichtefaktor (0,8 bei 60er). **Frage an die Spec:**
+  sollen die Grenzen aus §11 mit demselben Faktor mitskalieren?
 - **`SATIN_TOO_NARROW` misst das Minimum und trifft damit jede Schrift.** §7.4 warnt unter
   1 mm Spaltenbreite, gemessen über die schmalste Sprosse. Eine Schriftspalte läuft am
   Buchstabenende spitz zu — „TEXMA" in 8 mm erzeugt deshalb 23 Warnungen, die kleinste über
