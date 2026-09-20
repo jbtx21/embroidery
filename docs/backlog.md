@@ -23,6 +23,29 @@ Neue Einträge oben in den passenden Abschnitt.
   Buchstabenende spitz zu — „TEXMA" in 8 mm erzeugt deshalb 23 Warnungen, die kleinste über
   0,08 mm. Das ist Schriftgestaltung, kein Fehler. **Frage an die Spec:** soll das Kriterium
   auf die mediane Breite oder auf einen Anteil der Spalte gehen?
+- **Golden Files für §15 gibt es nirgends zu holen.** Geprüft am 20.09.2026: das
+  Ink/Stitch-Repo (`inkstitch/inkstitch`) hat in `tests/` **keine** SVG-DST-Paare, nur
+  Lettering-Fixtures und ein Style-Cascade-SVG. Die Abnahme aus §15 braucht also Dateien,
+  die **bei TEXMA entstehen**: SVG in Inkscape mit Ink/Stitch parametrisieren, als DST
+  exportieren, beide ins Repo. Das ist keine offene Suche mehr, sondern eine Zulieferung.
+- **Der Konverter liest nur den Einzeldatei-Aufbau.** 132 der 142 Schriften haben
+  `ltr.svg`; fünf legen einen Ordner `ltr/` mit einer SVG je Glyph an
+  (`ags_garamond_latin_grec`, `honoka`, `mai_en_fleur`, `roman_ags_bicolor`, `sunset`).
+  Ink/Stitch kennt zusätzlich `.xz`-gepackte Varianten, die im Fonts-Repo aber nicht
+  vorkommen. Kleine Erweiterung, sobald eine dieser Schriften gebraucht wird.
+- **Neun Ink/Stitch-Schriften sind für Kundenarbeit gesperrt.** Acht stehen unter
+  CC BY-NC-SA 4.0 (nicht gewerblich), eine unter CC BY-ND 4.0 (keine Bearbeitung — die
+  Umwandlung ins JSON ist eine). Namen in `packages/fonts/src/inkstitch/README.md`. 103
+  sind OFL, 27 CC BY-SA, 3 Public Domain.
+- **`libembroidery` (Zlib) als zweite Meinung zu §13.2.** PES, JEF, VP3 und EXP laufen bei
+  uns über `apps/api` und pyembroidery (MIT). `Embroidermodder/libembroidery` liest und
+  schreibt dieselben Formate unter Zlib-Lizenz — brauchbar als Kreuzprüfung oder als
+  Format-Referenz. `frno7/libpes` wäre genauer für PES, steht aber unter GPL-3.0 und
+  scheidet damit für uns aus.
+- **Ink/Stitch ist GPL-3.0.** Der Code taugt zum Verstehen eines Verfahrens, **nicht zum
+  Übernehmen**. Das gilt besonders für den offenen Punkt `railsForBranch`: die Lösung
+  (Kontur zwischen den Astenden in zwei Ketten teilen) ist Standard-Geometrie und wird bei
+  uns aus §7.1 heraus gebaut, nicht abgeschrieben.
 - **Nur `caffeine_tiny` liegt im Repo.** Das Ink/Stitch-Repo hat 142 Schriften; hereingeholt
   ist die eine, die der Test braucht (820 KB). Weitere kommen einzeln dazu, jede mit ihrer
   `LICENSE` — siehe `packages/fonts/src/inkstitch/README.md`.
