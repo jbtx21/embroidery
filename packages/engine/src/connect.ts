@@ -37,6 +37,11 @@ export type RawBlock = {
   threadIndex: number;
   points: Point[];
   trimAfter: TrimAfter;
+  /**
+   * Indices in `points` the needle reaches by a jump rather than a stitch — a
+   * fill whose travel found no way inside says so here (spec §8.7, 21.09.2026).
+   */
+  jumpAt?: number[];
   /** The area this object covers — used by the coverage test. */
   cover?: Polygon;
 };
@@ -118,11 +123,15 @@ export function connectBlocks(
   const filled = raw.filter((b) => b.points.length > 0);
   if (filled.length === 0) return [];
 
-  const out: StitchBlock[] = filled.map((b) => ({
-    objectId: b.objectId,
-    threadIndex: b.threadIndex,
-    stitches: b.points.map(stitchAt),
-  }));
+  const out: StitchBlock[] = filled.map((b) => {
+    const stitches = b.points.map(stitchAt);
+    // Inside a block a jump is a move the object asked for, not a connection.
+    for (const i of b.jumpAt ?? []) {
+      const s = stitches[i];
+      if (s) s.cmd = "jump";
+    }
+    return { objectId: b.objectId, threadIndex: b.threadIndex, stitches };
+  });
 
   for (let i = 0; i + 1 < filled.length; i++) {
     const action = decideConnection(i, filled, opts);

@@ -1,6 +1,14 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { bbox, dist, initGeometry, pointInPolygon } from "@texma-stitch/geometry";
-import { annulus, circle, polygonOf, pt, rect } from "../test/fixtures/shapes.js";
+import type { Point, Polygon } from "@texma-stitch/geometry";
+import {
+  bbox,
+  dist,
+  initGeometry,
+  offset,
+  pointInPolygon,
+  segmentInside,
+} from "@texma-stitch/geometry";
+import { annulus, circle, hourglass, polygonOf, pt, rect } from "../test/fixtures/shapes.js";
 import { fillObject } from "../test/fixtures/designs.js";
 import {
   contourUnderlay,
@@ -17,6 +25,7 @@ import {
   sectionStitches,
   sections,
   TRAVEL_STITCH_MM,
+  travelStitches,
 } from "./fill.js";
 
 beforeAll(async () => {
@@ -165,12 +174,12 @@ describe("generation", () => {
   });
 
   it("starts near the given start point", () => {
-    const withStart = fillRegion(square, params, pt(10, 0));
+    const withStart = fillRegion(square, params, pt(10, 0)).points;
     expect(withStart[0]!.x).toBeGreaterThan(5);
   });
 
   it("ends near the given end point", () => {
-    const withEnd = fillRegion(square, params, undefined, pt(10, 10));
+    const withEnd = fillRegion(square, params, undefined, pt(10, 10)).points;
     const last = withEnd[withEnd.length - 1]!;
     expect(dist(last, pt(10, 10))).toBeLessThan(2);
   });
@@ -310,7 +319,7 @@ describe("generation", () => {
   });
 
   it("runs the contour underlay around every ring", () => {
-    const ring = contourUnderlay(annulus(0, 0, 10, 5), 0.4);
+    const ring = contourUnderlay(annulus(0, 0, 10, 5), 0.4).points;
     expect(ring.length).toBeGreaterThan(20);
   });
 
@@ -342,5 +351,81 @@ describe("narrowRowShare (spec §11)", () => {
 
   it("returns zero for a shape without rows", () => {
     expect(narrowRowShare([])).toEqual({ pieces: 0, share: 0 });
+  });
+});
+
+describe("travel stays inside the shape (spec §8.7, 21.09.2026)", () => {
+  /**
+   * Every running segment of a fill has to lie inside the shape. Tolerance is
+   * 0,1 mm — compensation and underlap widen the stitched area, and a point on
+   * the outline is inside as far as this test is concerned. Segments that the
+   * fill itself marked as jumps are not running stitches and are skipped.
+   */
+  const outsideRuns = (
+    shape: Polygon,
+    points: Point[],
+    jumpAt: number[],
+    tolMm = 0.1,
+  ): number[] => {
+    const area = offset(shape, tolMm);
+    const jumps = new Set(jumpAt);
+    const out: number[] = [];
+    for (let i = 1; i < points.length; i++) {
+      if (jumps.has(i)) continue;
+      const a = points[i - 1]!;
+      const b = points[i]!;
+      if (dist(a, b) < 1e-9) continue;
+      if (!area.some((p) => segmentInside(p, a, b))) out.push(i);
+    }
+    return out;
+  };
+
+  it("reports a jump when there is no way inside", () => {
+    const t = travelStitches(square, pt(5, 5), pt(40, 5));
+    expect(t.jump).toBe(true);
+    expect(t.points).toHaveLength(0);
+  });
+
+  it("stitches the way when it lies inside", () => {
+    const t = travelStitches(square, pt(1, 1), pt(9, 9));
+    expect(t.jump).toBe(false);
+    expect(t.points.length).toBeGreaterThan(3);
+  });
+
+  it("keeps every running segment of a ring inside the shape", () => {
+    const ring = annulus(0, 0, 12, 6);
+    const r = generateFill(
+      fillObject("f", ring, {
+        rowSpacingMm: 0.6,
+        underlay: { contour: true, fill: "single", spacingMm: 2, insetMm: 0.4 },
+      }),
+    );
+    expect(outsideRuns(ring, r.stitches, r.jumpAt)).toEqual([]);
+  });
+
+  it("keeps every running segment inside a shape whose underlay falls apart", () => {
+    // The 0,4 mm inset cuts the 0,6 mm waist: the underlay is two pieces, the
+    // shape itself is one — so the way between them exists and must be used.
+    const shape = hourglass(0.6);
+    const r = generateFill(
+      fillObject("f", shape, {
+        rowSpacingMm: 0.6,
+        underlay: { contour: true, fill: "single", spacingMm: 2, insetMm: 0.4 },
+      }),
+    );
+    expect(outsideRuns(shape, r.stitches, r.jumpAt)).toEqual([]);
+  });
+
+  it("jumps and says so when the area falls into two parts", () => {
+    // The push compensation of 0,4 mm eats the 0,6 mm waist from both sides.
+    const shape = hourglass(0.6);
+    const r = generateFill(
+      fillObject("f", shape, { rowSpacingMm: 0.6, pushCompMm: 0.4, angleDeg: 90 }),
+    );
+    expect(r.jumpAt.length).toBeGreaterThan(0);
+    const w = r.warnings.find((x) => x.code === "TRAVEL_OUTSIDE");
+    expect(w).toBeDefined();
+    expect(w!.objectId).toBe("f");
+    expect(outsideRuns(shape, r.stitches, r.jumpAt, 0.5)).toEqual([]);
   });
 });

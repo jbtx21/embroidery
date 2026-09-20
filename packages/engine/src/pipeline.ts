@@ -31,14 +31,17 @@ import { edgeGapRisks, resolveOverlaps } from "./resolve-overlaps.js";
 import { validate } from "./validate.js";
 import { warn, WARNING } from "./warnings.js";
 
+/** What a generated object contributes to a block (spec §4, §8.7). */
+export type GeneratedStitches = { points: Point[]; jumpAt: number[] };
+
 /** Cache for the stitch block of a single object (spec §4). */
 export interface StitchCache {
-  get(key: string): Point[] | undefined;
-  set(key: string, value: Point[]): void;
+  get(key: string): GeneratedStitches | undefined;
+  set(key: string, value: GeneratedStitches): void;
 }
 
 export function createCache(): StitchCache {
-  const map = new Map<string, Point[]>();
+  const map = new Map<string, GeneratedStitches>();
   return {
     get: (key) => map.get(key),
     set: (key, value) => {
@@ -57,23 +60,29 @@ export type PlanOptions = {
 };
 
 /** Stitches of a single object — no connections, no lock stitches. */
-export function generateObject(obj: StitchObject): { points: Point[]; warnings: Warning[] } {
+export function generateObject(obj: StitchObject): {
+  points: Point[];
+  /** Indices the needle reaches by a jump instead of a stitch (spec §8.7). */
+  jumpAt: number[];
+  warnings: Warning[];
+} {
   switch (obj.type) {
     case "running":
-      return { points: generateRunning(obj), warnings: [] };
+      return { points: generateRunning(obj), jumpAt: [], warnings: [] };
     case "satin": {
       const r = generateSatin(obj);
-      return { points: r.stitches, warnings: r.warnings };
+      return { points: r.stitches, jumpAt: [], warnings: r.warnings };
     }
     case "fill": {
       const r = generateFill(obj);
-      return { points: r.stitches, warnings: r.warnings };
+      return { points: r.stitches, jumpAt: r.jumpAt, warnings: r.warnings };
     }
     case "text":
       // After `expand` there is no text object left; if one still arrives, that
       // is a bug in the ordering of the stages, not a silent no-op.
       return {
         points: [],
+        jumpAt: [],
         warnings: [
           warn(
             WARNING.NOT_IMPLEMENTED,
@@ -126,20 +135,21 @@ export function planDesign(design: Design, opts: PlanOptions = {}): StitchPlan {
   const raw: RawBlock[] = [];
   for (const obj of resolved.objects) {
     const key = stableHash(obj, design.preset);
-    let points = opts.cache?.get(key);
-    if (!points) {
-      const generated = generateObject(obj);
-      warnings.push(...generated.warnings);
-      points = generated.points;
-      opts.cache?.set(key, points);
+    let generated = opts.cache?.get(key);
+    if (!generated) {
+      const fresh = generateObject(obj);
+      warnings.push(...fresh.warnings);
+      generated = { points: fresh.points, jumpAt: fresh.jumpAt };
+      opts.cache?.set(key, generated);
     }
-    if (points.length === 0) continue;
+    if (generated.points.length === 0) continue;
     const cover = coverPolygon(obj);
     raw.push({
       objectId: obj.id,
       threadIndex: obj.threadIndex,
-      points,
+      points: generated.points,
       trimAfter: obj.trimAfter,
+      ...(generated.jumpAt.length > 0 ? { jumpAt: generated.jumpAt } : {}),
       ...(cover ? { cover } : {}),
     });
   }

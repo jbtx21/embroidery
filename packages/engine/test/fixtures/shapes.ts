@@ -304,3 +304,33 @@ export function letterR(h = 14, w = 10, stroke = 2.4): Polygon {
 export const LETTER_T = letterT();
 export const LETTER_S = letterS();
 export const LETTER_R = letterR();
+
+/**
+ * Hourglass: two blocks joined by a narrow waist. The waist decides whether the
+ * shape survives compensation or falls into two parts — the case where a fill
+ * has no way from one part to the other (spec §8.7).
+ */
+export function hourglass(waistMm = 0.6, w = 20, h = 20): Polygon {
+  const half = waistMm / 2;
+  const mid = h / 2;
+  return {
+    outer: orient(
+      [
+        pt(0, 0),
+        pt(w, 0),
+        pt(w, mid - half),
+        pt(w / 2 + half, mid - half),
+        pt(w / 2 + half, mid + half),
+        pt(w, mid + half),
+        pt(w, h),
+        pt(0, h),
+        pt(0, mid + half),
+        pt(w / 2 - half, mid + half),
+        pt(w / 2 - half, mid - half),
+        pt(0, mid - half),
+      ],
+      true,
+    ),
+    holes: [],
+  };
+}

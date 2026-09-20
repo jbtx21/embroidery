@@ -11,7 +11,6 @@ import {
   applyToPolygon,
   clipHorizontal,
   closeRing,
-  dedupe,
   dist,
   insideTravel,
   offset,
@@ -20,6 +19,7 @@ import {
   polygonBbox,
   rings,
   rotator,
+  segmentInside,
 } from "@texma-stitch/geometry";
 import type { FillObject, Warning } from "./types.js";
 import { runningStitches } from "./running.js";
@@ -227,8 +227,102 @@ export function narrowRowShare(rows: Segment[][]): { pieces: number; share: numb
 }
 
 // ---------------------------------------------------------------------------
-// Section order and travel paths (spec §8.5)
+// Section order and travel paths (spec §8.5, §8.7)
 // ---------------------------------------------------------------------------
+
+/**
+ * How far the travel area is widened over the stitched shape (mm).
+ *
+ * Phase ends and section ends sit exactly ON the outline, and a point on the
+ * boundary is neither in nor out: the visibility test then finds no way and the
+ * travel falls back to the straight line. A hair of air around the shape makes
+ * those points properly inside. Far under what the machine can resolve.
+ */
+export const TRAVEL_INSIDE_EPS_MM = 0.05;
+
+/**
+ * How many of the nearest section entries are checked for a direct line before
+ * the plain nearest one is taken (spec §8.5).
+ */
+const NEAREST_CHECKED = 8;
+
+/** Travel path without its start and end point, or a jump (spec §8.7). */
+export type TravelPath = { points: Point[]; jump: boolean };
+
+/** Points plus the indices that are reached by a jump instead of a stitch. */
+export type StitchPath = { points: Point[]; jumpAt: number[] };
+
+/** Does every segment of the path lie inside the shape? */
+function pathInside(poly: Polygon, path: Polyline): boolean {
+  for (let i = 1; i < path.length; i++) {
+    if (!segmentInside(poly, path[i - 1]!, path[i]!)) return false;
+  }
+  return true;
+}
+
+/** The area the needle may travel through: the shape plus a hair of air. */
+export function travelArea(poly: Polygon): Polygon {
+  return offset(poly, TRAVEL_INSIDE_EPS_MM)[0] ?? poly;
+}
+
+/**
+ * Pieces in the order the needle should walk them: nearest first, from where it
+ * stands. Without this they arrive in whatever order the clipping produced
+ * (spec §8.5).
+ */
+export function nearestFirst(pieces: Polygon[], from: Point | undefined): Polygon[] {
+  if (pieces.length < 2) return [...pieces];
+  const centre = (p: Polygon): Point => {
+    const b = polygonBbox(p);
+    return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+  };
+  const left = pieces.map((p) => ({ poly: p, at: centre(p) }));
+  const out: Polygon[] = [];
+  let cursor = from ?? left[0]!.at;
+  while (left.length > 0) {
+    let best = 0;
+    for (let i = 1; i < left.length; i++) {
+      if (dist(cursor, left[i]!.at) < dist(cursor, left[best]!.at)) best = i;
+    }
+    const [taken] = left.splice(best, 1);
+    out.push(taken!.poly);
+    cursor = taken!.at;
+  }
+  return out;
+}
+
+/**
+ * Guard at the exit of a fill: every stitch that leaves the shape is replaced
+ * by the way around inside it, and where there is no way, by a jump.
+ *
+ * The rows themselves are cut from the shape and cannot leave it — what can is
+ * the move between them: the row change of §8.7 runs straight from the end of
+ * one row to the start of the next, and on a waisted shape that line crosses
+ * bare fabric. Checking here catches every one of them, wherever it came from.
+ */
+export function keepInside(area: Polygon, pts: Point[], known: number[] = []): StitchPath {
+  const jumps = new Set(known);
+  const out: Point[] = [];
+  const jumpAt: number[] = [];
+  for (const [i, p] of pts.entries()) {
+    // A jump is allowed to leave the shape — that is the whole point of it.
+    if (i === 0 || jumps.has(i)) {
+      if (jumps.has(i)) jumpAt.push(out.length);
+      out.push(p);
+      continue;
+    }
+    const from = out[out.length - 1]!;
+    if (dist(from, p) < 1e-9 || segmentInside(area, from, p)) {
+      out.push(p);
+      continue;
+    }
+    const way = travelPath(area, from, p);
+    if (way.jump) jumpAt.push(out.length);
+    else out.push(...way.points);
+    out.push(p);
+  }
+  return { points: out, jumpAt };
+}
 
 /**
  * Greedy: nearest unvisited section by distance. The travel path runs INSIDE the
@@ -240,43 +334,53 @@ export function fillRegion(
   params: FillParams,
   startPoint?: Point,
   endPoint?: Point,
-): Point[] {
+  travelPoly?: Polygon,
+): StitchPath {
   const rotate = rotator(-params.angleDeg);
   const unrotate = rotator(params.angleDeg);
   const rotated = applyToPolygon(rotate, poly);
+  // Travelling happens in the area the whole object covers, not only in the
+  // piece this phase stitches — the underlay sits inset, and the way from one
+  // inset piece to the next runs through the shape around it (spec §8.7).
+  const travelRot = travelPoly ? applyToPolygon(rotate, travelPoly) : travelArea(rotated);
 
   const rows = scanlines(rotated, params.rowSpacingMm);
-  if (rows.length === 0) return [];
+  if (rows.length === 0) return { points: [], jumpAt: [] };
   const all = sections(rows);
-  if (all.length === 0) return [];
+  if (all.length === 0) return { points: [], jumpAt: [] };
 
   const b = polygonBbox(rotated);
   let cursor: Point = startPoint ? rotate(startPoint) : { x: b.minX, y: b.maxY };
 
   const open = new Set(all.map((_, i) => i));
   const out: Point[] = [];
+  const jumpAt: number[] = [];
   while (open.size > 0) {
-    let bestIndex = -1;
-    let bestEntry: Entry | undefined;
-    let bestDistance = Infinity;
+    // Nearest first — but a section behind a narrow waist is only near as the
+    // crow flies. Taking it means walking there and back through the waist, and
+    // every one of those ways lies on top of the last: measured on STUTTGART
+    // 80 mm, 33 stitches in one square millimetre from a single fill. So the
+    // nearest few are checked, and one that is straight ahead wins over one
+    // that needs a detour (spec §8.5, 21.09.2026).
+    const candidates: { index: number; entry: Entry; d: number }[] = [];
     for (const i of open) {
-      for (const e of entries(all[i]!)) {
-        const d = dist(cursor, e.point);
-        if (d < bestDistance) {
-          bestDistance = d;
-          bestIndex = i;
-          bestEntry = e;
-        }
-      }
+      for (const e of entries(all[i]!))
+        candidates.push({ index: i, entry: e, d: dist(cursor, e.point) });
     }
+    candidates.sort((a, b) => a.d - b.d);
+    const reachable = candidates
+      .slice(0, NEAREST_CHECKED)
+      .find((c) => segmentInside(travelRot, cursor, c.entry.point));
+    const chosen = reachable ?? candidates[0];
+    const bestIndex = chosen ? chosen.index : -1;
+    const bestEntry = chosen?.entry;
     if (bestIndex === -1 || !bestEntry) break;
     open.delete(bestIndex);
 
     if (out.length > 0) {
-      const path = insideTravel(rotated, cursor, bestEntry.point);
-      const stitched = runningStitches(path, { stitchLengthMm: TRAVEL_STITCH_MM });
-      // Drop the first point — the cursor already sits there.
-      for (let i = 1; i < stitched.length; i++) out.push(stitched[i]!);
+      const way = travelPath(travelRot, cursor, bestEntry.point);
+      if (way.jump) jumpAt.push(out.length);
+      else for (const p of way.points) out.push(p);
     }
 
     for (const p of sectionStitches(all[bestIndex]!, params, bestEntry)) out.push(p);
@@ -285,12 +389,17 @@ export function fillRegion(
 
   if (endPoint) {
     const target = rotate(endPoint);
-    const path = insideTravel(rotated, cursor, target);
-    const stitched = runningStitches(path, { stitchLengthMm: TRAVEL_STITCH_MM });
-    for (let i = 1; i < stitched.length; i++) out.push(stitched[i]!);
+    const way = travelPath(travelRot, cursor, target);
+    if (way.jump) jumpAt.push(out.length);
+    else for (const p of way.points) out.push(p);
+    out.push(target);
   }
 
-  return out.map(unrotate);
+  // The rows are inside by construction, the moves between them are not — the
+  // guard replaces those. It carries the jumps found above through, because
+  // inserting a way shifts every index behind it (§8.7).
+  const guarded = keepInside(travelRot, out, jumpAt);
+  return { points: guarded.points.map(unrotate), jumpAt: guarded.jumpAt };
 }
 
 // ---------------------------------------------------------------------------
@@ -324,9 +433,12 @@ export function contourUnderlay(
   insetMm: number,
   stitchLengthMm = 2.5,
   from?: Point,
-): Point[] {
+  travelPoly?: Polygon,
+): StitchPath {
   const inner = offset(poly, -Math.abs(insetMm));
+  const area = travelPoly ?? travelArea(poly);
   const out: Point[] = [];
+  const jumpAt: number[] = [];
   let cursor = from;
   for (const part of inner) {
     for (const ring of rings(part)) {
@@ -334,24 +446,59 @@ export function contourUnderlay(
       const pts = runningStitches(closeRing(started), { stitchLengthMm });
       if (pts.length === 0) continue;
       if (cursor !== undefined && out.length > 0) {
-        out.push(...travelStitches(poly, cursor, pts[0]!));
+        const way = travelPath(area, cursor, pts[0]!);
+        if (way.jump) jumpAt.push(out.length);
+        else out.push(...way.points);
       }
       out.push(...pts);
       cursor = pts[pts.length - 1]!;
     }
   }
-  return out;
+  return { points: out, jumpAt };
 }
 
 /**
- * Way from a to b inside the shape, as running stitches, WITHOUT the starting
- * point — the cursor already sits there (spec §8.5, §8.7).
+ * Way from a to b inside the shape, as running stitches, WITHOUT the start and
+ * end point — the cursor sits on one, the caller sets the other (spec §8.5,
+ * §8.7).
+ *
+ * `insideTravel` answers with the straight line when it finds no way inside —
+ * because a or b lie outside, or the area falls into parts. Stitching that line
+ * drags the thread across bare fabric; measured on the Atzensport logo, 20 mm of
+ * it. So the way is checked, and when it does not hold, the move becomes a jump
+ * (spec §8.7, 21.09.2026).
  */
-export function travelStitches(poly: Polygon, a: Point, b: Point): Point[] {
-  const stitched = runningStitches(insideTravel(poly, a, b), {
-    stitchLengthMm: TRAVEL_STITCH_MM,
-  });
-  return stitched.slice(1);
+export function travelPath(poly: Polygon, a: Point, b: Point): TravelPath {
+  const path = insideTravel(poly, a, b);
+  if (!pathInside(poly, path)) return { points: [], jump: true };
+  // The way follows the outline, and the outline has a bend every tenth of a
+  // millimetre. Stitching each one puts hundreds of needle holes into the same
+  // spot — measured on STUTTGART 80 mm: the density peak went from 24 to 43.
+  // Resampling by length alone is no good either: it drops a bend, and the
+  // chord across it leaves the shape, which is what this function prevents.
+  // So: reach as far along the way as a stitch may go AND the chord still lies
+  // inside, then divide that stretch.
+  const out: Point[] = [];
+  let i = 0;
+  while (i < path.length - 1) {
+    let j = i + 1;
+    while (
+      j + 1 < path.length &&
+      dist(path[i]!, path[j + 1]!) <= TRAVEL_STITCH_MM &&
+      segmentInside(poly, path[i]!, path[j + 1]!)
+    ) {
+      j++;
+    }
+    out.push(...bridge(path[i]!, path[j]!, TRAVEL_STITCH_MM));
+    if (j < path.length - 1) out.push({ ...path[j]! });
+    i = j;
+  }
+  return { points: out, jump: false };
+}
+
+/** `travelPath` on the shape itself, with the hair of air around it (§8.7). */
+export function travelStitches(poly: Polygon, a: Point, b: Point): TravelPath {
+  return travelPath(travelArea(poly), a, b);
 }
 
 /** Longest bounding-box edge — decides single versus double underlay (spec §8.6). */
@@ -364,7 +511,30 @@ export function longestEdgeMm(poly: Polygon): number {
 // Generation
 // ---------------------------------------------------------------------------
 
-export type FillResult = { stitches: Point[]; warnings: Warning[] };
+export type FillResult = {
+  stitches: Point[];
+  /** Indices in `stitches` the needle reaches by a jump, not a stitch (§8.7). */
+  jumpAt: number[];
+  warnings: Warning[];
+};
+
+/**
+ * Drop points that repeat the one before, and carry the jump marks along —
+ * removing a point shifts every index behind it.
+ */
+function dedupeMarked(points: Point[], jumpAt: number[], eps: number): StitchPath {
+  const marked = new Set(jumpAt);
+  const out: Point[] = [];
+  const marks: number[] = [];
+  for (const [i, p] of points.entries()) {
+    const last = out[out.length - 1];
+    // A jump target is kept even when it repeats: the jump is the information.
+    if (last !== undefined && dist(last, p) <= eps && !marked.has(i)) continue;
+    if (marked.has(i)) marks.push(out.length);
+    out.push(p);
+  }
+  return { points: out, jumpAt: marks };
+}
 
 export function generateFill(obj: FillObject): FillResult {
   const warnings: Warning[] = [];
@@ -422,7 +592,7 @@ export function generateFill(obj: FillObject): FillResult {
     warnings.push(
       warn(WARNING.INVALID_GEOMETRY, "The underlap makes the area vanish.", "error", obj.id),
     );
-    return { stitches: [], warnings };
+    return { stitches: [], jumpAt: [], warnings };
   }
 
   const topParams: FillParams = {
@@ -433,22 +603,47 @@ export function generateFill(obj: FillObject): FillResult {
   };
 
   const stitches: Point[] = [];
+  const jumps: number[] = [];
+  let outside = 0;
+  let longestOutsideMm = 0;
   const cursor = (): Point | undefined => stitches[stitches.length - 1];
+
+  // ONE travel area per part, built once after the knockdown cut the shape and
+  // the compensation widened it (spec §8.7, 21.09.2026). Every phase of this
+  // part travels in it — before, the underlay travelled in its own inset piece
+  // and the way between two pieces left the shape.
+  const areas = parts.map(travelArea);
+
   /**
    * Append one phase. Between two phases the needle travels INSIDE the shape
-   * (spec §8.7) — before, the move from the underlay to the top stitching was a
-   * single stitch of whatever length the two happened to be apart.
+   * (spec §8.7); where no way inside exists, it jumps and the object says so.
    */
-  const phase = (pts: Point[], within: Polygon): void => {
-    if (pts.length === 0) return;
+  const phase = (path: StitchPath, within: Polygon): void => {
+    if (path.points.length === 0) return;
     const from = cursor();
-    if (from !== undefined) stitches.push(...travelStitches(within, from, pts[0]!));
-    stitches.push(...pts);
+    if (from !== undefined) {
+      const way = travelPath(within, from, path.points[0]!);
+      if (way.jump) {
+        jumps.push(stitches.length);
+        outside += 1;
+        longestOutsideMm = Math.max(longestOutsideMm, dist(from, path.points[0]!));
+      } else stitches.push(...way.points);
+    }
+    const base = stitches.length;
+    for (const i of path.jumpAt) {
+      jumps.push(base + i);
+      outside += 1;
+      const to = path.points[i]!;
+      const previous = i > 0 ? path.points[i - 1]! : from;
+      if (previous) longestOutsideMm = Math.max(longestOutsideMm, dist(previous, to));
+    }
+    stitches.push(...path.points);
   };
 
-  for (const part of parts) {
+  for (const part of nearestFirst(parts, undefined)) {
+    const area = areas[parts.indexOf(part)]!;
     if (obj.underlay.contour) {
-      phase(contourUnderlay(part, obj.underlay.insetMm, 2.5, cursor()), part);
+      phase(contourUnderlay(part, obj.underlay.insetMm, 2.5, cursor(), area), area);
     }
     if (obj.underlay.fill !== "none") {
       const inner = offset(part, -Math.abs(obj.underlay.insetMm));
@@ -457,7 +652,12 @@ export function generateFill(obj: FillObject): FillResult {
           ? [obj.angleDeg - 45, obj.angleDeg + 45]
           : [obj.angleDeg + 90];
       for (const angleDeg of angles) {
-        for (const i of inner) {
+        // The inset can break the piece into several, and clipper hands them
+        // over in its own order. Walking them in that order means crossing the
+        // shape again for every one of them, and each crossing lies on top of
+        // the last: measured on STUTTGART 80 mm, 33 stitches in one square
+        // millimetre. Nearest first (spec §8.5, 21.09.2026).
+        for (const i of nearestFirst(inner, cursor())) {
           phase(
             fillRegion(
               i,
@@ -468,16 +668,31 @@ export function generateFill(obj: FillObject): FillResult {
                 staggerRows: obj.staggerRows,
               },
               cursor(),
+              undefined,
+              area,
             ),
-            part,
+            area,
           );
         }
       }
     }
     // The top stitching starts where the user asked, or else where the needle
     // already stands.
-    phase(fillRegion(part, topParams, obj.startPoint ?? cursor(), obj.endPoint), part);
+    phase(fillRegion(part, topParams, obj.startPoint ?? cursor(), obj.endPoint, area), area);
   }
 
-  return { stitches: dedupe(stitches, 1e-6), warnings };
+  if (outside > 0) {
+    warnings.push(
+      warn(
+        WARNING.TRAVEL_OUTSIDE,
+        `${outside} way${outside === 1 ? "" : "s"} inside the shape could not be found — ` +
+          `jumped instead of stitching across, longest ${longestOutsideMm.toFixed(1)} mm.`,
+        "warn",
+        obj.id,
+      ),
+    );
+  }
+
+  const clean = dedupeMarked(stitches, jumps, 1e-6);
+  return { stitches: clean.points, jumpAt: clean.jumpAt, warnings };
 }
