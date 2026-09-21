@@ -232,3 +232,16 @@ Plausibilitätsschwellen:
 
 Neu sind fünf Tests zum prozentualen Zugausgleich (`satin.test.ts`): Breitenmessung,
 Prozentrechnung, Deckel, Millimeter-Override und der Vergleich schmal gegen breit.
+
+## Beim Bauen gefunden (Zugausgleich-Boden, 21.09.2026)
+
+- **Der prozentuale Zugausgleich braucht eine Untergrenze.** Ich hatte den Deckel eingebaut
+  und den Boden vergessen. 12 % einer 0,46-mm-Spalte sind 0,06 mm; die Spalte bleibt damit
+  unter der Mindeststichlänge von 0,6 mm (§11), und `postProcess` räumt jeden zweiten Stich
+  weg. Die Buchstaben des STUTTGART-Logos standen hohl auf dem Bild. Aufgefallen ist es am
+  gerenderten PNG, nicht an einem der 472 Tests — deshalb steht der Bildvergleich in der
+  Neuplanung (§6).
+- **Der Faden zieht konstant, nicht proportional.** Die Fachpraxis führt beides getrennt und
+  addiert: fester Millimeterwert plus prozentualer Anteil. Unsere Klammer aus Boden (0,2)
+  und Deckel (0,4) bildet das an den Rändern ab; die saubere Addition ist eine offene
+  Änderung in `docs/neuplanung-punchprogramm.md`.

@@ -398,3 +398,32 @@ Breite ergibt 0,08 mm statt 0,20.
 67 von 3.518 Zellen über 18/mm², also 1,9 % — dicht an den 2 % aus §11, aber darunter. Die
 einzigen Fehler sind `OBJECT_OUTSIDE_HOOP` bei den drei großen Motiven, also die
 Rahmengröße.
+
+## Untergrenze für den Zugausgleich (21.09.2026)
+
+Der prozentuale Zugausgleich ohne Boden ließ die Buchstaben hohl stehen: die schmalsten
+Spalten des STUTTGART-Logos sind 0,43–0,46 mm breit, 12 % davon sind 0,06 mm statt der
+früheren 0,20. Unter der Mindeststichlänge von 0,6 mm (§11) räumt `postProcess` jeden
+zweiten Stich weg — `z13-bebebe-020-0` fiel von 289 auf 156 Stiche, ohne Mindeststichlänge
+wären es 300 gewesen. Gefunden am gerenderten Bild, nicht an einem Test.
+
+Mit `pullCompMinMm` = 0,2 (dem früheren Festwert) und 15 % für Jersey und Fleece:
+
+| Motiv                      |          Stiche | Trims | Dichte max | Sprung ohne Trim > 5 mm |
+| -------------------------- | --------------: | ----: | ---------: | ----------------------: |
+| STUTTGART 80 mm            | 16.084 → 17.314 |    58 |         32 |                   **0** |
+| STUTTGART 250 mm           | 75.058 → 75.097 |   208 |         34 |                   **0** |
+| Berufsfeuerwehr Köln 90 mm | 21.863 → 22.518 |    73 |         32 |                   **0** |
+| Eislingen Print 200 mm     | 26.499 → 28.345 |   169 |         22 |                   **0** |
+| Atzensport 80 mm           | 12.871 → 13.476 |   121 |         29 |                   **0** |
+| Atzensport 200 mm          | 43.331 → 43.496 |   144 |         18 |                   **0** |
+
+Die Stiche kommen dort zurück, wo sie fehlten — in den schmalen Spalten. Die Zusage aus
+§10.2 hält unverändert.
+
+**Einordnung gegen das Archiv** (`docs/neuplanung-punchprogramm.md`): STUTTGART 80 mm liegt
+mit 17.314 Stichen auf 80,3 × 74,9 mm bei 2,88 Stichen/mm². Der Median der Brustmotive im
+Archiv ist 1,30, das 90. Perzentil 2,37. Der Abstand ist damit größer als vor dieser
+Korrektur — die Korrektur war trotzdem richtig, weil die Buchstaben sonst nicht lesbar
+sind. Woher der Überschuss kommt und in welcher Reihenfolge er abgetragen wird, steht in
+der Neuplanung, §1.3.

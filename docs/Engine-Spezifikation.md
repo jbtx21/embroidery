@@ -362,12 +362,28 @@ Neu:
 
 | Größe | Bedeutung |
 |---|---|
-| `pullCompPct` | Prozent der **medianen Spaltenbreite**, **je Seite**. Standard 12. |
+| `pullCompPct` | Prozent der **medianen Spaltenbreite**, **je Seite**. Standard 12; Jersey und Fleece 15. |
+| `pullCompMinMm` | **Untergrenze**, je Seite. Standard 0,2. |
 | `pullCompMaxMm` | Obergrenze dafür, je Seite. Standard 0,4. |
 | `pullCompMm` | **Override** in Millimetern. Gesetzt, gilt er allein — so bringt eine Schrift mit, womit sie gezeichnet wurde (§9.2). |
 
+**Die Untergrenze ist so wichtig wie der Deckel** *(21.09.2026)*. Der Faden zieht das Gewebe
+um einen annähernd **konstanten** Betrag zusammen; der Anteil, der mit der Breite skaliert,
+kommt obendrauf. Ein rein proportionaler Ausgleich ist deshalb physikalisch falsch, und
+gemessen war er schädlich: die schmalsten Buchstabenspalten des STUTTGART-Logos sind 0,43
+bis 0,46 mm breit, 12 % davon sind 0,06 mm statt der früheren 0,20. Die Spalte blieb damit
+unter der Mindeststichlänge von 0,6 mm (§11), `postProcess` räumte jeden zweiten Stich weg,
+und die Buchstaben standen hohl auf dem Bild — `z13-bebebe-020-0` fiel von 289 auf 156
+Stiche. Mit dem Boden von 0,2 mm (dem früheren Festwert und dem Praxisminimum aus §14) sind
+es wieder 300.
+
+Die Fachpraxis führt beides ohnehin getrennt: ein fester Millimeterwert **plus** ein
+prozentualer Anteil, additiv. Unsere Klammer aus Boden und Deckel bildet das an den Rändern
+ab; die saubere Addition steht in `docs/neuplanung-punchprogramm.md` als Änderung an.
+
 Die 12 % sind so gewählt, dass die mittlere Spalte bleibt, wo sie war: 12 % von 1,68 mm
-sind 0,20 mm, der alte Festwert. Schmale Spalten werden dadurch weniger fett (0,7 mm → 0,08
+sind 0,20 mm, der alte Festwert. **Jersey und Fleece bekommen 15 %** *(21.09.2026)* —
+dehnbare und flauschige Ware zieht stärker zusammen. Schmale Spalten werden dadurch weniger fett (0,7 mm → 0,08
 statt 0,20), breite mehr (ab 3,33 mm greift der Deckel von 0,4). Gemessen wird die **mediane**
 Breite über elf Stichproben nach Bogenlängenanteil, nicht das Mittel: eine Spalte, die an
 einem Ende ausläuft, soll nicht überall so breit behandelt werden.
@@ -833,12 +849,12 @@ Startwerte, in Phase 5 gegen Probesticks justieren.
 
 | Preset | Fill Reihe | Fill Stich | Satin Abstand | Zug Fill | Zug Satin | Schub | Überlappung | Unterlage Fill | Unterlage Satin | Hinweis |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Piqué | 0,40 | 4,0 | 0,38 | 0,20 | 12 % / max 0,4 | 0,10 | 0,20 | contour + single | contour + zigzag | Standard |
-| Jersey | 0,45 | 4,0 | 0,40 | 0,25 | 12 % / max 0,4 | 0,15 | 0,25 | contour + single | contour + zigzag | dünne Shirtware, Schneidvlies |
-| Softshell | 0,42 | 4,0 | 0,40 | 0,25 | 12 % / max 0,4 | 0,10 | 0,20 | contour + single | contour + zigzag | |
-| Fleece | 0,40 | 4,0 | 0,40 | 0,30 | 12 % / max 0,4 | 0,15 | 0,25 | contour + double | contour + zigzag, Inset 0,3 | Topping empfohlen |
-| Cap | 0,38 | 4,0 | 0,35 | 0,20 | 12 % / max 0,4 | 0,10 | 0,20 | contour + single | center + contour | Reihenfolge Mitte → außen, unten → oben (§10.1) |
-| Frottee | 0,38 | 4,0 | 0,35 | 0,20 | 12 % / max 0,4 | 0,15 | 0,30 | contour + double | contour + zigzag | Knockdown-Fill unter Motiv, Topping |
+| Piqué | 0,40 | 4,0 | 0,38 | 0,20 | 12 % / 0,2–0,4 | 0,10 | 0,20 | contour + single | contour + zigzag | Standard |
+| Jersey | 0,45 | 4,0 | 0,40 | 0,25 | **15 %** / 0,2–0,4 | 0,15 | 0,25 | contour + single | contour + zigzag | dünne Shirtware, Schneidvlies |
+| Softshell | 0,42 | 4,0 | 0,40 | 0,25 | 12 % / 0,2–0,4 | 0,10 | 0,20 | contour + single | contour + zigzag | |
+| Fleece | 0,40 | 4,0 | 0,40 | 0,30 | **15 %** / 0,2–0,4 | 0,15 | 0,25 | contour + double | contour + zigzag, Inset 0,3 | Topping empfohlen |
+| Cap | 0,38 | 4,0 | 0,35 | 0,20 | 12 % / 0,2–0,4 | 0,10 | 0,20 | contour + single | center + contour | Reihenfolge Mitte → außen, unten → oben (§10.1) |
+| Frottee | 0,38 | 4,0 | 0,35 | 0,20 | 12 % / 0,2–0,4 | 0,15 | 0,30 | contour + double | contour + zigzag | Knockdown-Fill unter Motiv, Topping |
 
 **Referenz ZSK EPCwin** *(21.09.2026)*. Die Produktionswerte der EPCwin-Dokumentation sind
 **0,4 bis 0,6 mm Reihenabstand** und **4 bis 5 mm Stichlänge**. Unsere Werte lagen darunter:
@@ -860,10 +876,10 @@ Spannung und der Rahmen dreht unter der Nadel; die dichtere Spalte deckt das ab.
 Prozent seiner Breite (§7.2). Der **Schub beim Satin** bleibt offen — dort steht weiterhin
 nur der Zug.
 
-**Der Satin-Zugausgleich ist für alle Presets gleich** *(21.09.2026)*: 12 % mit Deckel
-0,4 mm. Die Stoffunterschiede, die vorher in 0,20 bis 0,30 mm steckten, fallen damit
-zunächst weg — die Breite der Spalte wiegt schwerer als die Ware. Ob eine dehnbare Ware
-einen höheren Prozentsatz braucht, entscheidet der Probestick.
+**Der Satin-Zugausgleich ist je Preset** *(21.09.2026)*: 12 %, bei **Jersey und Fleece
+15 %**, immer zwischen 0,2 und 0,4 mm je Seite. Dehnbare und flauschige Ware zieht stärker
+zusammen; die Breite der Spalte wiegt trotzdem schwerer als die Ware, deshalb der Prozentsatz
+und nicht ein fester Aufschlag.
 
 **Schub und Überlappung** *(19.09.2026)*: neue Spalten zu §8.1.1 und §8.1.2. Der Schub
 liegt bei rund der Hälfte des Zugs — er wirkt quer und fällt kleiner aus. Beides sind

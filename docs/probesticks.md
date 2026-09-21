@@ -22,11 +22,11 @@ Erste echte Abnahme der Engine.
 
 | Kennzahl                               |                                      Wert |
 | -------------------------------------- | ----------------------------------------: |
-| Stiche                                 |                                    16.084 |
-| Sprünge / Trims / Farbwechsel          |                              171 / 57 / 6 |
+| Stiche                                 |                                    17.314 |
+| Sprünge / Trims / Farbwechsel          |                              168 / 58 / 6 |
 | Größe                                  |                            80,3 × 74,9 mm |
-| Dichte, Spitze                         | 33 Stiche/mm² (Warnung: 1,9 % der Zellen) |
-| Maschinenzeit (800 U/min, rechnerisch) |                                  24,2 min |
+| Dichte, Spitze                         |      32 Stiche/mm² (Warnung, kein Fehler) |
+| Maschinenzeit (800 U/min, rechnerisch) |                                  25,8 min |
 | Objekte                                | 80 — davon 74 Satinspalten, 6 Füllflächen |
 
 _(21.09.2026 dreimal nachgezogen: nach dem Reisewege-Fix (§8.7.1), nach der Trim-Regel für
@@ -133,9 +133,9 @@ einer.
 
 | Kennzahl    | Engine | Puncher |   Δ |
 | ----------- | -----: | ------: | --: |
-| Stiche      | 16.084 | _offen_ |     |
-| Sprünge     |    171 | _offen_ |     |
-| Trims       |     57 | _offen_ |     |
+| Stiche      | 17.314 | _offen_ |     |
+| Sprünge     |    168 | _offen_ |     |
+| Trims       |     58 | _offen_ |     |
 | Farbwechsel |      6 | _offen_ |     |
 
 ### Ergebnis
