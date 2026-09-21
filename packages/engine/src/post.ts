@@ -23,9 +23,13 @@ export function postProcess(
   let lastX: number | undefined;
   let lastY: number | undefined;
 
-  for (const block of blocks) {
+  let lastWasJump = false;
+  for (const [bi, block] of blocks.entries()) {
     const stitches: Stitch[] = [];
-    for (const s of block.stitches) {
+    for (const [index, s] of block.stitches.entries()) {
+      // The needle carries on across the block boundary, so the stitch before a
+      // jump can be the last one of the block before it.
+      const next = block.stitches[index + 1] ?? blocks[bi + 1]?.stitches[0];
       if (!isMovement(s)) {
         stitches.push({ ...s });
         // Commands do not move, but they do set the reference position.
@@ -43,7 +47,13 @@ export function postProcess(
       const dy = s.y - lastY;
       const d = Math.hypot(dx, dy);
 
-      if (d < minStitchMm && s.tie !== true) continue; // tiny stitch
+      // The stitches on either side of a jump anchor it: the one before sets
+      // where it starts, the one after catches the thread. Dropping either for
+      // being short makes the jump longer than the rule allows or merges two
+      // jumps into one, and the thread then lies on the fabric across both
+      // (spec §10.2, 21.09.2026).
+      const anchor = s.cmd === "stitch" && (lastWasJump || next?.cmd === "jump");
+      if (d < minStitchMm && s.tie !== true && !anchor) continue; // tiny stitch
 
       if (d > maxStitchMm) {
         const parts = Math.ceil(d / maxStitchMm);
@@ -56,6 +66,7 @@ export function postProcess(
         }
       }
       stitches.push({ ...s });
+      lastWasJump = s.cmd === "jump";
       lastX = s.x;
       lastY = s.y;
     }

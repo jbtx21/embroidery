@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { initGeometry } from "@texma-stitch/geometry";
 import { polygonOf, pt, rect } from "../test/fixtures/shapes.js";
 import { fillObject, runningObject, satinObject } from "../test/fixtures/designs.js";
-import { CONNECT_DEFAULTS, connectBlocks, decideConnection } from "./connect.js";
+import { CONNECT_DEFAULTS, connectBlocks, cutLongJumps, decideConnection } from "./connect.js";
 import type { RawBlock } from "./connect.js";
 import type { Stitch } from "./types.js";
 
@@ -149,6 +149,51 @@ describe("connections (spec §10.2)", () => {
   it("drops empty blocks", () => {
     expect(connectBlocks([raw("a", 0, []), raw("b", 0, [pt(0, 0), pt(1, 0)])])).toHaveLength(1);
     expect(connectBlocks([])).toHaveLength(0);
+  });
+});
+
+describe("jumps inside a block follow the same trim rule (spec §10.2, 21.09.2026)", () => {
+  // A fill that found no way inside jumps (§8.7.1). Without a trim the thread
+  // lies on top of the fabric all the way — the same thing §10.2 prevents
+  // between two objects.
+  const line = (from: number, to: number) => [pt(from, 0), pt(to, 0)];
+
+  it("trims before a long jump over bare fabric", () => {
+    const blocks = [raw("f", 0, [...line(0, 1), ...line(20, 21)], { jumpAt: [2] })];
+    const b = cutLongJumps(connectBlocks(blocks), blocks)[0]!.stitches;
+    const jump = b.findIndex((s) => s.cmd === "jump");
+    expect(jump).toBeGreaterThan(0);
+    expect(b.slice(0, jump).some((s) => s.cmd === "trim")).toBe(true);
+  });
+
+  it("leaves a short jump alone", () => {
+    const blocks = [raw("f", 0, [...line(0, 1), ...line(4, 5)], { jumpAt: [2] })];
+    const b = cutLongJumps(connectBlocks(blocks), blocks)[0]!.stitches;
+    const jump = b.findIndex((s) => s.cmd === "jump");
+    expect(jump).toBeGreaterThan(0);
+    expect(b.some((s) => s.cmd === "trim")).toBe(false);
+  });
+
+  it("leaves a long jump alone when a later object of the same colour covers it", () => {
+    const cover = polygonOf(rect(-1, -1, 30, 2));
+    const blocks = [
+      raw("f", 0, [...line(0, 1), ...line(20, 21)], { jumpAt: [2] }),
+      raw("later", 0, [pt(0, 5), pt(1, 5)], { cover }),
+    ];
+    const b = cutLongJumps(connectBlocks(blocks), blocks)[0]!.stitches;
+    const jump = b.findIndex((s) => s.cmd === "jump");
+    expect(jump).toBeGreaterThan(0);
+    expect(b.slice(0, jump).some((s) => s.cmd === "trim")).toBe(false);
+  });
+
+  it("never trims inside a block whose object says never", () => {
+    const blocks = [
+      raw("f", 0, [...line(0, 1), ...line(20, 21)], { jumpAt: [2], trimAfter: "never" }),
+    ];
+    const b = cutLongJumps(connectBlocks(blocks), blocks)[0]!.stitches;
+    const jump = b.findIndex((s) => s.cmd === "jump");
+    expect(jump).toBeGreaterThan(0);
+    expect(b.some((s) => s.cmd === "trim")).toBe(false);
   });
 });
 

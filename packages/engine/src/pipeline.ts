@@ -14,7 +14,7 @@ import { isGeometryReady } from "@texma-stitch/geometry";
 import type { FontRegistry } from "@texma-stitch/fonts";
 import { analyze } from "./analyze.js";
 import type { ConnectOptions, RawBlock } from "./connect.js";
-import { CONNECT_DEFAULTS, connectBlocks } from "./connect.js";
+import { CONNECT_DEFAULTS, connectBlocks, cutLongJumps } from "./connect.js";
 import { expand } from "./expand.js";
 import { generateFill } from "./fill.js";
 import { stableHash } from "./hash.js";
@@ -158,7 +158,12 @@ export function planDesign(design: Design, opts: PlanOptions = {}): StitchPlan {
 
   const connected = connectBlocks(raw, opts.connect ?? CONNECT_DEFAULTS);
   const tied = tieBlocks(connected);
-  const finished = postProcess(tied, machine.maxJumpMm, machine.minStitchMm);
+  const cleaned = postProcess(tied, machine.maxJumpMm, machine.minStitchMm);
+  // Last: cut the thread where a jump would drag it across bare fabric (§10.2).
+  // It runs at the very end because the lock stitches and the minimum stitch
+  // length move the ends of a jump — a 5,0 mm jump became 5,3 mm on STUTTGART
+  // 250 mm, and only here is the length the one the machine will sew.
+  const finished = cutLongJumps(cleaned, raw, opts.connect ?? CONNECT_DEFAULTS);
 
   const { stats, warnings: analysisWarnings } = analyze(finished, machine);
   warnings.push(...analysisWarnings);

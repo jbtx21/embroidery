@@ -76,6 +76,75 @@ describe("running stitch (spec §6)", () => {
   });
 });
 
+describe("post-processing keeps the anchor after a jump (spec §11, 21.09.2026)", () => {
+  it("does not drop a short stitch that follows a jump", () => {
+    // Without it two jumps merge into one long one and the thread lies on the
+    // fabric across both (spec §10.2).
+    const blocks = postProcess(
+      [
+        {
+          objectId: "f",
+          threadIndex: 0,
+          stitches: [
+            { x: 0, y: 0, cmd: "stitch" },
+            { x: 4, y: 0, cmd: "jump" },
+            { x: 4.3, y: 0, cmd: "stitch" },
+            { x: 8, y: 0, cmd: "jump" },
+            { x: 12, y: 0, cmd: "stitch" },
+          ],
+        },
+      ],
+      MAX_STITCH_MM,
+      MIN_STITCH_MM,
+    );
+    const s = blocks[0]!.stitches;
+    expect(s.filter((x) => x.cmd === "stitch").map((x) => x.x)).toContain(4.3);
+  });
+
+  it("does not drop a short stitch that precedes a jump", () => {
+    // Dropping it moves the start of the jump back and makes the jump longer
+    // than the rule allows.
+    const blocks = postProcess(
+      [
+        {
+          objectId: "f",
+          threadIndex: 0,
+          stitches: [
+            { x: 0, y: 0, cmd: "stitch" },
+            { x: 4, y: 0, cmd: "stitch" },
+            { x: 4.3, y: 0, cmd: "stitch" },
+            { x: 9, y: 0, cmd: "jump" },
+            { x: 12, y: 0, cmd: "stitch" },
+          ],
+        },
+      ],
+      MAX_STITCH_MM,
+      MIN_STITCH_MM,
+    );
+    expect(blocks[0]!.stitches.map((x) => x.x)).toContain(4.3);
+  });
+
+  it("still drops a short stitch between two stitches", () => {
+    const blocks = postProcess(
+      [
+        {
+          objectId: "f",
+          threadIndex: 0,
+          stitches: [
+            { x: 0, y: 0, cmd: "stitch" },
+            { x: 4, y: 0, cmd: "stitch" },
+            { x: 4.3, y: 0, cmd: "stitch" },
+            { x: 8, y: 0, cmd: "stitch" },
+          ],
+        },
+      ],
+      MAX_STITCH_MM,
+      MIN_STITCH_MM,
+    );
+    expect(blocks[0]!.stitches.map((x) => x.x)).not.toContain(4.3);
+  });
+});
+
 describe("lock stitches (spec §10.3)", () => {
   it("locks at the start and before the end", () => {
     const blocks = tieBlocks([
@@ -121,6 +190,32 @@ describe("lock stitches (spec §10.3)", () => {
       },
     ]);
     expect(blocks[1]!.stitches[1]!.tie).toBe(true);
+  });
+
+  it("locks again after a trim inside a block (spec §10.3, 21.09.2026)", () => {
+    // A fill that jumps has its trim in the middle of its own block (§10.2).
+    // Without a lock after it the thread pulls straight back out.
+    const blocks = tieBlocks([
+      {
+        objectId: "f",
+        threadIndex: 0,
+        stitches: [
+          { x: 0, y: 0, cmd: "stitch" },
+          { x: 5, y: 0, cmd: "stitch" },
+          { x: 5, y: 0, cmd: "trim" },
+          { x: 30, y: 0, cmd: "jump" },
+          { x: 35, y: 0, cmd: "stitch" },
+          { x: 40, y: 0, cmd: "stitch" },
+          { x: 40, y: 0, cmd: "end" },
+        ],
+      },
+    ]);
+    const s = blocks[0]!.stitches;
+    const jump = s.findIndex((x) => x.cmd === "jump");
+    expect(jump).toBeGreaterThan(0);
+    // Locked before the trim and again on the far side of the jump.
+    expect(s[jump - 2]!.tie).toBe(true);
+    expect(s[jump + 1]!.tie).toBe(true);
   });
 
   it("moves the trim to where the needle actually is", () => {

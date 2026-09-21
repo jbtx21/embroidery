@@ -13,7 +13,7 @@ export const TIE_LENGTH_MM = 0.3;
 
 const isCommand = (s: Stitch): boolean => s.cmd !== "stitch" && s.cmd !== "jump";
 
-function direction(from: Point, to: Point): Point | undefined {
+export function direction(from: Point, to: Point): Point | undefined {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const l = Math.hypot(dx, dy);
@@ -24,7 +24,7 @@ function direction(from: Point, to: Point): Point | undefined {
 const tieStitch = (p: Point): Stitch => ({ x: p.x, y: p.y, cmd: "stitch", tie: true });
 
 /** Three short stitches around `p` along `dir`: q, p, q. */
-function lockStitches(p: Point, dir: Point): Stitch[] {
+export function lockStitches(p: Point, dir: Point): Stitch[] {
   const q: Point = { x: p.x + dir.x * TIE_LENGTH_MM, y: p.y + dir.y * TIE_LENGTH_MM };
   return [tieStitch(q), tieStitch(p), tieStitch(q)];
 }
@@ -75,6 +75,23 @@ export function tieBlocks(blocks: StitchBlock[]): StitchBlock[] {
         s[k] = { ...cmd, x: last.x, y: last.y };
       }
       i += lock.length;
+    }
+
+    // A trim in the MIDDLE of a block — a fill that jumps has one (§10.2,
+    // §8.7.1) — needs a lock on the far side just as much as a new block does,
+    // otherwise the thread pulls back out of the first stitches after it.
+    for (let i = 0; i < s.length - 1; i++) {
+      if (s[i]!.cmd !== "trim" && s[i]!.cmd !== "color") continue;
+      let at = i + 1;
+      while (at < s.length && isCommand(s[at]!)) at++;
+      if (at >= s.length - 1) break; // nothing left to lock onto
+      const p0 = s[at]!;
+      const next = s.slice(at + 1).find((x) => !isCommand(x));
+      const dir = next ? direction(p0, next) : undefined;
+      if (!dir) continue;
+      const lock = lockStitches(p0, dir);
+      s.splice(at + 1, 0, ...lock);
+      i = at + lock.length;
     }
 
     const last = s[s.length - 1];
