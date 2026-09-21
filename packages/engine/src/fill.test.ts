@@ -132,8 +132,10 @@ describe("documented values (spec §8, §11)", () => {
 describe("generation", () => {
   it("fills a square and stays inside", () => {
     const r = generateFill(fillObject("f", square));
-    // 10 x 10 mm at the preset row spacing of 0,40 mm — 25 rows, plus underlay.
-    expect(r.stitches.length).toBeGreaterThan(120);
+    // 10 x 10 mm at the preset row spacing of 0,40 mm and a stitch length of
+    // 4,0 mm — 25 rows, plus underlay. Was > 120 until 21.09.2026, when the
+    // stitch length went from 3,0 to 4,0 (§14).
+    expect(r.stitches.length).toBeGreaterThan(90);
     const b = bbox(r.stitches);
     expect(b.minX).toBeGreaterThanOrEqual(-1e-6);
     expect(b.maxX).toBeLessThanOrEqual(10 + 1e-6);

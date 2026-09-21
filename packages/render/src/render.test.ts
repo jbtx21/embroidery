@@ -176,7 +176,7 @@ describe("drawing (spec §12)", () => {
   it("strokes twice per run (shadow and thread), not twice per stitch", () => {
     const ctx = stubContext();
     const stats = renderPlan(ctx, plan, { view: view(), threads: THREADS });
-    expect(stats.stitches).toBeGreaterThan(400);
+    expect(stats.stitches).toBeGreaterThan(350); // §14 values since 21.09.2026
     expect(stats.strokes).toBeLessThan(stats.stitches / 20);
     expect(ctx.calls.filter((c) => c === "stroke").length).toBe(stats.strokes);
   });

@@ -470,10 +470,22 @@ describe("object helpers", () => {
 
 describe("presets (spec §14)", () => {
   it("carries the values from the table", () => {
-    // Industry values since 19.09.2026: 0,40 standard, 0,35 on heavy goods.
+    // EPCwin production values since 21.09.2026: row spacing 0,38 to 0,45,
+    // stitch length 4,0.
     expect(PRESETS.pique.fillRowSpacingMm).toBe(0.4);
-    expect(PRESETS.cap.fillRowSpacingMm).toBe(0.35);
-    expect(PRESETS.softshell.fillRowSpacingMm).toBe(0.35);
+    expect(PRESETS.softshell.fillRowSpacingMm).toBe(0.42);
+    expect(PRESETS.fleece.fillRowSpacingMm).toBe(0.4);
+    expect(PRESETS.cap.fillRowSpacingMm).toBe(0.38);
+    expect(PRESETS.jersey.fillRowSpacingMm).toBe(0.45);
+    expect(PRESETS.frottee.fillRowSpacingMm).toBe(0.38);
+    for (const p of Object.values(PRESETS)) {
+      expect(p.fillStitchLengthMm).toBe(4.0);
+      expect(p.fillRowSpacingMm).toBeGreaterThanOrEqual(0.38);
+      expect(p.fillRowSpacingMm).toBeLessThanOrEqual(0.45);
+      // Satin pull compensation is a percentage of the column width now.
+      expect(p.pullCompPct).toBe(12);
+      expect(p.pullCompMaxMm).toBe(0.4);
+    }
     expect(PRESETS.fleece.pullCompMm).toBe(0.3);
     expect(PRESETS.fleece.fillUnderlay.fill).toBe("double");
     expect(PRESETS.cap.satinUnderlay.center).toBe(true);

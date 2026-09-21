@@ -350,7 +350,7 @@ describe.skipIf(!withPy)("cross-check against pyembroidery (spec §13.2)", () =>
 
   it("produces a byte-identical DST for a full stitch plan", () => {
     const units = prepareUnits(planToUnits(samplePlan().blocks));
-    expect(units.length).toBeGreaterThan(400);
+    expect(units.length).toBeGreaterThan(350); // was 400 before the §14 values
     expect(
       Buffer.from(writeDstFromUnits(units, { label: "Plan" })).equals(
         Buffer.from(pyembroideryDst(units, "Plan")),

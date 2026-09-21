@@ -224,9 +224,10 @@ describe("pipeline (spec §4)", () => {
       ]),
     );
     expect(plan.blocks).toHaveLength(2);
-    // Was > 500 until 19.09.2026; the minimum stitch length went from 0,3 to
-    // 0,6 mm (§11) and now drops the row turns of the fill.
-    expect(plan.stats.stitches).toBeGreaterThan(450);
+    // Was > 500 until 19.09.2026 (minimum stitch length 0,3 → 0,6 mm, §11),
+    // then > 450 until 21.09.2026, when the fill stitch length went to 4,0 mm
+    // and the row spacings to the EPCwin values (§14).
+    expect(plan.stats.stitches).toBeGreaterThan(380);
     expect(plan.stats.colorChanges).toBe(1);
     const all = plan.blocks.flatMap((b) => b.stitches);
     expect(all[all.length - 1]!.cmd).toBe("end");

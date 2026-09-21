@@ -247,7 +247,7 @@ describe("filled paths", () => {
     expect(ring.rowSpacingMm).toBe(0.4); // Piqué
     const fleece = importSvg(SVG_FILLED, { preset: "fleece" });
     const ringFleece = fleece.design.objects.find((o) => o.id === "ring") as FillObject;
-    expect(ringFleece.rowSpacingMm).toBe(0.35);
+    expect(ringFleece.rowSpacingMm).toBe(0.4); // EPCwin value since 21.09.2026
   });
 
   it("keeps fill=none with a stroke a running stitch", () => {
