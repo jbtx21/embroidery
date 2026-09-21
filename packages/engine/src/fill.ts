@@ -25,8 +25,14 @@ import type { FillObject, Warning } from "./types.js";
 import { runningStitches } from "./running.js";
 import { warn, WARNING } from "./warnings.js";
 
-/** Stitch length of the travel paths inside the shape (spec §8.5). */
-export const TRAVEL_STITCH_MM = 2.0;
+/**
+ * Stitch length of the travel paths inside the shape (spec §8.5, 21.09.2026 —
+ * before 2,0). A travel path runs under the top stitching and is not seen, and
+ * 3 mm is what a digitiser uses for a hidden running stitch. It also puts a
+ * third fewer needle holes into the fabric where several ways share a narrow
+ * bridge. Connections BETWEEN objects keep 2,0 (§10.2) — those can show.
+ */
+export const TRAVEL_STITCH_MM = 3.0;
 /** Area below which a fill stops making sense (spec §11). */
 export const FILL_TINY_MM2 = 4;
 /**
