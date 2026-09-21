@@ -497,7 +497,7 @@ verändert (Regel 8).
 
 ### 8.5 Sektionsreihenfolge und Reisewege
 - Start: Sektion nächst `startPoint`, sonst unten links.
-- Greedy: nächste unbesuchte Sektion nach Distanz; Reiseweg mit `insideTravel` als Running (Stichlänge 2,0) **innerhalb der Form**, damit er später überdeckt wird.
+- Greedy: nächste unbesuchte Sektion nach Distanz; Reiseweg mit `insideTravel` als Running (Stichlänge **3,0** — *21.09.2026, vorher 2,0*) **innerhalb der Form**, damit er später überdeckt wird. Ein Reiseweg liegt unter dem Deckstich und ist nicht zu sehen; 3 mm ist, was ein Puncher für einen verdeckten Laufstich nimmt, und setzt ein Drittel weniger Nadeleinstiche dort, wo mehrere Wege denselben Steg benutzen. **Verbindungen zwischen Objekten behalten 2,0** (§10.2) — die können sichtbar sein.
 - Ende bei `endPoint`, falls gesetzt.
 
 **Nächste heißt erreichbare** *(21.09.2026)*. Die Distanz ist die Luftlinie, und hinter
@@ -720,6 +720,25 @@ Entscheidung zwischen Blockende A und Blockanfang B:
 
 `trimAfter` am Objekt überschreibt: `always` → immer Trim, `never` → nie.
 
+**Dieselbe Regel gilt für Sprünge innerhalb eines Blocks** *(21.09.2026)*. Seit §8.7.1
+springt ein Fill, wenn er keinen Weg innerhalb der Form findet. Ein Sprung ohne Trim lässt
+den Faden **oben auf dem Stoff** liegen — dieselbe Sache, die diese Tabelle zwischen zwei
+Objekten verhindert. Also: bis `jumpTrimMm` bleibt er, darüber wird der Faden geschnitten,
+es sei denn, ein späteres Objekt derselben Farbe stickt über die Linie.
+
+Drei Feinheiten, alle gemessen:
+
+1. **Gezählt wird ab dem letzten Stich, nicht je Sprung.** Ein Verbindungssprung und ein
+   Sprung im folgenden Objekt stehen ohne Stich dazwischen — der Faden spannt über beide.
+   An STUTTGART 250 mm macht das 10,3 mm aus.
+2. **Die Prüfung läuft als letzte Stufe**, nach Verriegelung und Nachbearbeitung. Die
+   Verriegelung (§10.3) verschiebt den Anfang eines Sprungs um bis zu 0,3 mm, und die
+   Mindeststichlänge (§11) kann den Stich davor entfernen; erst am Ende ist die Strecke die,
+   die die Maschine fährt. Die Stufe setzt ihre Verriegelung selbst: sichern, schneiden,
+   nach dem Sprung wieder sichern.
+3. **Der erste und der letzte Stich an einem Sprung sind Anker** und werden von §11 nicht
+   als zu kurz entfernt — sonst verschmelzen zwei erlaubte Sprünge zu einem unerlaubten.
+
 ### 10.3 Verriegelung
 - Nach jedem `trim`/`color` und am Anfang: drei Stiche 0,3 mm vor/zurück entlang der ersten Stichrichtung.
 - Vor jedem `trim` und am Ende: dasselbe rückwärts.
@@ -732,6 +751,7 @@ Entscheidung zwischen Blockende A und Blockanfang B:
 - **Mindeststichlänge 0,6 mm** *(19.09.2026 — vorher 0,3 mm)*. Kürzere Stiche entfernen. Die Praxis zieht die Grenze bei 1 mm: darunter perforiert die Nadel den Stoff, statt ihn zu decken, und auf der Unterseite entstehen Fadenknäuel. 1,0 mm als harte Grenze würde allerdings den Reihenwechsel im Tatami mit abräumen, der bei 0,40 mm Reihenabstand genau 0,40 mm lang ist und dazugehört. 0,6 mm trifft die Stiche, die niemand gewollt hat, und lässt die stehen, die aus dem Verfahren kommen.
 - Der Wert ist **konfigurierbar** (`minStitchMm` im Maschinenprofil, §14) — eine Maschine mit anderem Greifer verträgt andere Grenzen.
 - **Verriegelung ist ausgenommen.** Verriegelungsstiche sind per Definition kurz und tragen deshalb `tie: true` (§3), sonst würde genau die Verriegelung aus §10.3 hier verschwinden. *(19.09.2026)*
+- **Die Anker an einem Sprung sind ausgenommen** *(21.09.2026)*. Der Stich vor einem Sprung legt fest, wo der Sprung beginnt, der Stich danach fängt den Faden. Wird einer von beiden als zu kurz entfernt, wächst der Sprung oder zwei Sprünge verschmelzen — und der Faden liegt über eine Strecke oben, die §10.2 geschnitten hätte.
 - Stiche und Sprünge > 12,1 mm in Teilstücke splitten (DST-Limit 121 Einheiten).
 - **Rundung: kaufmännisch-symmetrisch** (`roundHalfEven`, halbe Werte zur geraden Zahl), überall dort, wo Millimeter zu ganzen Formateinheiten werden. Grund: die Kreuzprüfung aus §13.2 läuft gegen Python, dessen `round()` genauso rundet. Bei Reihenabstand 0,25 mm liegt jede zweite Koordinate exakt auf der halben DST-Einheit — mit `Math.round` wäre die Datei nicht byte-identisch. *(19.09.2026)*
 - Stats:

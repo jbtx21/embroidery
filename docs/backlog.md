@@ -7,9 +7,11 @@ Neue Einträge oben in den passenden Abschnitt.
 
 - **Die Reisewege bündeln sich.** Sie laufen jetzt innerhalb der Form (§8.7.1) — und mehrere
   hintereinander gern auf derselben Linie an der Kontur. STUTTGART 80 mm: Dichtespitze von
-  24 auf 33. Zwei Reihenfolge-Regeln (§8.5) haben 44 auf 33 gedrückt, der Rest bleibt.
-  **Frage:** die Wege streuen (Versatz nach innen, wechselnde Seite), oder die Sektionen in
-  Bändern füllen statt greedy?
+  24 auf 33. Zwei Reihenfolge-Regeln (§8.5) haben 44 auf 33 gedrückt, die Reisestichlänge
+  von 3,0 mm dann auf 32 — damit liegt das Motiv mit 1,8 % dichter Zellen wieder unter der
+  Fehlerschwelle (2 %, §11). _(21.09.2026: entschieden, dass gestreut wird, wenn der
+  Probestick am Steg einen Grat zeigt — vorher nicht.)_ **Offen bleibt:** Sektionen in
+  Bändern füllen statt greedy, falls die Stege doch auffallen.
 - **Die Mindeststichlänge schneidet Ecken enger Wege ab.** `postProcess` entfernt den
   Knickpunkt (§11), die Sehne schneidet die Kurve: 0,21 bis 0,37 mm Überstand an den sechs
   Logos. **Frage:** Knickpunkte eines Reisewegs wie Verriegelungen schützen (dann Stiche

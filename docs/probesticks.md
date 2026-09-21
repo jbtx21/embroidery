@@ -22,12 +22,18 @@ Erste echte Abnahme der Engine.
 
 | Kennzahl                               |                                      Wert |
 | -------------------------------------- | ----------------------------------------: |
-| Stiche                                 |                                    17.966 |
-| Sprünge / Trims / Farbwechsel          |                              135 / 38 / 6 |
+| Stiche                                 |                                    17.661 |
+| Sprünge / Trims / Farbwechsel          |                              170 / 56 / 6 |
 | Größe                                  |                            80,3 × 74,9 mm |
-| Dichte, Spitze                         |                             24 Stiche/mm² |
-| Maschinenzeit (800 U/min, rechnerisch) |                                  25,6 min |
+| Dichte, Spitze                         |      32 Stiche/mm² (Warnung, kein Fehler) |
+| Maschinenzeit (800 U/min, rechnerisch) |                                  26,1 min |
 | Objekte                                | 80 — davon 74 Satinspalten, 6 Füllflächen |
+
+_(21.09.2026 zweimal nachgezogen: nach dem Reisewege-Fix (§8.7.1) und nach der Trim-Regel
+für Sprünge (§10.2) samt Reisestichlänge 3,0 mm (§8.5). Am Anfang standen hier 17.966
+Stiche, 135 Sprünge, 38 Trims und Dichte 24 — mit Laufstichen, die bis zu 55 mm über
+blanken Stoff liefen, und Sprüngen, die den Faden oben liegen ließen. Zahlen und
+Begründung in `docs/messung-echte-logos.md`.)_
 
 Satinbreiten über alle 74 Spalten: min 0,23 mm · 25 % 1,17 mm · **median 1,68 mm** ·
 75 % 2,63 mm · **max 9,81 mm**. Vier Spalten liegen über 4 mm, eine über 6 mm, achtzehn
@@ -45,18 +51,19 @@ Preset Piqué, die Werte, an denen im Zweifel gedreht wird:
 | Fill-Unterlage                           |  Kontur + einfach, 2,0 mm, Inset 0,4 |
 | Satin-Unterlage                          | Kontur + Zickzack, 3,0 mm, Inset 0,4 |
 
-Die 60 Warnungen des Laufs, nach Code:
+Die 64 Warnungen des Laufs, nach Code:
 
-| Code                      | Anzahl | Wo hinsehen                                             |
-| ------------------------- | -----: | ------------------------------------------------------- |
-| `SATIN_TOO_NARROW`        |     34 | die 18 Spalten unter 1 mm Breite                        |
-| `SELF_INTERSECTING_RAILS` |     15 | Ecken und enge Bögen                                    |
-| `EDGE_GAP_RISK`           |      4 | Fill-Kante an Satin-Rail, unter 0,3 mm ohne Überlappung |
-| `FILL_TINY`               |      4 | Reste über 1 mm², unter 4 mm²                           |
-| `SHAPE_SPLIT`             |      2 | Form zerfiel beim Normieren                             |
-| `DENSITY_HIGH`            |      1 | Warnung, kein Fehler (§11)                              |
+| Code                      | Anzahl | Wo hinsehen                                                  |
+| ------------------------- | -----: | ------------------------------------------------------------ |
+| `SATIN_TOO_NARROW`        |     34 | die 18 Spalten unter 1 mm Breite                             |
+| `SELF_INTERSECTING_RAILS` |     15 | Ecken und enge Bögen                                         |
+| `EDGE_GAP_RISK`           |      4 | Fill-Kante an Satin-Rail, unter 0,3 mm ohne Überlappung      |
+| `FILL_TINY`               |      4 | Reste über 1 mm², unter 4 mm²                                |
+| `TRAVEL_OUTSIDE`          |      4 | Stellen, an denen der Fill springt statt zu sticken (§8.7.1) |
+| `SHAPE_SPLIT`             |      2 | Form zerfiel beim Normieren                                  |
+| `DENSITY_HIGH`            |      1 | Warnung: 1,8 % der Zellen über 18/mm², Spitze 32 (§11)       |
 
-### Die vier Punkte
+### Die Punkte für die Auswertung
 
 Je Punkt: was man ansieht, was es bedeutet, welcher Knopf.
 
@@ -98,6 +105,22 @@ eine Ecke einen Ansatz zeigt, ist das der erste Verdächtige (siehe `docs/backlo
 
 - Befund: _offen_
 
+**5. Die graue Schildfläche — ein Grat an den Stegen?**
+Ihre Reisewege sammeln sich in den schmalen Stegen zwischen den ausgeschnittenen
+Buchstaben; dort ist die dichteste Stelle des Motivs (32 Stiche/mm²). Mit 3,0 mm
+Reisestichlänge liegt sie wieder unter der Fehlerschwelle aus §11 — ob das reicht,
+entscheidet der Stoff. Zeigt er einen Grat oder wird steif, werden die Wege gestreut.
+
+- Befund: _offen_
+
+**6. Fadenreste — 56 Trims statt 38.**
+Der Faden wird jetzt überall dort geschnitten, wo ein Sprung ihn sonst über blanken Stoff
+ziehen würde (§10.2). Auf dem Stoff heißt das: keine Verbindungsfäden zwischen den Teilen.
+Schneidet die Maschine schlecht, heißt es stattdessen: mehr Reste zum Nacharbeiten. Beides
+ansehen und gegeneinander halten.
+
+- Befund: _offen_
+
 ### Vergleich mit einer Puncher-Datei
 
 Keine gepunchte Datei desselben Logos im Repo — die Stickvoll-Dateien sind andere Motive
@@ -108,9 +131,9 @@ einer.
 
 | Kennzahl    | Engine | Puncher |   Δ |
 | ----------- | -----: | ------: | --: |
-| Stiche      | 17.966 | _offen_ |     |
-| Sprünge     |    135 | _offen_ |     |
-| Trims       |     38 | _offen_ |     |
+| Stiche      | 17.661 | _offen_ |     |
+| Sprünge     |    170 | _offen_ |     |
+| Trims       |     56 | _offen_ |     |
 | Farbwechsel |      6 | _offen_ |     |
 
 ### Ergebnis

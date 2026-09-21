@@ -317,3 +317,51 @@ stehen im Backlog — die letzte wäre eine Spec-Änderung.
 
 **Laufzeit.** Der Wächter prüft jedes Stichsegment eines Fills. STUTTGART 250 mm braucht
 damit 20 s statt 6 s. Für den Batch-Lauf hinnehmbar, für den Editor nicht — im Backlog.
+
+## Reisestichlänge 3,0 und Trim-Regel für Sprünge (21.09.2026)
+
+Zwei Entscheidungen nach der Messung oben: die Reise im Fill sticht mit **3,0 mm** statt 2,0
+(§8.5 — unter dem Deckstich ist sie unsichtbar), und ein Sprung im Fill folgt derselben
+Trim-Regel wie eine Verbindung zwischen zwei Objekten (§10.2). Ein Sprung ohne Trim lässt
+den Faden oben liegen; das war die eigentliche Lücke, nicht die Erleichterung.
+
+| Motiv                      |          Stiche |   Sprünge |     Trims | Dichte max |
+| -------------------------- | --------------: | --------: | --------: | ---------: |
+| STUTTGART 80 mm            | 18.258 → 17.661 |       170 |   38 → 56 |    33 → 32 |
+| STUTTGART 250 mm           | 83.267 → 81.646 |       673 |  64 → 207 |    34 → 32 |
+| Berufsfeuerwehr Köln 90 mm | 24.550 → 23.671 | 281 → 280 |   68 → 73 |         32 |
+| Eislingen Print 200 mm     | 29.334 → 30.116 |      1188 | 109 → 170 |         22 |
+| Atzensport 80 mm           | 14.021 → 13.803 |       303 | 106 → 121 |         27 |
+| Atzensport 200 mm          | 48.213 → 46.889 |       545 | 132 → 143 |    22 → 18 |
+
+**Die Prüfung, auf die es ankommt** — längster Sprung ohne Trim über unbedecktem Stoff,
+gemessen ab dem letzten Stich, also über Ketten aus mehreren Sprüngen hinweg:
+
+| Motiv             | vorher  |  jetzt | davon über 5 mm |
+| ----------------- | ------- | -----: | --------------: |
+| STUTTGART 80 mm   | 12,0 mm | 4,9 mm |           **0** |
+| STUTTGART 250 mm  | 12,1 mm | 4,3 mm |           **0** |
+| Köln 90 mm        | 11,9 mm | 5,0 mm |           **0** |
+| Eislingen 200 mm  | 12,0 mm | 4,8 mm |           **0** |
+| Atzensport 80 mm  | 12,0 mm | 5,0 mm |           **0** |
+| Atzensport 200 mm | 12,0 mm | 4,8 mm |           **0** |
+
+Drei Dinge mussten dafür stimmen, jedes einzeln gemessen:
+
+1. **Ketten statt Einzelsprünge.** Ein Verbindungssprung und ein Sprung im nächsten Objekt
+   stehen ohne Stich dazwischen — 10,3 mm Faden an STUTTGART 250 mm, den keine Einzelprüfung
+   sieht.
+2. **Die Anker an einem Sprung.** Die Mindeststichlänge (§11) räumte den Stich vor oder nach
+   einem Sprung weg; damit wuchs der Sprung oder zwei verschmolzen. An Eislingen kamen so
+   8 von 11 Fällen zustande.
+3. **Die Stufe gehört ans Ende.** Verriegelung und Nachbearbeitung verschieben die Enden
+   eines Sprungs; aus 5,0 mm wurden 5,3 mm. Erst nach ihnen ist die Strecke die, die die
+   Maschine fährt.
+
+**Die Trims steigen deutlich** — STUTTGART 250 mm von 64 auf 207, Eislingen von 109 auf 170.
+Das ist der Preis dafür, dass kein Faden mehr über blanken Stoff läuft, und war so gewollt.
+Für die Laufzeit heißt das drei Sekunden je Trim (§11).
+
+**Nebenbei erledigt:** STUTTGART 80 mm meldet `DENSITY_HIGH` wieder nur als **Warnung**.
+67 von 3.754 Zellen liegen über 18/mm², also 1,8 % — unter den 2 % aus §11. Die längere
+Reisestichlänge hat gereicht; die Wege müssen nicht gestreut werden.

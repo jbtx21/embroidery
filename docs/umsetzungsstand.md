@@ -190,3 +190,28 @@ der Schub zerteilt) und zwei in `geometry.test.ts` für den Weg um ein rundes Lo
 - **Die Reihenfolge der Teilstücke kam aus dem Verschneiden.** `offset` gibt die Stücke in
   seiner eigenen Ordnung zurück; der Fill lief sie der Reihe nach ab und querte die Form für
   jedes erneut. Gemessen: 33 Stiche aus einer Füllfläche in einem Quadratmillimeter.
+
+## Geänderte Erwartungswerte, 21.09.2026 (Reisestichlänge und Trim-Regel)
+
+| Datei                                 | vorher                    | jetzt                        | Grund                                                    |
+| ------------------------------------- | ------------------------- | ---------------------------- | -------------------------------------------------------- |
+| `packages/engine/src/fill.test.ts`    | `TRAVEL_STITCH_MM` 2,0    | 3,0                          | §8.5: verdeckte Reise, Puncher-Praxis                    |
+| `packages/engine/src/fill.test.ts`    | Weg hat mehr als 3 Punkte | mehr als 1                   | Folge der längeren Stiche auf demselben Weg              |
+| `packages/engine/src/connect.test.ts` | —                         | vier Tests zur Trim-Regel    | §10.2 gilt jetzt auch für Sprünge innerhalb eines Blocks |
+| `packages/engine/src/running.test.ts` | —                         | drei Tests zu Ankern und Tie | §11-Ausnahme und Verriegelung nach einem Binnen-Trim     |
+
+Die Trims der fünf Logos steigen dadurch (STUTTGART 250 mm von 64 auf 207). Das ist keine
+verschobene Erwartung, sondern das Ziel: vorher lag der Faden über blanken Stoff.
+
+## Beim Bauen gefunden (Trim-Regel)
+
+- **Einzelprüfung reicht nicht.** Ein Verbindungssprung und ein Sprung im nächsten Objekt
+  stehen ohne Stich dazwischen; jeder für sich ist erlaubt, zusammen sind es 10,3 mm Faden
+  auf dem Stoff. Gezählt wird deshalb ab dem letzten Stich.
+- **Die Nachbearbeitung verlängert Sprünge.** Die Mindeststichlänge entfernte die Stiche
+  direkt vor und nach einem Sprung, die Verriegelung verschob seinen Anfang um 0,3 mm. Aus
+  5,0 mm wurden 5,3 mm — und kein Trim. Die Stufe läuft jetzt als letzte und bringt ihre
+  eigene Verriegelung mit.
+- **Die Deckungsprüfung muss beim nächsten Objekt beginnen.** Ich hatte sie beim laufenden
+  beginnen lassen; das erklärte Fäden für gedeckt, die von dem Objekt gedeckt worden wären,
+  das sie gerade zieht.
