@@ -365,3 +365,36 @@ Für die Laufzeit heißt das drei Sekunden je Trim (§11).
 **Nebenbei erledigt:** STUTTGART 80 mm meldet `DENSITY_HIGH` wieder nur als **Warnung**.
 67 von 3.754 Zellen liegen über 18/mm², also 1,8 % — unter den 2 % aus §11. Die längere
 Reisestichlänge hat gereicht; die Wege müssen nicht gestreut werden.
+
+## EPCwin-Presets und prozentualer Zugausgleich (21.09.2026)
+
+Referenz ZSK EPCwin: Produktionswerte sind 0,4–0,6 mm Reihenabstand und 4–5 mm Stichlänge
+(§14). Unsere Presets lagen darunter — bis 0,35 mm Abstand und überall 3,0 mm Stichlänge.
+Korrigiert auf 0,38–0,45 je nach Ware und 4,0 mm Stichlänge; der Satin-Zugausgleich rechnet
+jetzt in Prozent der Spaltenbreite (12 %, Deckel 0,4 mm je Seite) statt in festen
+Millimetern (§7.2).
+
+| Motiv                      |          Stiche |       Δ | Dichte max |
+| -------------------------- | --------------: | ------: | ---------: |
+| STUTTGART 80 mm            | 17.661 → 16.084 |  −8,9 % |    32 → 33 |
+| STUTTGART 250 mm           | 81.646 → 75.058 |  −8,1 % |    32 → 34 |
+| Berufsfeuerwehr Köln 90 mm | 23.671 → 21.863 |  −7,6 % |    32 → 27 |
+| Eislingen Print 200 mm     | 30.116 → 26.499 | −12,0 % |    22 → 18 |
+| Atzensport 80 mm           | 13.803 → 12.871 |  −6,8 % |    27 → 29 |
+| Atzensport 200 mm          | 46.889 → 43.331 |  −7,6 % |    17 → 17 |
+
+Rund 3.600 Stiche weniger allein bei Eislingen, gut 6.500 bei STUTTGART 250 mm — das sind
+sechs bis acht Minuten Maschinenzeit je Stück, bei gleicher Deckung. Die Trim- und
+Sprungzahlen bleiben, und die Null aus der Prüfung oben hält: **kein Sprung ohne Trim über
+unbedecktem Stoff über 5 mm**, auf keinem der sechs Läufe.
+
+**Die Dichte steigt dort, wo breite Satinspalten liegen** (STUTTGART), und fällt dort, wo
+Flächen dominieren (Köln, Eislingen). Grund ist der prozentuale Zugausgleich: eine Spalte
+über 3,33 mm Breite bekommt jetzt den Deckel von 0,4 mm je Seite statt der früheren 0,2 —
+sie überlappt ihre Nachbarn stärker. Schmale Spalten bekommen umgekehrt weniger: 0,7 mm
+Breite ergibt 0,08 mm statt 0,20.
+
+`DENSITY_HIGH` bleibt auf allen sechs Läufen eine **Warnung**. STUTTGART 80 mm liegt bei
+67 von 3.518 Zellen über 18/mm², also 1,9 % — dicht an den 2 % aus §11, aber darunter. Die
+einzigen Fehler sind `OBJECT_OUTSIDE_HOOP` bei den drei großen Motiven, also die
+Rahmengröße.

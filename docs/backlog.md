@@ -3,6 +3,17 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Aus dem Abgleich mit EPCwin (21.09.2026)
+
+- **Satin-Ecküberstich.** _(Phase 3.)_ An einer Ecke einer Satinspalte muss die äußere Rail
+  über den Schnittpunkt hinauslaufen, sonst klafft die Ecke auf der Außenseite und staucht
+  sich auf der Innenseite. EPCwin führt das als eigene Einstellung. Unsere Spalten enden
+  heute exakt am Rail-Ende; bei den Buchstabenformen aus §7.7.1 fällt das an jedem Knick an.
+- **Fill-Umkehrverhalten am Reihenende.** _(Niedrig.)_ EPCwin unterscheidet Hut- und
+  Zickzack-Umkehr: die eine setzt den Wendepunkt versetzt, die andere lässt die Reihen
+  spitz zusammenlaufen. Wir kennen nur die eine Form (§8.3). Auf sichtbaren Kanten macht das
+  einen Unterschied, auf verdeckten nicht.
+
 ## Aus dem Reisewege-Fix (21.09.2026)
 
 - **Die Reisewege bündeln sich.** Sie laufen jetzt innerhalb der Form (§8.7.1) — und mehrere

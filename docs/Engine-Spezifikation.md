@@ -350,7 +350,27 @@ Eingabe: `railA`, `railB`, optional `rungs`.
 - Mit Sprossen: jede Sprosse schneidet beide Rails, teilt sie in Abschnitte. Innerhalb eines Abschnitts wieder nach Anteil. Sprossen sind das Werkzeug des Editors gegen Verdrehen.
 
 ### 7.2 Zugausgleich
-- Beide Rails um `pullCompMm` senkrecht nach außen versetzen (Standard 0,2 mm). Optional asymmetrisch (`pullCompA`, `pullCompB`) für später.
+- Beide Rails **je Seite** senkrecht nach außen versetzen. Optional asymmetrisch (`pullCompA`, `pullCompB`) für später.
+
+**Der Ausgleich richtet sich nach der Breite der Spalte** *(21.09.2026 — vorher ein fester
+Millimeterwert)*. Der Faden zieht die Spalte in der Breite zusammen, und zwar umso mehr, je
+breiter sie ist; ein fester Wert ist deshalb für die schmale Spalte zu viel und für die
+breite zu wenig. Gemessen an STUTTGART 80 mm: Spaltenbreiten von 0,23 bis 9,81 mm, Median
+1,68 — alle bekamen dieselben 0,20 mm.
+
+Neu:
+
+| Größe | Bedeutung |
+|---|---|
+| `pullCompPct` | Prozent der **medianen Spaltenbreite**, **je Seite**. Standard 12. |
+| `pullCompMaxMm` | Obergrenze dafür, je Seite. Standard 0,4. |
+| `pullCompMm` | **Override** in Millimetern. Gesetzt, gilt er allein — so bringt eine Schrift mit, womit sie gezeichnet wurde (§9.2). |
+
+Die 12 % sind so gewählt, dass die mittlere Spalte bleibt, wo sie war: 12 % von 1,68 mm
+sind 0,20 mm, der alte Festwert. Schmale Spalten werden dadurch weniger fett (0,7 mm → 0,08
+statt 0,20), breite mehr (ab 3,33 mm greift der Deckel von 0,4). Gemessen wird die **mediane**
+Breite über elf Stichproben nach Bogenlängenanteil, nicht das Mittel: eine Spalte, die an
+einem Ende ausläuft, soll nicht überall so breit behandelt werden.
 
 ### 7.3 Zickzack
 - Abstand `spacingMm` (Standard 0,4). Gemessen auf der **längeren** Seite jedes Abschnitts, damit die Außenkurve keine Lücken bekommt.
@@ -811,14 +831,22 @@ Vorschau, Größe, Stiche, Farbfolge mit Garnnummern, Trims, Laufzeit, Preset.
 
 Startwerte, in Phase 5 gegen Probesticks justieren.
 
-| Preset | Fill Reihe | Satin Abstand | Zug | Schub | Überlappung | Unterlage Fill | Unterlage Satin | Hinweis |
-|---|---|---|---|---|---|---|---|---|
-| Piqué | 0,40 | 0,38 | 0,20 | 0,10 | 0,20 | contour + single | contour + zigzag | Standard |
-| Jersey | 0,45 | 0,40 | 0,25 | 0,15 | 0,25 | contour + single | contour + zigzag | dünne Shirtware, Schneidvlies |
-| Softshell | 0,35 | 0,40 | 0,25 | 0,10 | 0,20 | contour + single | contour + zigzag | |
-| Fleece | 0,35 | 0,40 | 0,30 | 0,15 | 0,25 | contour + double | contour + zigzag, Inset 0,3 | Topping empfohlen |
-| Cap | 0,35 | 0,35 | 0,20 | 0,10 | 0,20 | contour + single | center + contour | Reihenfolge Mitte → außen, unten → oben (§10.1) |
-| Frottee | 0,35 | 0,35 | 0,20 | 0,15 | 0,30 | contour + double | contour + zigzag | Knockdown-Fill unter Motiv, Topping |
+| Preset | Fill Reihe | Fill Stich | Satin Abstand | Zug Fill | Zug Satin | Schub | Überlappung | Unterlage Fill | Unterlage Satin | Hinweis |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Piqué | 0,40 | 4,0 | 0,38 | 0,20 | 12 % / max 0,4 | 0,10 | 0,20 | contour + single | contour + zigzag | Standard |
+| Jersey | 0,45 | 4,0 | 0,40 | 0,25 | 12 % / max 0,4 | 0,15 | 0,25 | contour + single | contour + zigzag | dünne Shirtware, Schneidvlies |
+| Softshell | 0,42 | 4,0 | 0,40 | 0,25 | 12 % / max 0,4 | 0,10 | 0,20 | contour + single | contour + zigzag | |
+| Fleece | 0,40 | 4,0 | 0,40 | 0,30 | 12 % / max 0,4 | 0,15 | 0,25 | contour + double | contour + zigzag, Inset 0,3 | Topping empfohlen |
+| Cap | 0,38 | 4,0 | 0,35 | 0,20 | 12 % / max 0,4 | 0,10 | 0,20 | contour + single | center + contour | Reihenfolge Mitte → außen, unten → oben (§10.1) |
+| Frottee | 0,38 | 4,0 | 0,35 | 0,20 | 12 % / max 0,4 | 0,15 | 0,30 | contour + double | contour + zigzag | Knockdown-Fill unter Motiv, Topping |
+
+**Referenz ZSK EPCwin** *(21.09.2026)*. Die Produktionswerte der EPCwin-Dokumentation sind
+**0,4 bis 0,6 mm Reihenabstand** und **4 bis 5 mm Stichlänge**. Unsere Werte lagen darunter:
+Reihenabstände bis 0,35 mm und durchweg 3,0 mm Stichlänge — dichter und kürzer, als eine
+Produktionsdatei braucht, also mehr Nadeleinstiche für dieselbe Deckung. Korrigiert:
+Reihenabstand 0,38 bis 0,45 je nach Ware, Stichlänge überall **4,0**. Der Satin bleibt
+unverändert; dort entscheidet der Zickzack-Abstand, nicht die Stichlänge. Gemessen an sechs
+Läufen kostet das 7 bis 12 % der Stiche (`docs/messung-echte-logos.md`).
 
 **Jersey** *(19.09.2026)*: dünne, dehnbare Shirtware. Die Praxis nennt dafür 0,45 mm — die
 lockerste Dichte der Skala, weil zu dichte Stiche den Stoff perforieren. Dehnbar heißt
@@ -828,13 +856,20 @@ zugleich mehr Zugausgleich und ein tragendes Schneidvlies.
 Spannung und der Rahmen dreht unter der Nadel; die dichtere Spalte deckt das ab.
 
 **Cap-Zugausgleich 0,20 statt 0,15** *(20.09.2026)*: 0,15 lag unter dem Praxisminimum von
-0,2 mm. Der **Schub beim Satin** (§7.2) bleibt offen — dort steht weiterhin nur der Zug.
+0,2 mm. Der Wert gilt seit dem 21.09.2026 nur noch für den **Fill**; der Satin rechnet in
+Prozent seiner Breite (§7.2). Der **Schub beim Satin** bleibt offen — dort steht weiterhin
+nur der Zug.
+
+**Der Satin-Zugausgleich ist für alle Presets gleich** *(21.09.2026)*: 12 % mit Deckel
+0,4 mm. Die Stoffunterschiede, die vorher in 0,20 bis 0,30 mm steckten, fallen damit
+zunächst weg — die Breite der Spalte wiegt schwerer als die Ware. Ob eine dehnbare Ware
+einen höheren Prozentsatz braucht, entscheidet der Probestick.
 
 **Schub und Überlappung** *(19.09.2026)*: neue Spalten zu §8.1.1 und §8.1.2. Der Schub
 liegt bei rund der Hälfte des Zugs — er wirkt quer und fällt kleiner aus. Beides sind
 **Startwerte ohne Probestick**; sie sind die ersten, die in Phase 5 zu messen sind.
 
-**Reihenabstand: Industriewerte.** *(19.09.2026 — vorher 0,25 bis 0,28.)* Die Praxis
+**Reihenabstand: Industriewerte.** *(19.09.2026 — vorher 0,25 bis 0,28; am 21.09.2026 auf die EPCwin-Werte oben nachgezogen.)* Die Praxis
 punchtet 40er-Garn mit **0,40 mm** als Standard, **0,35 mm** auf schwerer Ware (Kappen,
 Jacken) und **0,45 mm** auf dünnen Shirts. Die alten Werte lagen 35 bis 60 % darüber und
 spreizten untereinander nur 12 % — sie unterschieden die Stoffe praktisch nicht. Gemessen

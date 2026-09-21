@@ -215,3 +215,20 @@ verschobene Erwartung, sondern das Ziel: vorher lag der Faden über blanken Stof
 - **Die Deckungsprüfung muss beim nächsten Objekt beginnen.** Ich hatte sie beim laufenden
   beginnen lassen; das erklärte Fäden für gedeckt, die von dem Objekt gedeckt worden wären,
   das sie gerade zieht.
+
+## Geänderte Erwartungswerte, 21.09.2026 (EPCwin-Presets)
+
+Die Reihenabstände und die Stichlänge aus §14 verschieben jede Stichzahl. Fünf bestehende
+Tests haben Mindestzahlen geprüft und wurden nachgezogen — keine Golden Files, sondern
+Plausibilitätsschwellen:
+
+| Datei                                    | vorher                    | jetzt | Grund                            |
+| ---------------------------------------- | ------------------------- | ----- | -------------------------------- |
+| `packages/engine/src/fill.test.ts`       | Quadrat > 120 Stiche      | > 90  | Stichlänge 3,0 → 4,0             |
+| `packages/engine/src/pipeline.test.ts`   | Plan > 450 Stiche         | > 380 | dasselbe, plus Reihenabstände    |
+| `packages/formats/src/dst/dst.test.ts`   | > 400 Einheiten           | > 350 | dasselbe (Byte-Vergleich bleibt) |
+| `packages/render/src/render.test.ts`     | > 400 Stiche              | > 350 | dasselbe                         |
+| `packages/engine/src/import/svg.test.ts` | Fleece-Reihenabstand 0,35 | 0,40  | EPCwin-Wert                      |
+
+Neu sind fünf Tests zum prozentualen Zugausgleich (`satin.test.ts`): Breitenmessung,
+Prozentrechnung, Deckel, Millimeter-Override und der Vergleich schmal gegen breit.
