@@ -22,15 +22,16 @@ Erste echte Abnahme der Engine.
 
 | Kennzahl                               |                                      Wert |
 | -------------------------------------- | ----------------------------------------: |
-| Stiche                                 |                                    17.661 |
-| Sprünge / Trims / Farbwechsel          |                              170 / 56 / 6 |
+| Stiche                                 |                                    16.084 |
+| Sprünge / Trims / Farbwechsel          |                              171 / 57 / 6 |
 | Größe                                  |                            80,3 × 74,9 mm |
-| Dichte, Spitze                         |      32 Stiche/mm² (Warnung, kein Fehler) |
-| Maschinenzeit (800 U/min, rechnerisch) |                                  26,1 min |
+| Dichte, Spitze                         | 33 Stiche/mm² (Warnung: 1,9 % der Zellen) |
+| Maschinenzeit (800 U/min, rechnerisch) |                                  24,2 min |
 | Objekte                                | 80 — davon 74 Satinspalten, 6 Füllflächen |
 
-_(21.09.2026 zweimal nachgezogen: nach dem Reisewege-Fix (§8.7.1) und nach der Trim-Regel
-für Sprünge (§10.2) samt Reisestichlänge 3,0 mm (§8.5). Am Anfang standen hier 17.966
+_(21.09.2026 dreimal nachgezogen: nach dem Reisewege-Fix (§8.7.1), nach der Trim-Regel für
+Sprünge (§10.2) samt Reisestichlänge 3,0 mm (§8.5), zuletzt nach den EPCwin-Presets (§14,
+Stichlänge 4,0) und dem prozentualen Satin-Zugausgleich (§7.2). Am Anfang standen hier 17.966
 Stiche, 135 Sprünge, 38 Trims und Dichte 24 — mit Laufstichen, die bis zu 55 mm über
 blanken Stoff liefen, und Sprüngen, die den Faden oben liegen ließen. Zahlen und
 Begründung in `docs/messung-echte-logos.md`.)_
@@ -44,24 +45,25 @@ Preset Piqué, die Werte, an denen im Zweifel gedreht wird:
 | Parameter                                |                                 Wert |
 | ---------------------------------------- | -----------------------------------: |
 | `fillRowSpacingMm`                       |                                 0,40 |
-| `fillStitchLengthMm` / `fillStaggerRows` |                              3,0 / 4 |
+| `fillStitchLengthMm` / `fillStaggerRows` |                              4,0 / 4 |
 | `satinSpacingMm`                         |                                 0,38 |
-| `pullCompMm` / `pushCompMm`              |                          0,20 / 0,10 |
+| `pullCompMm` (Fill) / `pushCompMm`       |                          0,20 / 0,10 |
+| Satin-Zugausgleich                       |   12 % der Breite, höchstens 0,40 mm |
 | `underlapMm`                             |                                 0,20 |
 | Fill-Unterlage                           |  Kontur + einfach, 2,0 mm, Inset 0,4 |
 | Satin-Unterlage                          | Kontur + Zickzack, 3,0 mm, Inset 0,4 |
 
-Die 64 Warnungen des Laufs, nach Code:
+Die 65 Warnungen des Laufs, nach Code:
 
 | Code                      | Anzahl | Wo hinsehen                                                  |
 | ------------------------- | -----: | ------------------------------------------------------------ |
-| `SATIN_TOO_NARROW`        |     34 | die 18 Spalten unter 1 mm Breite                             |
+| `SATIN_TOO_NARROW`        |     35 | die Spalten unter 1 mm Breite                                |
 | `SELF_INTERSECTING_RAILS` |     15 | Ecken und enge Bögen                                         |
 | `EDGE_GAP_RISK`           |      4 | Fill-Kante an Satin-Rail, unter 0,3 mm ohne Überlappung      |
 | `FILL_TINY`               |      4 | Reste über 1 mm², unter 4 mm²                                |
 | `TRAVEL_OUTSIDE`          |      4 | Stellen, an denen der Fill springt statt zu sticken (§8.7.1) |
 | `SHAPE_SPLIT`             |      2 | Form zerfiel beim Normieren                                  |
-| `DENSITY_HIGH`            |      1 | Warnung: 1,8 % der Zellen über 18/mm², Spitze 32 (§11)       |
+| `DENSITY_HIGH`            |      1 | Warnung: 1,9 % der Zellen über 18/mm², Spitze 33 (§11)       |
 
 ### Die Punkte für die Auswertung
 
@@ -131,9 +133,9 @@ einer.
 
 | Kennzahl    | Engine | Puncher |   Δ |
 | ----------- | -----: | ------: | --: |
-| Stiche      | 17.661 | _offen_ |     |
-| Sprünge     |    170 | _offen_ |     |
-| Trims       |     56 | _offen_ |     |
+| Stiche      | 16.084 | _offen_ |     |
+| Sprünge     |    171 | _offen_ |     |
+| Trims       |     57 | _offen_ |     |
 | Farbwechsel |      6 | _offen_ |     |
 
 ### Ergebnis
