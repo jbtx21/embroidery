@@ -483,7 +483,9 @@ describe("presets (spec §14)", () => {
       expect(p.fillRowSpacingMm).toBeGreaterThanOrEqual(0.38);
       expect(p.fillRowSpacingMm).toBeLessThanOrEqual(0.45);
       // Satin pull compensation is a percentage of the column width now.
-      expect(p.pullCompPct).toBe(12);
+      // Stretchy and lofty goods pull more, so Jersey and Fleece get 15 %.
+      expect(p.pullCompPct).toBe(p.id === "jersey" || p.id === "fleece" ? 15 : 12);
+      expect(p.pullCompMinMm).toBe(0.2);
       expect(p.pullCompMaxMm).toBe(0.4);
     }
     expect(PRESETS.fleece.pullCompMm).toBe(0.3);

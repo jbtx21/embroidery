@@ -448,6 +448,7 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
             spacingMm: preset.satinSpacingMm,
             // Satin compensation follows the column width (spec §7.2, §14).
             pullCompPct: preset.pullCompPct,
+            pullCompMinMm: preset.pullCompMinMm,
             pullCompMaxMm: preset.pullCompMaxMm,
             underlay: preset.satinUnderlay,
           });

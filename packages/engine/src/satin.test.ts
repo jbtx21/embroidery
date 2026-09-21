@@ -250,8 +250,22 @@ describe("pull compensation as a percentage (spec §7.2, 21.09.2026)", () => {
     expect(pullCompFor(obj)).toBe(0.05);
   });
 
+  it("never goes below the minimum — the thread pulls a fixed amount", () => {
+    // 12 % of a 0,46 mm column is 0,06 mm. The column then stays under the
+    // minimum stitch length of §11, and post-processing takes out every other
+    // stitch: the letters of STUTTGART 80 mm went hollow (21.09.2026).
+    const [railA, railB] = railsOf(0.46);
+    const obj = satinObject("s", railA, railB, {
+      pullCompMm: undefined,
+      pullCompPct: 12,
+      pullCompMinMm: 0.2,
+      pullCompMaxMm: 0.4,
+    });
+    expect(pullCompFor(obj)).toBeCloseTo(0.2, 6);
+  });
+
   it("widens a narrow column less than a wide one", () => {
-    const narrow = satinObject("n", ...railsOf(1.5), { pullCompMm: undefined, pullCompPct: 12 });
+    const narrow = satinObject("n", ...railsOf(2), { pullCompMm: undefined, pullCompPct: 12 });
     const wide = satinObject("w", ...railsOf(3), { pullCompMm: undefined, pullCompPct: 12 });
     expect(pullCompFor(narrow)).toBeLessThan(pullCompFor(wide));
   });

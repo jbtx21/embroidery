@@ -167,14 +167,15 @@ function pointAtFraction(rail: Polyline, t: number): Point {
  *
  * An explicit `pullCompMm` wins — that is the override, and the way a font
  * states what it was drawn with (§9.2). Otherwise the percentage of the
- * column's own width, capped.
+ * column's own width, held between the floor and the cap.
  */
 export function pullCompFor(obj: SatinObject): number {
   if (obj.pullCompMm !== undefined) return obj.pullCompMm;
   const pct = obj.pullCompPct ?? 0;
   if (pct === 0) return 0;
   const wide = (columnWidthMm(obj.railA, obj.railB) * pct) / 100;
-  return obj.pullCompMaxMm === undefined ? wide : Math.min(wide, obj.pullCompMaxMm);
+  const capped = obj.pullCompMaxMm === undefined ? wide : Math.min(wide, obj.pullCompMaxMm);
+  return obj.pullCompMinMm === undefined ? capped : Math.max(capped, obj.pullCompMinMm);
 }
 
 export function applyPullComp(

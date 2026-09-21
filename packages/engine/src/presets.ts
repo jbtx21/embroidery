@@ -22,8 +22,15 @@ export type Preset = {
   satinSpacingMm: number;
   /** Fill: along the thread direction, outwards (spec §8.1.1). */
   pullCompMm: number;
-  /** Satin: pull compensation per side as a percentage of the column width (§7.2). */
+  /**
+   * Satin: pull compensation per side as a percentage of the column width
+   * (§7.2). 12 % is the house value; stretchy and lofty goods get 15 %.
+   */
   pullCompPct: number;
+  /** Satin: lower limit of that compensation in mm — the thread pulls a roughly
+   * constant amount, so a narrow column needs the same floor as a wide one
+   * (§7.2). */
+  pullCompMinMm: number;
   /** Satin: upper limit of that compensation in mm (§7.2). */
   pullCompMaxMm: number;
   /** Across the thread direction, inwards (spec §8.1.1). */
@@ -60,6 +67,7 @@ export const PRESETS: Record<PresetId, Preset> = {
     satinSpacingMm: 0.38,
     pullCompMm: 0.2,
     pullCompPct: 12,
+    pullCompMinMm: 0.2,
     pullCompMaxMm: 0.4,
     pushCompMm: 0.1,
     underlapMm: 0.2,
@@ -75,7 +83,8 @@ export const PRESETS: Record<PresetId, Preset> = {
     fillStaggerRows: 4,
     satinSpacingMm: 0.4,
     pullCompMm: 0.25,
-    pullCompPct: 12,
+    pullCompPct: 15,
+    pullCompMinMm: 0.2,
     pullCompMaxMm: 0.4,
     pushCompMm: 0.15,
     underlapMm: 0.25,
@@ -92,6 +101,7 @@ export const PRESETS: Record<PresetId, Preset> = {
     satinSpacingMm: 0.4,
     pullCompMm: 0.25,
     pullCompPct: 12,
+    pullCompMinMm: 0.2,
     pullCompMaxMm: 0.4,
     pushCompMm: 0.1,
     underlapMm: 0.2,
@@ -106,7 +116,8 @@ export const PRESETS: Record<PresetId, Preset> = {
     fillStaggerRows: 4,
     satinSpacingMm: 0.4,
     pullCompMm: 0.3,
-    pullCompPct: 12,
+    pullCompPct: 15,
+    pullCompMinMm: 0.2,
     pullCompMaxMm: 0.4,
     pushCompMm: 0.15,
     underlapMm: 0.25,
@@ -123,6 +134,7 @@ export const PRESETS: Record<PresetId, Preset> = {
     satinSpacingMm: 0.35,
     pullCompMm: 0.2,
     pullCompPct: 12,
+    pullCompMinMm: 0.2,
     pullCompMaxMm: 0.4,
     pushCompMm: 0.1,
     underlapMm: 0.2,
@@ -139,6 +151,7 @@ export const PRESETS: Record<PresetId, Preset> = {
     satinSpacingMm: 0.35,
     pullCompMm: 0.2,
     pullCompPct: 12,
+    pullCompMinMm: 0.2,
     pullCompMaxMm: 0.4,
     pushCompMm: 0.15,
     underlapMm: 0.3,

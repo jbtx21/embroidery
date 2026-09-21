@@ -82,12 +82,17 @@ export type SatinObject = Base & {
   /**
    * Pull compensation per side (spec §7.2). Given in millimetres it is used as
    * it stands — that is what a font brings along (§9.2). Otherwise it is
-   * `pullCompPct` of the column's own width, capped at `pullCompMaxMm`: a 6 mm
-   * column pulls in more than a 1,5 mm one, so a fixed value is either too much
-   * for the narrow or too little for the wide. *(21.09.2026)*
+   * `pullCompPct` of the column's own width, held between `pullCompMinMm` and
+   * `pullCompMaxMm`: a 6 mm column pulls in more than a 1,5 mm one, so a fixed
+   * value is either too much for the narrow or too little for the wide. The
+   * floor matters as much as the cap — the needle pulls the fabric together by
+   * a roughly constant amount, and a 0,46 mm column compensated by 6 % stays
+   * under the minimum stitch length of §11, where post-processing takes out
+   * every other stitch. *(21.09.2026)*
    */
   pullCompMm?: number;
   pullCompPct?: number;
+  pullCompMinMm?: number;
   pullCompMaxMm?: number;
   /** Above this width, split satin kicks in (spec §7.4). */
   maxWidthMm: number;

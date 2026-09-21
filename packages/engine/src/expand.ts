@@ -71,6 +71,7 @@ function satinFrom(
     // percentage of the column width applies (spec §7.2).
     ...(column.pullCompMm !== undefined ? { pullCompMm: column.pullCompMm } : {}),
     pullCompPct: preset.pullCompPct,
+    pullCompMinMm: preset.pullCompMinMm,
     pullCompMaxMm: preset.pullCompMaxMm,
     maxWidthMm: TEXT_MAX_WIDTH_MM,
     underlay: preset.satinUnderlay,

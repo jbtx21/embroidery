@@ -46,6 +46,7 @@ export type AutoSatinOptions = {
   /** Explicit compensation in mm; without one the percentage below applies. */
   pullCompMm?: number;
   pullCompPct?: number;
+  pullCompMinMm?: number;
   pullCompMaxMm?: number;
   underlay?: SatinUnderlay;
   threadIndex?: number;
@@ -517,6 +518,7 @@ export function autoSatin(shape: Polygon, opts: AutoSatinOptions = {}): AutoSati
       // (spec §7.2).
       ...(opts.pullCompMm !== undefined ? { pullCompMm: opts.pullCompMm } : {}),
       pullCompPct: opts.pullCompPct ?? preset.pullCompPct,
+      pullCompMinMm: opts.pullCompMinMm ?? preset.pullCompMinMm,
       pullCompMaxMm: opts.pullCompMaxMm ?? preset.pullCompMaxMm,
       maxWidthMm,
       underlay: opts.underlay ?? preset.satinUnderlay,
