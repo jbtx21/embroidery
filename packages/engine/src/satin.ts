@@ -140,6 +140,43 @@ export function pairRails(
  * "Outwards" means away from the other rail — the sign comes from where the
  * column actually lies, not from the drawing direction.
  */
+/**
+ * Median width of the column, sampled along both rails by arc-length fraction.
+ * The median, not the mean: a column that flares at one end should not be
+ * widened as if it were that wide everywhere (spec §7.2).
+ */
+export function columnWidthMm(railA: Polyline, railB: Polyline): number {
+  if (railA.length < 2 || railB.length < 2) return 0;
+  const samples: number[] = [];
+  for (let i = 0; i <= 10; i++) {
+    samples.push(dist(pointAtFraction(railA, i / 10), pointAtFraction(railB, i / 10)));
+  }
+  samples.sort((a, b) => a - b);
+  return samples[Math.floor(samples.length / 2)] ?? 0;
+}
+
+/** Point at a fraction of the rail's length. */
+function pointAtFraction(rail: Polyline, t: number): Point {
+  const total = arcLength(rail);
+  if (total < 1e-12) return { ...rail[0]! };
+  return pointAt(rail, total * t);
+}
+
+/**
+ * Pull compensation of a column in millimetres per side (spec §7.2, §14).
+ *
+ * An explicit `pullCompMm` wins — that is the override, and the way a font
+ * states what it was drawn with (§9.2). Otherwise the percentage of the
+ * column's own width, capped.
+ */
+export function pullCompFor(obj: SatinObject): number {
+  if (obj.pullCompMm !== undefined) return obj.pullCompMm;
+  const pct = obj.pullCompPct ?? 0;
+  if (pct === 0) return 0;
+  const wide = (columnWidthMm(obj.railA, obj.railB) * pct) / 100;
+  return obj.pullCompMaxMm === undefined ? wide : Math.min(wide, obj.pullCompMaxMm);
+}
+
 export function applyPullComp(
   railA: Polyline,
   railB: Polyline,
@@ -325,7 +362,7 @@ export function generateSatin(obj: SatinObject): SatinResult {
     rungs = [...rungs].reverse();
   }
 
-  const [compA, compB] = applyPullComp(railA, railB, obj.pullCompMm);
+  const [compA, compB] = applyPullComp(railA, railB, pullCompFor({ ...obj, railA, railB }));
   let pairs = pairRails(compA, compB, rungs, obj.spacingMm);
   if (pairs.length === 0) {
     warnings.push(warn(WARNING.EMPTY_OBJECT, "Satin yields no rungs.", "error", obj.id));

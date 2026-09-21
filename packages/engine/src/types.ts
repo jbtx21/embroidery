@@ -79,7 +79,16 @@ export type SatinObject = Base & {
   rungs: [Point, Point][];
   /** Zigzag spacing, peak to peak on the same rail. */
   spacingMm: number;
-  pullCompMm: number;
+  /**
+   * Pull compensation per side (spec §7.2). Given in millimetres it is used as
+   * it stands — that is what a font brings along (§9.2). Otherwise it is
+   * `pullCompPct` of the column's own width, capped at `pullCompMaxMm`: a 6 mm
+   * column pulls in more than a 1,5 mm one, so a fixed value is either too much
+   * for the narrow or too little for the wide. *(21.09.2026)*
+   */
+  pullCompMm?: number;
+  pullCompPct?: number;
+  pullCompMaxMm?: number;
   /** Above this width, split satin kicks in (spec §7.4). */
   maxWidthMm: number;
   underlay: SatinUnderlay;

@@ -446,7 +446,9 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
             idPrefix: objId,
             threadIndex,
             spacingMm: preset.satinSpacingMm,
-            pullCompMm: preset.pullCompMm,
+            // Satin compensation follows the column width (spec §7.2, §14).
+            pullCompPct: preset.pullCompPct,
+            pullCompMaxMm: preset.pullCompMaxMm,
             underlay: preset.satinUnderlay,
           });
           const mixed = r.warnings.some((w) => w.code === WARNING.SATIN_TOO_WIDE);

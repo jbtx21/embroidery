@@ -2,10 +2,13 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { dist, initGeometry, polygonArea } from "@texma-stitch/geometry";
 import { arc, pt } from "../test/fixtures/shapes.js";
 import { satinObject } from "../test/fixtures/designs.js";
+import type { Polyline } from "@texma-stitch/geometry";
 import {
   applyPullComp,
   applyShortStitches,
   centerLine,
+  columnWidthMm,
+  pullCompFor,
   generateSatin,
   pairRails,
   railSections,
@@ -211,5 +214,45 @@ describe("generation", () => {
     expect(centerLine(pairs)[0]!.y).toBeCloseTo(2, 9);
     const outline = satinOutline(railA, railB);
     expect(polygonArea(outline)).toBeCloseTo(80, 6);
+  });
+});
+
+describe("pull compensation as a percentage (spec §7.2, 21.09.2026)", () => {
+  const railsOf = (widthMm: number): [Polyline, Polyline] => [
+    [pt(0, 0), pt(20, 0)],
+    [pt(0, widthMm), pt(20, widthMm)],
+  ];
+
+  it("measures the width of a column", () => {
+    const [a, b] = railsOf(4);
+    expect(columnWidthMm(a, b)).toBeCloseTo(4, 6);
+  });
+
+  it("takes the percentage of the width", () => {
+    const [railA, railB] = railsOf(2);
+    const obj = satinObject("s", railA, railB, { pullCompMm: undefined, pullCompPct: 12 });
+    expect(pullCompFor(obj)).toBeCloseTo(0.24, 6);
+  });
+
+  it("caps it", () => {
+    const [railA, railB] = railsOf(10);
+    const obj = satinObject("s", railA, railB, {
+      pullCompMm: undefined,
+      pullCompPct: 12,
+      pullCompMaxMm: 0.4,
+    });
+    expect(pullCompFor(obj)).toBeCloseTo(0.4, 6);
+  });
+
+  it("lets an explicit millimetre value win — the font brings its own (spec §9.2)", () => {
+    const [railA, railB] = railsOf(2);
+    const obj = satinObject("s", railA, railB, { pullCompMm: 0.05, pullCompPct: 12 });
+    expect(pullCompFor(obj)).toBe(0.05);
+  });
+
+  it("widens a narrow column less than a wide one", () => {
+    const narrow = satinObject("n", ...railsOf(1.5), { pullCompMm: undefined, pullCompPct: 12 });
+    const wide = satinObject("w", ...railsOf(3), { pullCompMm: undefined, pullCompPct: 12 });
+    expect(pullCompFor(narrow)).toBeLessThan(pullCompFor(wide));
   });
 });

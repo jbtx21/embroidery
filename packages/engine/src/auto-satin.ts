@@ -43,7 +43,10 @@ export type AutoSatinOptions = {
   /** Above this median width a branch becomes a fill (spec §7.4, default 7). */
   maxWidthMm?: number;
   spacingMm?: number;
+  /** Explicit compensation in mm; without one the percentage below applies. */
   pullCompMm?: number;
+  pullCompPct?: number;
+  pullCompMaxMm?: number;
   underlay?: SatinUnderlay;
   threadIndex?: number;
   /** Ids become `${idPrefix}-0`, `${idPrefix}-1`, … */
@@ -510,7 +513,11 @@ export function autoSatin(shape: Polygon, opts: AutoSatinOptions = {}): AutoSati
       // the arc-length pairing of §7.1 is already the right one (spec §7.7.1).
       rungs: [],
       spacingMm: opts.spacingMm ?? preset.satinSpacingMm,
-      pullCompMm: opts.pullCompMm ?? preset.pullCompMm,
+      // A percentage of the column width, unless the caller names millimetres
+      // (spec §7.2).
+      ...(opts.pullCompMm !== undefined ? { pullCompMm: opts.pullCompMm } : {}),
+      pullCompPct: opts.pullCompPct ?? preset.pullCompPct,
+      pullCompMaxMm: opts.pullCompMaxMm ?? preset.pullCompMaxMm,
       maxWidthMm,
       underlay: opts.underlay ?? preset.satinUnderlay,
       shortStitches: true,

@@ -67,7 +67,11 @@ function satinFrom(
     // What the font states beats the preset (spec §9.2) — the glyph was drawn
     // with these values and its side bearings are cut to match.
     spacingMm: column.spacingMm ?? preset.satinSpacingMm,
-    pullCompMm: column.pullCompMm ?? preset.pullCompMm,
+    // The font's own millimetre value is the override; without one the preset's
+    // percentage of the column width applies (spec §7.2).
+    ...(column.pullCompMm !== undefined ? { pullCompMm: column.pullCompMm } : {}),
+    pullCompPct: preset.pullCompPct,
+    pullCompMaxMm: preset.pullCompMaxMm,
     maxWidthMm: TEXT_MAX_WIDTH_MM,
     underlay: preset.satinUnderlay,
     shortStitches: true,
