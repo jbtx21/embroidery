@@ -29,7 +29,8 @@ import {
   simplify,
 } from "@texma-stitch/geometry";
 import { PRESETS } from "./presets.js";
-import type { FillObject, SatinObject, SatinUnderlay, StitchObject, Warning } from "./types.js";
+import { columnWidthMm, railMidline } from "./satin.js";
+import type { FillObject, SatinUnderlay, StitchObject, Warning } from "./types.js";
 import { warn, WARNING } from "./warnings.js";
 
 /** Rungs are placed roughly this far apart along the branch (spec §7.1). */
@@ -38,6 +39,14 @@ const RUNG_SPACING_MM = 2;
 const RAIL_SIMPLIFY_MM = 0.08;
 /** How far a rung sticks out past each rail, as a share of the column width. */
 const RUNG_OVERSHOOT = 0.15;
+/**
+ * Below this median width a branch is a line, not a column (spec §7.4). The
+ * archive's narrowest satin column is 1,41 mm; 1,2 leaves a margin so that a
+ * genuinely thin letter stroke still gets its satin.
+ */
+export const SATIN_MIN_COLUMN_MM = 1.2;
+/** Stitch length of the running stitch that replaces a too-narrow column. */
+export const NARROW_RUN_STITCH_MM = 1.8;
 
 export type AutoSatinOptions = {
   /** Above this median width a branch becomes a fill (spec §7.4, default 7). */
@@ -500,7 +509,33 @@ export function autoSatin(shape: Polygon, opts: AutoSatinOptions = {}): AutoSati
     return { objects: [], warnings };
   }
 
-  const objects: StitchObject[] = usable.map(({ railA, railB }, i): SatinObject => {
+  // A column narrower than this is a line, not a satin column (spec §7.4,
+  // 25.09.2026). Measured against the TEXMA archive of 192 production files:
+  // the narrowest satin column there is 1,41 mm wide, the median 1,99. The
+  // engine was producing columns of 0,15 mm — the needle stands on the spot,
+  // the fabric perforates, and every one of them costs underlay, lock stitches
+  // and a way in and out. A digitiser stitches a strip that thin as a running
+  // stitch, three times over for coverage.
+  let narrow = 0;
+  const objects: StitchObject[] = usable.map(({ railA, railB }, i): StitchObject => {
+    if (columnWidthMm(railA, railB) < SATIN_MIN_COLUMN_MM) {
+      narrow += 1;
+      return {
+        id: `${idPrefix}-${i}`,
+        type: "running",
+        threadIndex: opts.threadIndex ?? 0,
+        visible: true,
+        locked: false,
+        trimAfter: "auto",
+        // All parts of one shape are one sequence (spec §10.1): they were
+        // ordered along the skeleton, and `autoOrder` must not pull them apart.
+        sequence: idPrefix,
+        path: railMidline(railA, railB),
+        closed: false,
+        stitchLengthMm: NARROW_RUN_STITCH_MM,
+        repeats: 3,
+      };
+    }
     return {
       id: `${idPrefix}-${i}`,
       type: "satin",
@@ -508,6 +543,7 @@ export function autoSatin(shape: Polygon, opts: AutoSatinOptions = {}): AutoSati
       visible: true,
       locked: false,
       trimAfter: "auto",
+      sequence: idPrefix,
       railA,
       railB,
       // No rungs: both rails were cut from the outline and run the same way, so
@@ -527,5 +563,15 @@ export function autoSatin(shape: Polygon, opts: AutoSatinOptions = {}): AutoSati
     };
   });
 
+  if (narrow > 0) {
+    warnings.push(
+      warn(
+        WARNING.SATIN_TOO_NARROW,
+        `${narrow} of ${usable.length} columns are narrower than ${SATIN_MIN_COLUMN_MM} mm — ` +
+          `stitched as a running stitch (three passes) instead.`,
+        "info",
+      ),
+    );
+  }
   return { objects, warnings };
 }

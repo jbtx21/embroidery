@@ -303,3 +303,42 @@ describe("rails cut from the outline (spec §7.7.1)", () => {
     expect(budget(polygonOf(rect(0, 0, 40, 3)), r)).toBeLessThanOrEqual(1.3);
   });
 });
+
+describe("columns too narrow to be satin become running stitch (spec §7.4, 25.09.2026)", () => {
+  // The archive of 192 production files has no satin column narrower than
+  // 1,41 mm; the engine produced columns of 0,15 mm. A strip that thin is a
+  // line, and a digitiser stitches it as one.
+  it("turns a 0,8 mm strip into a running stitch on its midline", () => {
+    const r = autoSatin(polygonOf(rect(0, 0, 30, 0.8)));
+    const satins = r.objects.filter((o) => o.type === "satin");
+    const runs = r.objects.filter((o) => o.type === "running");
+    expect(satins).toHaveLength(0);
+    expect(runs.length).toBeGreaterThan(0);
+    const run = runs[0]!;
+    if (run.type !== "running") throw new Error("no running object");
+    expect(run.repeats).toBe(3);
+    // The midline sits in the middle of the strip, not on its edge.
+    for (const p of run.path) expect(Math.abs(p.y - 0.4)).toBeLessThan(0.25);
+  });
+
+  it("leaves a 3 mm bar a satin column", () => {
+    const r = autoSatin(polygonOf(rect(0, 0, 40, 3)));
+    expect(r.objects.filter((o) => o.type === "satin").length).toBeGreaterThan(0);
+    expect(r.objects.filter((o) => o.type === "running")).toHaveLength(0);
+  });
+
+  it("says how many columns it converted", () => {
+    const r = autoSatin(polygonOf(rect(0, 0, 30, 0.8)));
+    const w = r.warnings.find((x) => x.code === "SATIN_TOO_NARROW");
+    expect(w).toBeDefined();
+    expect(w!.message).toMatch(/running/i);
+  });
+});
+
+describe("all parts of one shape share a sequence (spec §10.1, 25.09.2026)", () => {
+  it("gives every object of a proposal the same sequence", () => {
+    const r = autoSatin(LETTER_R, { idPrefix: "z1-abc" });
+    expect(r.objects.length).toBeGreaterThan(1);
+    for (const o of r.objects) expect(o.sequence).toBe("z1-abc");
+  });
+});

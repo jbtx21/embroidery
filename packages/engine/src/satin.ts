@@ -155,6 +155,22 @@ export function columnWidthMm(railA: Polyline, railB: Polyline): number {
   return samples[Math.floor(samples.length / 2)] ?? 0;
 }
 
+/**
+ * Midline between two rails, sampled by arc-length fraction — the line a narrow
+ * column collapses to when it is stitched as a running stitch (spec §7.4).
+ */
+export function railMidline(railA: Polyline, railB: Polyline, steps = 24): Polyline {
+  if (railA.length < 2 || railB.length < 2) return [];
+  const out: Polyline = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const a = pointAtFraction(railA, t);
+    const b = pointAtFraction(railB, t);
+    out.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  }
+  return out;
+}
+
 /** Point at a fraction of the rail's length. */
 function pointAtFraction(rail: Polyline, t: number): Point {
   const total = arcLength(rail);
