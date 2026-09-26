@@ -6,6 +6,7 @@ import {
   initGeometry,
   offset,
   pointInPolygon,
+  polygonArea,
   segmentInside,
 } from "@texma-stitch/geometry";
 import {
@@ -19,11 +20,13 @@ import {
 } from "../test/fixtures/shapes.js";
 import { fillObject } from "../test/fixtures/designs.js";
 import {
+  CONTOUR_MIN_WIDTH_MM,
   contourUnderlay,
   DOUBLE_UNDERLAY_EDGE_MM,
   FILL_TINY_MM2,
   fillRegion,
   generateFill,
+  keepWide,
   longestEdgeMm,
   NARROW_MIN_ROWS,
   NARROW_SHARE,
@@ -495,5 +498,35 @@ describe("travel paths spread their stitches (spec §8.7, 26.09.2026)", () => {
   it("gives the same answer twice (rule 3)", () => {
     const again = travelStitches(u, pt(2, 1), pt(18, 2));
     expect(again.points).toEqual(gapWays()[0]!.points);
+  });
+});
+
+describe("the contour underlay leaves the splinters alone (spec §8.6, 26.09.2026)", () => {
+  /**
+   * The inset outline of a shape cut up by a knockdown falls into splinters: on
+   * STUTTGART 80 mm the grey shield gave 50 rings, 54 of its 661 mm² in bands
+   * narrower than a needle. Both edges of such a band are the same needle track
+   * — measured 15 penetrations in one 0,2 mm cell, from the contour underlay
+   * alone (spec §11).
+   */
+  it("drops a band narrower than the needle", () => {
+    expect(keepWide([polygonOf(rect(0, 0, 20, 0.6))], CONTOUR_MIN_WIDTH_MM)).toEqual([]);
+  });
+
+  it("keeps a part that has room for it", () => {
+    const kept = keepWide([polygonOf(rect(0, 0, 20, 10))], CONTOUR_MIN_WIDTH_MM);
+    expect(kept).toHaveLength(1);
+    expect(polygonArea(kept[0]!)).toBeGreaterThan(20 * 10 * 0.9);
+  });
+
+  it("stitches nothing where the inset outline is a splinter", () => {
+    // 0,6 mm web: inset by 0,4 mm there is nothing left worth an underlay.
+    const web = polygonOf(rect(0, 0, 20, 1.4));
+    expect(contourUnderlay(web, 0.4, 2.5).points).toHaveLength(0);
+  });
+
+  it("still stitches the outline of a proper area", () => {
+    const u = contourUnderlay(polygonOf(rect(0, 0, 20, 10)), 0.4, 2.5);
+    expect(u.points.length).toBeGreaterThan(10);
   });
 });

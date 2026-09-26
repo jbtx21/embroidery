@@ -504,3 +504,40 @@ der Steg ist so eng, dass der Versatz auf seinen Mindestwert 0,15 mm zurückfäl
 weiter führt über die **Zahl der Durchgänge** — 13 Reisewege durch eine Engstelle sind das
 Verfahren, nicht die Geometrie. Das ist Kandidat 2 aus dem Plan (Bänder statt Greedy in der
 Sektionsreihenfolge).
+
+## Schritt 2b: keine Konturunterlage auf Splittern (26.09.2026)
+
+Der Rest der Häufung kam nicht vom Deckstich und nicht von der Gitterunterlage, sondern von
+der **Konturunterlage**. Gemessen durch Abschalten einzelner Phasen an STUTTGART 80 mm:
+
+| Variante             | Stiche | Dichte max | Nadel max | Zellen ≥ 6 |
+| -------------------- | -----: | ---------: | --------: | ---------: |
+| alles an             | 14.916 |         38 |        13 |         14 |
+| ohne Gitterunterlage | 13.121 |         32 |        14 |         10 |
+| ohne jede Unterlage  | 10.365 |         26 |     **5** |      **0** |
+
+Die Konturunterlage der grauen Schildfläche allein ergab **50 Ringe** und **15 Einstiche in
+einer Zelle**: der Knockdown zerschneidet die Fläche in Stege, und die um 0,4 mm eingerückte
+Kontur eines Stegs ist ein Band, dessen beide Kanten dieselbe Nadelspur sind. 54 der 661 mm²
+dieser Fläche liegen in Bändern, die ein 0,3-mm-Öffnen nicht überstehen.
+
+Regel dagegen (§8.6): die eingerückte Kontur wird geöffnet, was schmaler als 0,8 mm ist,
+bekommt keine Unterlage.
+
+| Motiv                     | Stiche vorher → nachher | max je 0,2 mm² | Zellen ≥ 6 | max je mm² |
+| ------------------------- | ----------------------: | -------------: | ---------: | ---------: |
+| STUTTGART 80 mm           |     14.916 → **13.294** |     13 → **7** | 14 → **2** |    38 → 31 |
+| STUTTGART 250 mm          |     75.125 → **71.200** |     10 → **7** | 22 → **7** |    30 → 22 |
+| Berufsfeuerwehr Köln 90   |     20.386 → **19.114** |      8 → **7** | 13 → **9** |    28 → 26 |
+| Eislingen Print 200 mm    |     23.386 → **22.648** |          7 → 7 |      1 → 1 |    18 → 18 |
+| Atzensport Hofbräu 80 mm  |     11.569 → **11.030** |          5 → 5 |      0 → 0 |    20 → 19 |
+| Atzensport Hofbräu 200 mm |     42.664 → **42.255** |          6 → 6 |      3 → 3 |    18 → 18 |
+
+**Damit meldet kein Motiv mehr einen Fehler.** Die schlimmste Zelle hat 7 Einstiche (Archiv:
+bis 8), die Zahl der Zellen ab 6 liegt zwischen 0 und 9 (Archiv: 0 bis 8). Die Zielmarke des
+Plans — unter 8 Einstiche und unter 10 Zellen — ist bei allen sechs erreicht.
+
+Es ist die erste Änderung dieser Sitzung, die **alle** Kennzahlen zugleich verbessert:
+Nadelhäufung, Dichte und Stichzahl gehen gemeinsam zurück (−11 % Stiche bei STUTTGART 80 mm).
+Der Grund ist, dass hier nichts umverteilt, sondern etwas weggelassen wird, das nie hätte
+gestickt werden dürfen.

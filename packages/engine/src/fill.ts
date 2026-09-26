@@ -413,6 +413,31 @@ export function fillRegion(
 // Underlay (spec §8.6)
 // ---------------------------------------------------------------------------
 
+/**
+ * How wide a part of the inset outline has to be to carry a contour underlay
+ * (spec §8.6, §11, 26.09.2026).
+ *
+ * A knockdown cuts the shape into webs, and the inset outline of a web is a band
+ * whose two edges are the SAME needle track. Measured on STUTTGART 80 mm: the
+ * grey shield gave 50 rings, 54 of its 661 mm² in bands narrower than a needle,
+ * and the contour underlay alone put 15 penetrations into one 0,2 mm cell —
+ * turning it off took the whole design from 13 to 5. A needle is 0,7 to 0,8 mm
+ * across, so anything under 0,8 mm wide cannot hold two tracks. The top stitches
+ * cover such a web on their own; an underlay there only perforates it.
+ */
+export const CONTOUR_MIN_WIDTH_MM = 0.8;
+
+/**
+ * The parts that are at least `minWidthMm` wide — shrunk by half of it and grown
+ * back, so a narrower band falls away and everything else stays where it was
+ * (rounded at the corners, which an underlay does not mind).
+ */
+export function keepWide(parts: Polygon[], minWidthMm: number): Polygon[] {
+  const half = Math.abs(minWidthMm) / 2;
+  if (half <= 0) return parts;
+  return parts.flatMap((part) => offset(part, -half).flatMap((core) => offset(core, half)));
+}
+
 /** Contour underlay: running stitch on the inward-offset outline. */
 /** Rotate a ring so it starts at the point nearest `from` (spec §8.7). */
 export function rotateRingTo(ring: Polyline, from: Point): Polyline {
@@ -442,7 +467,7 @@ export function contourUnderlay(
   from?: Point,
   travelPoly?: Polygon,
 ): StitchPath {
-  const inner = offset(poly, -Math.abs(insetMm));
+  const inner = keepWide(offset(poly, -Math.abs(insetMm)), CONTOUR_MIN_WIDTH_MM);
   const area = travelPoly ?? travelArea(poly);
   const out: Point[] = [];
   const jumpAt: number[] = [];

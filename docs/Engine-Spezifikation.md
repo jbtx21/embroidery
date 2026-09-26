@@ -554,6 +554,20 @@ Dichtespitze 44; mit ihr 33.
 
 Standard: contour + single. Ab 20 mm Kantenlänge: double.
 
+**Keine Konturunterlage auf Splittern** *(26.09.2026)*. Die eingerückte Kontur wird vor dem
+Sticken **geöffnet** (um 0,4 mm geschrumpft und wieder aufgeblasen, `keepWide`): was schmaler
+als **0,8 mm** ist, fällt weg. Grund: ein Knockdown (§4.1) zerschneidet die Fläche in Stege,
+und die eingerückte Kontur eines Stegs ist ein Band, dessen beide Kanten **dieselbe
+Nadelspur** sind. Gemessen an STUTTGART 80 mm: die graue Schildfläche ergab **50 Ringe**,
+54 ihrer 661 mm² in Bändern unter Nadelbreite, und die Konturunterlage allein setzte **15
+Einstiche in eine 0,2-mm-Zelle** (§11) — mehr als das ganze Archiv. Eine Nadel ist 0,7 bis
+0,8 mm dick; unter 0,8 mm Breite haben zwei Spuren keinen Platz. Der Deckstich hält so einen
+Steg ohnehin; eine Unterlage darin perforiert ihn nur.
+
+**Wirkung** *(sechs Läufe, 26.09.2026)*: Nadelhäufung von 13 auf 7 Einstiche je Zelle und von
+14 auf 2 Zellen (STUTTGART 80 mm), Dichte 38 → 31, Stichzahl −11 %. Alle sechs Läufe liegen
+damit im Feld des Archivs — **kein Motiv meldet mehr einen Fehler.**
+
 ### 8.7 Wege zwischen den Phasen *(20.09.2026)*
 
 Ein Fill besteht aus mehreren Phasen: Konturunterlage, Gitterunterlage (ein- oder
