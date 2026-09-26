@@ -533,7 +533,7 @@ verändert (Regel 8).
 
 ### 8.5 Sektionsreihenfolge und Reisewege
 - Start: Sektion nächst `startPoint`, sonst unten links.
-- Greedy: nächste unbesuchte Sektion nach Distanz; Reiseweg mit `insideTravel` als Running (Stichlänge **3,0** — *21.09.2026, vorher 2,0*) **innerhalb der Form**, damit er später überdeckt wird. Ein Reiseweg liegt unter dem Deckstich und ist nicht zu sehen; 3 mm ist, was ein Puncher für einen verdeckten Laufstich nimmt, und setzt ein Drittel weniger Nadeleinstiche dort, wo mehrere Wege denselben Steg benutzen. **Verbindungen zwischen Objekten behalten 2,0** (§10.2) — die können sichtbar sein.
+- Greedy: nächste unbesuchte Sektion nach Distanz; Reiseweg mit `insideTravel` als Running (Stichlänge **2,0** — *26.09.2026; am 21.09. auf 3,0 gesetzt, jetzt zurück*) **innerhalb der Form**, damit er später überdeckt wird. Die 3,0 sollten weniger Nadeleinstiche in einen Steg setzen und haben das nicht getan: die Einstiche kamen von den Graphknoten (§8.7.2) und der Konturunterlage (§8.6). Das TEXMA-Archiv zeigt einen Laufstich von höchstens 2,0 mm; gemessen gegen 3,0 kostet der kürzere Reiseweg 3 % mehr Stiche und senkt die Dichtespitze von STUTTGART 80 mm von 31 auf 28. **Verbindungen zwischen Objekten benutzen dieselben 2,0** (§10.2) — die können sichtbar sein.
 - Ende bei `endPoint`, falls gesetzt.
 
 **Nächste heißt erreichbare** *(21.09.2026)*. Die Distanz ist die Luftlinie, und hinter

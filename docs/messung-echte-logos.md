@@ -541,3 +541,32 @@ Es ist die erste Änderung dieser Sitzung, die **alle** Kennzahlen zugleich verb
 Nadelhäufung, Dichte und Stichzahl gehen gemeinsam zurück (−11 % Stiche bei STUTTGART 80 mm).
 Der Grund ist, dass hier nichts umverteilt, sondern etwas weggelassen wird, das nie hätte
 gestickt werden dürfen.
+
+## Schritt 3: die zwei Stichlängen nachgemessen (26.09.2026)
+
+Der Plan sah vor, beide am 21.09. gesetzten Werte zurückzunehmen — Reisestichlänge 3,0 → 2,0
+und Fill-Stichlänge 4,0 → 3,2 —, weil das Archiv einen Laufstich von höchstens 2,0 mm und
+eine Fill-Stichlänge mit p90 3,5 zeigt. Gemessen an drei Motiven, jede Änderung einzeln:
+
+| Variante                    | STUTTGART 80: Stiche / Dichte / Nadel |               Köln 90 |    Atzensport 200 |
+| --------------------------- | ------------------------------------: | --------------------: | ----------------: |
+| heute (Reise 3,0, Fill 4,0) |                     13.294 / 31 / 7/2 |     19.114 / 26 / 7/9 | 42.255 / 18 / 6/3 |
+| Reise 2,0                   |                     13.738 / 28 / 7/2 |     19.631 / 25 / 7/8 | 43.406 / 18 / 6/3 |
+| Reise 2,0 + Fill 3,2        |                     14.271 / 30 / 7/2 | 20.614 / 24 / **9**/8 | 46.238 / 18 / 6/3 |
+
+**Reisestichlänge 2,0 übernommen.** Kostet 2,7 bis 3,3 % Stiche und senkt die Dichtespitze
+von STUTTGART 80 mm von 31 auf 28. Die Begründung vom 21.09., 3,0 setze weniger Einstiche in
+einen Steg, hat sich als falsch erwiesen: die Einstiche kamen von den Graphknoten und der
+Konturunterlage, nicht von der Stichlänge.
+
+**Fill-Stichlänge bleibt bei 4,0.** Sie auf 3,2 zu senken kostet weitere 4 bis 6 % Stiche und
+verschlechtert zwei Kennzahlen: die Dichtespitze von STUTTGART 80 mm steigt wieder auf 30,
+und Köln geht von 7 auf **9** Einstiche je Zelle — über das Maximum des Archivs. Der einzige
+Gewinn wäre ein p90 der Stichlänge von 3,20 statt 4,00. Der Wert 4,0 steht in §14 auf der
+ZSK-EPCwin-Referenz (Produktionswerte 4–5 mm); das Archiv-p90 von 3,5 ist ein Mittel über
+zehn Jahre und mehrere Programme. Gegen eine Messung, die zwei Kennzahlen verschlechtert,
+reicht das nicht. **Offen für den Probestick** — am Stoff sieht man, ob 4,0 mm im Fill zu
+lang liegt.
+
+Stand aller sechs Läufe nach Schritt 3: Nadelhäufung 5 bis 7 Einstiche je Zelle, 0 bis 8
+Zellen ab 6 — das Archiv liegt bei 4 bis 8 und 0 bis 8. **Kein Motiv meldet einen Fehler.**

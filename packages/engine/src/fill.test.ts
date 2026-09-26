@@ -135,7 +135,7 @@ describe("section stitches (spec §8.4)", () => {
 
 describe("documented values (spec §8, §11)", () => {
   it("matches the numbers from the spec", () => {
-    expect(TRAVEL_STITCH_MM).toBe(3.0);
+    expect(TRAVEL_STITCH_MM).toBe(2.0);
     expect(FILL_TINY_MM2).toBe(4);
     expect(DOUBLE_UNDERLAY_EDGE_MM).toBe(20);
   });

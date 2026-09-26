@@ -27,13 +27,16 @@ import { runningStitches } from "./running.js";
 import { warn, WARNING } from "./warnings.js";
 
 /**
- * Stitch length of the travel paths inside the shape (spec §8.5, 21.09.2026 —
- * before 2,0). A travel path runs under the top stitching and is not seen, and
- * 3 mm is what a digitiser uses for a hidden running stitch. It also puts a
- * third fewer needle holes into the fabric where several ways share a narrow
- * bridge. Connections BETWEEN objects keep 2,0 (§10.2) — those can show.
+ * Stitch length of the travel paths inside the shape (spec §8.5, 26.09.2026 —
+ * 2,0, then 3,0 on 21.09.2026, now 2,0 again). Three millimetres were meant to
+ * put fewer needle holes into a narrow bridge, and they did nothing of the sort:
+ * the holes came from the graph nodes (§8.7.2) and the contour underlay (§8.6).
+ * What the TEXMA archive shows is a running stitch of at most 2,0 mm, and
+ * measured against 3,0 the shorter travel costs 3 % more stitches and takes the
+ * density peak of STUTTGART 80 mm from 31 to 28. Connections BETWEEN objects use
+ * the same 2,0 (§10.2) — those can show.
  */
-export const TRAVEL_STITCH_MM = 3.0;
+export const TRAVEL_STITCH_MM = 2.0;
 /** Area below which a fill stops making sense (spec §11). */
 export const FILL_TINY_MM2 = 4;
 /**
