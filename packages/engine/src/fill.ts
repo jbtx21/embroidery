@@ -16,6 +16,7 @@ import {
   offset,
   offsetDirectional,
   polygonArea,
+  pointInPolygon,
   polygonBbox,
   rings,
   rotator,
@@ -477,29 +478,142 @@ export function contourUnderlay(
 export function travelPath(poly: Polygon, a: Point, b: Point): TravelPath {
   const path = insideTravel(poly, a, b);
   if (!pathInside(poly, path)) return { points: [], jump: true };
-  // The way follows the outline, and the outline has a bend every tenth of a
-  // millimetre. Stitching each one puts hundreds of needle holes into the same
-  // spot — measured on STUTTGART 80 mm: the density peak went from 24 to 43.
-  // Resampling by length alone is no good either: it drops a bend, and the
-  // chord across it leaves the shape, which is what this function prevents.
-  // So: reach as far along the way as a stitch may go AND the chord still lies
-  // inside, then divide that stretch.
+
   const out: Point[] = [];
+  // The last penetration — the caller stitched `a` itself — and how far the way
+  // has run since. The beat carries across the bends instead of restarting on
+  // every leg, which is what tells two paths through one gap apart (§11).
+  let needle = path[0]!;
+  let carry = 0;
+  let cursor = path[0]!;
+  // Arc length on the way as the graph handed it over. The bends are spread by
+  // THIS length, not by the beat: the beat is changed by a step, so a step read
+  // off it would feed back on itself, and the paths gather at the fixed points
+  // of that feedback instead of spreading (measured on the U shape).
+  let run = 0;
+  const put = (q: Point): void => {
+    out.push(q);
+    needle = q;
+  };
+
   let i = 0;
   while (i < path.length - 1) {
+    // Reach as far along the way as the chord still lies inside. One stitch
+    // length caps the SCAN, not the stitch — the beat below keeps the stitches
+    // short, and without a cap this walk would cost O(n²) on an outline with a
+    // bend every tenth of a millimetre.
     let j = i + 1;
     while (
       j + 1 < path.length &&
-      dist(path[i]!, path[j + 1]!) <= TRAVEL_STITCH_MM &&
-      segmentInside(poly, path[i]!, path[j + 1]!)
+      dist(cursor, path[j + 1]!) <= TRAVEL_STITCH_MM &&
+      segmentInside(poly, cursor, path[j + 1]!)
     ) {
       j++;
     }
-    out.push(...bridge(path[i]!, path[j]!, TRAVEL_STITCH_MM));
-    if (j < path.length - 1) out.push({ ...path[j]! });
+    const last = j === path.length - 1;
+    // A bend the needle cannot skip: the chord past it leaves the shape.
+    const forced = !last && !segmentInside(poly, cursor, path[j + 1]!);
+    for (let k = i; k < j; k++) run += dist(path[k]!, path[k + 1]!);
+    const target = forced ? stepInwards(poly, cursor, path[j]!, path[j + 1]!, run) : path[j]!;
+    const stretch = dist(cursor, target);
+    const cuts = beatOn(stretch, carry);
+    for (const [n, t] of cuts.entries()) {
+      const q = {
+        x: cursor.x + (target.x - cursor.x) * t,
+        y: cursor.y + (target.y - cursor.y) * t,
+      };
+      // The first stitch on this leg spans the bend behind it, and that chord
+      // was never checked. Where it does not hold, the bend becomes a stitch.
+      if (n === 0 && carry > 1e-9 && !segmentInside(poly, needle, q)) put({ ...cursor });
+      put(q);
+    }
+    carry = cuts.length === 0 ? carry + stretch : stretch * (1 - cuts[cuts.length - 1]!);
+    // The bend is an extra penetration, the beat is not restarted by it: what
+    // comes after the gap then still depends on the way run before it, and the
+    // paths stay apart beyond the bend as well.
+    if (forced) put({ ...target });
+    cursor = target;
     i = j;
   }
   return { points: out, jump: false };
+}
+
+/**
+ * Where the needle goes down on a stretch of `lengthMm`, given that `carryMm` of
+ * the way has already run since the last penetration (spec §8.7, 26.09.2026).
+ * Returned as fractions of the stretch — the caller interpolates.
+ *
+ * The beat runs through the whole way instead of restarting on every leg. That
+ * is what a running stitch does, and it is what tells two travel paths apart:
+ * they reach the same gap having run different lengths, divide it differently,
+ * and their penetrations land in different places (§11).
+ */
+export function beatOn(lengthMm: number, carryMm: number): number[] {
+  if (lengthMm <= 1e-9) return [];
+  const out: number[] = [];
+  for (
+    let s = Math.max(TRAVEL_STITCH_MM - carryMm, 0);
+    s < lengthMm - 1e-9;
+    s += TRAVEL_STITCH_MM
+  ) {
+    out.push(s / lengthMm);
+  }
+  return out;
+}
+
+/**
+ * How far a forced bend of the travel way steps into the free area (spec §8.7,
+ * §11, 26.09.2026).
+ *
+ * `insideTravel` routes over the corners of a visibility graph, so every path
+ * through the same gap gets the SAME corner — and a corner is a needle
+ * penetration. Measured on STUTTGART 80 mm: eighteen travel paths of one fill
+ * put eighteen penetrations on one point, 0,00 mm apart. A needle is 0,7 mm
+ * across, so that is the same hole eighteen times: the fabric tears and the
+ * needle breaks.
+ */
+export const CORNER_SPREAD_MIN_MM = 0.15;
+export const CORNER_SPREAD_MAX_MM = 1.2;
+
+/**
+ * The bend steps along the OUTER bisector of its two legs. The obstacle it
+ * rounds lies on the inner side — that is why the way bends here at all — so
+ * outwards is where the free area is. How far follows from `runMm`, the length
+ * of way behind the bend: no state and no random (rule 3), and two paths that
+ * arrive having run different lengths step apart. The step is given up when the point or one
+ * of its legs would leave the area; the bend then stays where the graph put it,
+ * as it did before.
+ */
+export function stepInwards(
+  poly: Polygon,
+  from: Point,
+  node: Point,
+  to: Point,
+  runMm: number,
+): Point {
+  const lu = dist(from, node);
+  const lv = dist(node, to);
+  if (lu < 1e-9 || lv < 1e-9) return node;
+  const bx = (from.x - node.x) / lu + (to.x - node.x) / lv;
+  const by = (from.y - node.y) / lu + (to.y - node.y) / lv;
+  const lb = Math.hypot(bx, by);
+  // A straight way has no bisector — and no bend that needs moving either.
+  if (lb < 1e-6) return node;
+  // Continuous in the beat, not in steps: two paths that arrive a tenth of a
+  // millimetre apart step a tenth of a millimetre apart. Steps would hand whole
+  // groups of paths the same point again, which is the very thing to avoid.
+  const share =
+    (((runMm % TRAVEL_STITCH_MM) + TRAVEL_STITCH_MM) % TRAVEL_STITCH_MM) / TRAVEL_STITCH_MM;
+  let d = CORNER_SPREAD_MIN_MM + share * (CORNER_SPREAD_MAX_MM - CORNER_SPREAD_MIN_MM);
+  // Halve into a narrow gap, and give up when even the smallest step is too big.
+  while (d >= CORNER_SPREAD_MIN_MM) {
+    const q = { x: node.x - (bx / lb) * d, y: node.y - (by / lb) * d };
+    if (pointInPolygon(poly, q) && segmentInside(poly, from, q) && segmentInside(poly, q, to)) {
+      return q;
+    }
+    d /= 2;
+  }
+  return node;
 }
 
 /** `travelPath` on the shape itself, with the hair of air around it (§8.7). */

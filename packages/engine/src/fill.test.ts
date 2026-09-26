@@ -8,7 +8,15 @@ import {
   pointInPolygon,
   segmentInside,
 } from "@texma-stitch/geometry";
-import { annulus, circle, hourglass, polygonOf, pt, rect } from "../test/fixtures/shapes.js";
+import {
+  annulus,
+  circle,
+  hourglass,
+  polygonOf,
+  pt,
+  rect,
+  uShape,
+} from "../test/fixtures/shapes.js";
 import { fillObject } from "../test/fixtures/designs.js";
 import {
   contourUnderlay,
@@ -27,6 +35,7 @@ import {
   TRAVEL_STITCH_MM,
   travelStitches,
 } from "./fill.js";
+import type { TravelPath } from "./fill.js";
 
 beforeAll(async () => {
   await initGeometry();
@@ -429,5 +438,62 @@ describe("travel stays inside the shape (spec §8.7, 21.09.2026)", () => {
     expect(w).toBeDefined();
     expect(w!.objectId).toBe("f");
     expect(outsideRuns(shape, r.stitches, r.jumpAt, 0.5)).toEqual([]);
+  });
+});
+
+describe("travel paths spread their stitches (spec §8.7, 26.09.2026)", () => {
+  /**
+   * Several travel paths through one gap used to get the SAME corner node from
+   * the visibility graph, and a node is a stitch. Measured on STUTTGART 80 mm:
+   * 18 needle penetrations on one point, 0,00 mm apart, out of a single fill.
+   * A needle is 0,7 mm across — that is the same hole 18 times (spec §11).
+   */
+  const u = uShape();
+  const GAP_PATHS = 8;
+  // The slot leaves one 4 mm gap at the bottom, so all eight have to pass it.
+  const gapWays = (): TravelPath[] =>
+    Array.from({ length: GAP_PATHS }, (_, k) => travelStitches(u, pt(2, 1 + k * 0.5), pt(18, 2)));
+  /** Penetrations per 0,2 mm cell across all paths — the metric of §11. */
+  const perCell = (paths: { points: Point[] }[]): number => {
+    const cells = new Map<string, number>();
+    for (const p of paths) {
+      for (const s of p.points) {
+        const k = `${Math.round(s.x / 0.2)}:${Math.round(s.y / 0.2)}`;
+        cells.set(k, (cells.get(k) ?? 0) + 1);
+      }
+    }
+    return Math.max(...cells.values());
+  };
+
+  it("finds a way inside for each of them", () => {
+    for (const w of gapWays()) {
+      expect(w.jump).toBe(false);
+      expect(w.points.length).toBeGreaterThan(1);
+    }
+  });
+
+  it("does not stack the paths in one needle hole", () => {
+    expect(perCell(gapWays())).toBeLessThanOrEqual(3);
+  });
+
+  it("keeps every stitch inside the shape", () => {
+    const area = offset(u, 0.1);
+    for (const w of gapWays()) {
+      for (const s of w.points) expect(area.some((p) => pointInPolygon(p, s))).toBe(true);
+    }
+  });
+
+  it("holds the travel stitch length", () => {
+    for (const w of gapWays()) {
+      const pts = w.points;
+      for (let i = 1; i < pts.length; i++) {
+        expect(dist(pts[i - 1]!, pts[i]!)).toBeLessThanOrEqual(TRAVEL_STITCH_MM + 1e-6);
+      }
+    }
+  });
+
+  it("gives the same answer twice (rule 3)", () => {
+    const again = travelStitches(u, pt(2, 1), pt(18, 2));
+    expect(again.points).toEqual(gapWays()[0]!.points);
   });
 });

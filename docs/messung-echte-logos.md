@@ -469,3 +469,38 @@ und unter 10 Zellen ab 6.
 Die Dichte je mm² bleibt daneben stehen und misst weiter das Aussehen. Sie hätte den Befund
 nicht geliefert: Atzensport 200 mm liegt mit 18/mm² im grünen Bereich und hat trotzdem 37
 Zellen, in denen die Nadel sechsmal ins selbe Loch geht.
+
+## Schritt 2a: Reisewege streuen (26.09.2026)
+
+Ursache der Häufung, punktgenau gemessen: von 1.024 Einstichen in den heißen Zellen von
+STUTTGART 80 mm lagen **977 auf exakt derselben Koordinate** — 18-mal derselbe Punkt, alle
+aus einem einzigen Fill (`z01-bebebe-001#0`, die graue Schildfläche), an weit auseinander
+liegenden Stellen der Stichfolge. Das sind die Ecken des Sichtbarkeitsgraphen, über den
+`insideTravel` die Reisewege führt: jeder Weg durch dieselbe Engstelle bekommt dieselbe Ecke,
+und eine Ecke ist ein Einstich.
+
+Gegenmaßnahme in §8.7.2: durchlaufender Stichtakt und ein Versatz der erzwungenen Ecken auf
+der äußeren Winkelhalbierenden, stetig aus der gelaufenen Weglänge.
+
+| Motiv                     | Stiche vorher → nachher | max je 0,2 mm² |   Zellen ≥ 6 | max je mm² |
+| ------------------------- | ----------------------: | -------------: | -----------: | ---------: |
+| STUTTGART 80 mm           |         14.778 → 14.916 |    22 → **13** |  82 → **14** |    36 → 38 |
+| STUTTGART 250 mm          |         74.980 → 75.125 |    13 → **10** | 221 → **22** |    34 → 30 |
+| Berufsfeuerwehr Köln 90   |         20.273 → 20.386 |     13 → **8** |  36 → **13** |    29 → 28 |
+| Eislingen Print 200 mm    |         23.296 → 23.386 |          7 → 7 |        1 → 1 |    18 → 18 |
+| Atzensport Hofbräu 80 mm  |         11.529 → 11.569 |      6 → **5** |    1 → **0** |    20 → 20 |
+| Atzensport Hofbräu 200 mm |         42.664 → 42.664 |     10 → **6** |   37 → **3** |    18 → 18 |
+
+Von vier Fehlern sind zwei geblieben (STUTTGART 80 und 250 mm), zwei Motive sind auf
+Warnung gefallen, Atzensport 80 mm meldet nichts mehr. Die Stichzahl steigt um 0,1 bis
+0,9 %. **Die Dichte von STUTTGART 80 mm steigt von 36 auf 38 Stiche/mm²** — der versetzte
+Weg legt seine Stiche dichter an den Rand des Stegs. Beide Werte bleiben in derselben
+Kategorie (Warnung), aber es ist eine Verschlechterung und steht hier, damit sie nicht
+untergeht.
+
+**Was übrig bleibt, ist kein Versatzproblem mehr.** In der schlimmsten Zelle von STUTTGART
+80 mm liegen jetzt 13 Einstiche auf 13 **verschiedenen** Punkten, alle innerhalb von 0,2 mm:
+der Steg ist so eng, dass der Versatz auf seinen Mindestwert 0,15 mm zurückfällt. Der Weg
+weiter führt über die **Zahl der Durchgänge** — 13 Reisewege durch eine Engstelle sind das
+Verfahren, nicht die Geometrie. Das ist Kandidat 2 aus dem Plan (Bänder statt Greedy in der
+Sektionsreihenfolge).

@@ -611,6 +611,34 @@ und trifft dabei die Knicke enger Wege. Die Sehne schneidet dann die Ecke — an
 Logos bleibt ein Überstand von **0,21 bis 0,37 mm**, unter dem Zugausgleich von 0,2 mm je
 Seite. Das ist der Preis der Mindeststichlänge, kein Rückfall in das alte Verhalten.
 
+### 8.7.2 Reisewege streuen ihre Einstiche *(26.09.2026)*
+
+`insideTravel` führt über die Ecken eines Sichtbarkeitsgraphen, und jeder Weg durch dieselbe
+Engstelle bekommt **dieselbe** Ecke. Eine Ecke ist ein Nadeleinstich. Gemessen an STUTTGART
+80 mm: **18 Reisewege eines Fills setzten 18 Einstiche auf einen Punkt**, 0,00 mm auseinander
+— derselbe Nadelstich, 18-mal (§11, Nadelhäufung). Zwei Regeln dagegen:
+
+1. **Der Stichtakt läuft durch, statt an jedem Wegstück neu zu beginnen.** So macht es ein
+   Laufstich, und es trennt die Wege voneinander: sie erreichen die Engstelle mit
+   unterschiedlich viel gelaufener Strecke, teilen sie also unterschiedlich. Der Eckstich
+   ist ein Zusatzstich, er setzt den Takt nicht zurück.
+2. **Eine erzwungene Ecke tritt zur Seite**, auf der **äußeren** Winkelhalbierenden ihrer
+   beiden Schenkel — das Hindernis liegt auf der Innenseite, deshalb biegt der Weg dort
+   überhaupt. Wie weit: stetig aus der bis dahin gelaufenen Weglänge, zwischen **0,15 und
+   1,2 mm**. Gemessen an der Weglänge, **nicht** am Takt: ein Versatz verändert den Takt, ein
+   daraus abgeleiteter Versatz würde auf sich selbst zurückwirken, und die Wege sammeln sich
+   dann an den Fixpunkten dieser Rückkopplung statt zu streuen. Passt der Versatz nicht in
+   den Steg, wird er halbiert und zuletzt aufgegeben — dann bleibt die Ecke, wo der Graph sie
+   hingelegt hat. Geprüft wird jeder Versatz: Punkt und beide Schenkel müssen im Reisegebiet
+   liegen.
+
+**Wirkung** *(sechs Läufe, 26.09.2026)*: schlimmste Zelle 22 → 13 Einstiche, Zellen ab 6
+von 82 → 14 (STUTTGART 80 mm); 13/221 → 10/22 (250 mm); 13/36 → 8/13 (Köln); 10/37 → 6/3
+(Atzensport 200 mm). Stichzahl +0,1 bis +0,9 %. **Was bleibt**: in engen Stegen fällt der
+Versatz auf 0,15 mm zurück, und was dann noch häuft, sind nicht mehr identische Punkte,
+sondern 13 verschiedene Punkte in einer Zelle. Weiter kommt man nur über die **Zahl der
+Durchgänge** — die Sektionsreihenfolge (Bänder statt Greedy), nicht über den Versatz.
+
 ---
 
 ## 9. Text (Lettering)
