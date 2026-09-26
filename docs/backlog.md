@@ -3,6 +3,21 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Aus der Sichtung der offenen Software (26.09.2026)
+
+Vollständig in `docs/open-source-landschaft.md`.
+
+- **PES/JEF/EXP-Writer nach pyembroidery (MIT).** Dieselbe Referenz, gegen die der DST-Writer
+  byte-identisch prüft. Fleißarbeit mit belastbarer Vorlage — aber **erst wenn eine Maschine
+  oder ein Kunde es verlangt**; TEXMA fährt DST. _(Niedrig.)_
+- **Richtungsfelder für Füllungen** statt fester 45°: „Directionality-Aware Design of
+  Embroidery Patterns" (Eurographics 2023). Trifft den offenen Punkt „alle Flächen bekommen
+  denselben Stichwinkel" aus `docs/profi-abgleich.md`. Paper nachbauen, Code (MPL-2.0,
+  Forschungsprototyp) nicht übernehmen. _(Mittel, nach der Kleinschrift-Arbeit.)_
+- **Lizenzwarnung: PEmbroider ist für TEXMA gesperrt** — GPL-3.0 **plus** Anti-Capitalist
+  Software License, die kommerzielle Nutzung untersagt. Nicht einmal als Code-Vorlage. Neben
+  Ink/Stitch (GPL-3.0, nur lesen) damit die zweite Quelle, die ausscheidet.
+
 ## Aus dem zweiten Prozess-Abgleich (26.09.2026)
 
 Vollständig in `docs/profi-abgleich.md`, Abschnitt „Zweiter Abgleich".
