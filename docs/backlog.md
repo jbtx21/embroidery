@@ -3,6 +3,23 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Füllung als Graph — halb fertig (26.09.2026)
+
+- **`fill-graph.ts` liegt gebaut und getestet im Repo, ist aber nicht im Stichweg.** Reihen und
+  Konturstücke als Graph, Eulerisierung, Hierholzer-Pfad, Ringstücke als Weg — 15 Tests. An
+  `fillRegion` verdrahtet bringt es weniger Sprünge und Trims, aber mehr Nadelhäufung (drei von
+  sechs Läufen) und 27 bis 63 % Rechenzeit. Messung in `docs/messung-echte-logos.md`.
+- **Was fehlt, ist der zweite Graph**: ein Gitter im Inneren der Fläche für die Wege ZWISCHEN
+  den Reihen, dessen Kanten teurer werden, je näher sie der Kontur kommen (Ink/Stitchs
+  `build_travel_graph`). Erst damit wird aus der Reihenfolge ein Gewinn — ohne ihn sucht
+  weiterhin der Sichtbarkeitsgraph, und dort entsteht die Häufung. _(Hoch; der nächste
+  Versuch.)_
+- **Rechenzeit ist dabei ein Abnahmekriterium, kein Nebenaspekt.** STUTTGART 250 mm liegt schon
+  heute bei 17,4 s, mit dem Graphen bei 21,3 s. Regel 9 verlangt 0,3 s.
+- **Sackgasse, damit sie niemand zweimal geht:** die Konturstücke des Graphen als Laufstich zu
+  sticken. Jede zweite Kante ist doppelt, die doppelte Bahn liegt auf ihrer eigenen Spur —
+  Eislingen: Dichte 23 → 205, Nadelhäufung 6 → 78.
+
 ## Aus der Sichtung der offenen Software (26.09.2026)
 
 Vollständig in `docs/open-source-landschaft.md`.

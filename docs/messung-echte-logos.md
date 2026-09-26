@@ -595,3 +595,38 @@ Kante ins Innere der Spalte, und wo mehrere eingezogene Punkte zusammentreffen, 
 einzelne heiße Zelle. Die Fehlerschwelle aus §11 liegt bei 2 % der Zellen oder einer Zelle
 über 40; beide Motive bleiben Warnung. Bei STUTTGART sinkt die Zahl der Zellen über 18 sogar
 von 14 auf 10.
+
+## Füllung als Graph: gemessen und nicht übernommen (26.09.2026)
+
+Der Umbau aus `docs/verfahren-aus-inkstitch.md` §2: statt Reihen zu Sektionen zu bündeln und
+greedy anzusteuern, ein Graph aus Reihen und Konturstücken, in einem Eulerpfad abgelaufen
+(`packages/engine/src/fill-graph.ts`, 15 Tests). An `fillRegion` verdrahtet und gegen den
+Sektionsweg gemessen:
+
+| Motiv                     |              Stiche |       Sprünge |         Trims | Zellen > 18 |         Nadel |          Zeit |
+| ------------------------- | ------------------: | ------------: | ------------: | ----------: | ------------: | ------------: |
+| STUTTGART 80 mm           |     13.725 → 13.877 | 175 → **162** |   63 → **58** |  10 → **8** | 7/2 → **5/0** |   1,5 → 2,1 s |
+| STUTTGART 250 mm          | 73.107 → **72.574** | 482 → **457** |      97 → 102 |  13 → **8** | 6/4 → **8/5** | 17,4 → 21,3 s |
+| Berufsfeuerwehr Köln 90   |     19.602 → 19.740 | 388 → **379** | 121 → **120** |   7 → **8** | 7/8 → **7/6** |   4,1 → 4,8 s |
+| Eislingen Print 200 mm    | 22.969 → **22.843** | 972 → **949** | 186 → **180** |       3 → 3 |     6/2 → 6/3 |   1,1 → 1,6 s |
+| Atzensport Hofbräu 80 mm  |     11.331 → 11.433 | 348 → **335** |     123 → 125 |       0 → 0 |     5/0 → 6/2 |   0,9 → 1,2 s |
+| Atzensport Hofbräu 200 mm | 43.380 → **42.428** | 720 → **683** | 163 → **147** |       1 → 1 |     6/2 → 6/2 |   2,4 → 3,9 s |
+
+**Die Sprünge gehen überall zurück**, die Trims meist, die Stichzahl bleibt im Rauschen
+(±2 %). Dagegen steht: die **Nadelhäufung steigt bei drei von sechs Läufen**, und die
+**Rechenzeit um 27 bis 63 %** — STUTTGART 250 mm von 17,4 auf 21,3 Sekunden.
+
+Das Abbruchkriterium des Plans („wird die Nadelhäufung höher als heute, bleibt `sections`")
+greift damit. **`fillRegion` bleibt beim Sektionsweg**, der Graph bleibt als geprüftes Modul
+liegen.
+
+**Warum der Gewinn ausbleibt**: Der Graph regelt die Reihenfolge, nicht den Weg. Zwischen zwei
+Reihen sucht weiterhin der Sichtbarkeitsgraph (§8.7.1), und genau dort entsteht die Häufung.
+Ink/Stitch hat dafür einen **zweiten** Graphen — ein Gitter im Inneren der Fläche, dessen
+Kanten teurer werden, je näher sie der Kontur kommen. Ohne den ist der Umbau ein Tausch:
+weniger Sprünge gegen mehr Einstiche auf einem Fleck.
+
+**Was nicht funktioniert**, ebenfalls gemessen: die Konturstücke des Graphen selbst als
+Laufstich zu sticken. Jede zweite ist konstruktionsbedingt doppelt, und eine doppelte Bahn
+liegt exakt auf ihrer eigenen Spur — Eislingen ging von Dichte 23 auf **205** Stiche/mm² und
+von 6 auf **78** Einstiche je 0,2-mm-Zelle.
