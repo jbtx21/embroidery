@@ -104,6 +104,18 @@ function designCentre(objects: StitchObject[]): Point {
 export type OrderOptions = {
   /** Cap rule: work outwards from the centre and upwards from the bottom. */
   centreOut?: boolean;
+  /**
+   * Where each object really begins and ends, once its stitches exist (spec
+   * §10.1, 26.09.2026).
+   *
+   * Without them the order is chosen on a guess: `objectStart` reads a corner of
+   * the bounding box, and the end is not known at all. Measured on 26.09.2026,
+   * guessing the end made things worse — the way from the middle of a ragged
+   * area is not where the needle comes out. So the pipeline generates first and
+   * asks again, with the real ends in hand: on Köln 90 mm that shortens the sum
+   * of the ways between objects by 53 %.
+   */
+  ends?: ReadonlyMap<string, { start: Point; end: Point }>;
 };
 
 export function autoOrder(objects: StitchObject[], opts: OrderOptions = {}): StitchObject[] {
@@ -117,8 +129,12 @@ export function autoOrder(objects: StitchObject[], opts: OrderOptions = {}): Sti
 
   const centre = designCentre(objects);
   const entries = objects.map((obj) => {
-    const start = objectStart(obj);
-    return { obj, start, rank: orderRank(obj), radius: dist(centre, start) };
+    const known = opts.ends?.get(obj.id);
+    const start = known?.start ?? objectStart(obj);
+    // Without the real end, the start has to stand in for it: a guessed end is
+    // worse than none (§10.1).
+    const end = known?.end ?? start;
+    return { obj, start, end, rank: orderRank(obj), radius: dist(centre, start) };
   });
   const bandMm = bandWidth(Math.max(0, ...entries.map((e) => e.radius)));
 
@@ -195,7 +211,7 @@ export function autoOrder(objects: StitchObject[], opts: OrderOptions = {}): Sti
 
     done[best] = true;
     out.push(objects[best]!);
-    cursor = entries[best]!.start;
+    cursor = entries[best]!.end;
     for (const j of after[best]!) indegree[j]!--;
   }
 

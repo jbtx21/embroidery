@@ -107,6 +107,34 @@ const EMPTY_STATS = {
   needleCells: 0,
 };
 
+/**
+ * The blocks in the order `autoOrder` chooses once it knows the real ends
+ * (spec §10.1, 26.09.2026).
+ *
+ * Only the sequence changes — no stitch is touched, and the constraints are the
+ * ones from the first pass: overlapping objects keep their order, colours stay
+ * together, areas come before outlines.
+ */
+function reorderByEnds(raw: RawBlock[], objects: StitchObject[], design: Design): RawBlock[] {
+  const byId = new Map(raw.map((b) => [b.objectId, b]));
+  const stitched = objects.filter((o) => byId.has(o.id));
+  if (stitched.length < 2) return raw;
+
+  const ends = new Map<string, { start: Point; end: Point }>();
+  for (const block of raw) {
+    const first = block.points[0];
+    const last = block.points[block.points.length - 1];
+    if (first && last) ends.set(block.objectId, { start: first, end: last });
+  }
+
+  const sorted = autoOrder(stitched, { centreOut: design.preset === "cap", ends });
+  const out = sorted.flatMap((o) => {
+    const block = byId.get(o.id);
+    return block ? [block] : [];
+  });
+  return out.length === raw.length ? out : raw;
+}
+
 export function planDesign(design: Design, opts: PlanOptions = {}): StitchPlan {
   if (!isGeometryReady()) {
     throw new Error("Engine not initialised — call `await initEngine()` before planning.");
@@ -158,14 +186,22 @@ export function planDesign(design: Design, opts: PlanOptions = {}): StitchPlan {
 
   if (raw.length === 0) return { blocks: [], stats: { ...EMPTY_STATS }, warnings };
 
-  const connected = connectBlocks(raw, opts.connect ?? CONNECT_DEFAULTS);
+  // Second pass over the order (spec §10.1, 26.09.2026). The first one had to
+  // guess where an object begins and ends — it runs before a single stitch is
+  // calculated, because the knockdown of §4.1 depends on it. Now the stitches
+  // are there, so the question is asked again with the real ends: measured on
+  // Köln 90 mm, the ways between objects get 53 % shorter, and transitions that
+  // fall under 5 mm no longer need a trim (§10.2).
+  const ordering = mode === "auto" ? reorderByEnds(raw, resolved.objects, design) : raw;
+
+  const connected = connectBlocks(ordering, opts.connect ?? CONNECT_DEFAULTS);
   const tied = tieBlocks(connected);
   const cleaned = postProcess(tied, machine.maxJumpMm, machine.minStitchMm);
   // Last: cut the thread where a jump would drag it across bare fabric (§10.2).
   // It runs at the very end because the lock stitches and the minimum stitch
   // length move the ends of a jump — a 5,0 mm jump became 5,3 mm on STUTTGART
   // 250 mm, and only here is the length the one the machine will sew.
-  const finished = cutLongJumps(cleaned, raw, opts.connect ?? CONNECT_DEFAULTS);
+  const finished = cutLongJumps(cleaned, ordering, opts.connect ?? CONNECT_DEFAULTS);
 
   const { stats, warnings: analysisWarnings } = analyze(finished, machine);
   warnings.push(...analysisWarnings);

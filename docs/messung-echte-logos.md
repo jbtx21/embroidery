@@ -651,3 +651,30 @@ Stichzahl und Nadelhäufung gehen bei den beiden Motiven mit großen Flächen zu
 80 mm hat **78 Füllflächen** auf 80 × 115 mm — die Trims entstehen zwischen den Objekten, nicht
 innerhalb einer Fläche. Der nächste Hebel ist damit benannt: die Zahl der Objekte (Import,
 Fragmentzusammenfassung) und die Verbindungen zwischen ihnen (§10.2), nicht der Fill.
+
+## Reihenfolge nach den echten Enden (26.09.2026)
+
+§10.1: Die Folge wird zweimal bestimmt — grob vor dem Rechnen (der Knockdown braucht sie),
+und noch einmal mit den echten ersten und letzten Stichen, sobald sie feststehen.
+
+| Motiv                     |     Trims je 1000 |   Sprünge je 1000 | Dichtespitze |         Nadel |    Rechenzeit |
+| ------------------------- | ----------------: | ----------------: | -----------: | ------------: | ------------: |
+| Berufsfeuerwehr Köln 90   |   6,70 → **5,60** | 20,56 → **17,93** |      24 → 24 | 7/4 → 7/**3** |   4,5 → 5,3 s |
+| STUTTGART 80 mm           |   4,64 → **4,13** | 12,88 → **12,32** |  27 → **24** |     5/0 → 5/0 |   1,8 → 1,7 s |
+| Atzensport Hofbräu 80 mm  | 10,99 → **10,74** | 31,05 → **30,82** |      18 → 18 | 6/1 → **5/0** |   1,0 → 1,3 s |
+| Eislingen Print 200 mm    |   8,11 → **7,95** |     42,13 → 42,65 |      23 → 23 |     6/2 → 6/2 |   1,7 → 1,3 s |
+| STUTTGART 250 mm          |       1,33 → 1,39 |   6,59 → **6,26** |      22 → 22 |     6/4 → 6/3 | 17,4 → 20,4 s |
+| Atzensport Hofbräu 200 mm |       3,76 → 3,89 | 16,60 → **16,13** |      26 → 26 |     6/2 → 6/1 |   2,4 → 2,9 s |
+
+**Wo es weh tat, hilft es am meisten**: Köln −16 % Trims, STUTTGART 80 mm −11 %. Bei den beiden
+großen Motiven, die ohnehin im Median-Bereich liegen, bleiben die Trims gleich und die Sprünge
+gehen zurück. Dichte und Nadelhäufung bleiben oder verbessern sich.
+
+**Der Preis steht daneben**: der zweite Durchgang rechnet die Überlappungen (`precedence`)
+erneut — STUTTGART 250 mm braucht 20,4 statt 17,4 Sekunden. Die Rechenzeit ist ohnehin weit
+von Regel 9 entfernt und bleibt ein eigener Punkt im Backlog.
+
+**Die Schätzung des Möglichen lag höher**: eine reine Nearest-Neighbour-Ordnung auf den echten
+Enden verkürzt die Wegsumme um 36 bis 53 %. Davon kommt weniger an, weil `autoOrder` nicht nur
+den Weg kennt — Farbe halten, Flächen vor Konturen, Überlappungen nicht vertauschen. Das ist
+richtig so; was übrig bleibt, holt Schritt 2 (weniger Objekte).

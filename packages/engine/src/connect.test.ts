@@ -570,3 +570,43 @@ describe("warnings", () => {
     });
   });
 });
+
+describe("order with the real ends (spec §10.1, 26.09.2026)", () => {
+  /**
+   * Until the stitches exist, the end of an object is a guess. Guessing it made
+   * things worse (measured 26.09.2026), so the pipeline hands the real ends back
+   * in once they are known — and only then is the way measured from where the
+   * needle actually stands.
+   */
+  const objects = [
+    fillObject("long", polygonOf(rect(0, 0, 60, 6))),
+    runningObject("atStart", [pt(2, 12), pt(6, 12)]),
+    runningObject("atEnd", [pt(56, 12), pt(60, 12)]),
+  ];
+
+  it("measures from the start when it has nothing better", () => {
+    expect(autoOrder(objects).map((o) => o.id)).toEqual(["long", "atStart", "atEnd"]);
+  });
+
+  it("measures from the end once the ends are known", () => {
+    // "long" really finishes at its far end, so "atEnd" is the near one.
+    const ends = new Map([
+      ["long", { start: pt(0, 3), end: pt(60, 3) }],
+      ["atStart", { start: pt(2, 12), end: pt(6, 12) }],
+      ["atEnd", { start: pt(56, 12), end: pt(60, 12) }],
+    ]);
+    expect(autoOrder(objects, { ends }).map((o) => o.id)).toEqual(["long", "atEnd", "atStart"]);
+  });
+
+  it("keeps the order of overlapping objects whatever the ends say", () => {
+    const stacked = [
+      fillObject("unten", polygonOf(rect(0, 0, 20, 20))),
+      fillObject("oben", polygonOf(rect(5, 5, 10, 10)), { threadIndex: 1 }),
+    ];
+    const ends = new Map([
+      ["unten", { start: pt(0, 20), end: pt(20, 0) }],
+      ["oben", { start: pt(5, 15), end: pt(15, 5) }],
+    ]);
+    expect(autoOrder(stacked, { ends }).map((o) => o.id)).toEqual(["unten", "oben"]);
+  });
+});

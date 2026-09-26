@@ -829,6 +829,25 @@ Der Ring ist nicht Kosmetik: nach reinem Radius sortiert springt die Maschine zw
 Objekten, die zufällig auf demselben Kreis liegen, quer durchs Motiv. Gemessen am
 Eislingen-Logo waren das **922 Sprünge statt 265**. Mit Ringen sind es 334.
 
+**Die Reihenfolge wird zweimal bestimmt** *(26.09.2026)*. Der erste Durchgang läuft vor dem
+Rechnen, weil der Knockdown aus §4.1 ihn braucht — dort ist der Anfang eines Objekts eine
+Schätzung aus der Bounding Box und sein Ende gar nicht bekannt. Sobald die Stiche stehen,
+wird dieselbe Frage mit den **echten** ersten und letzten Stichen erneut gestellt
+(`autoOrder(objects, { ends })`, `reorderByEnds` in `pipeline.ts`), und erst dann entscheidet
+der Weg vom Ende des zuletzt gestickten Objekts, wie §10.1 es verlangt.
+
+Es ändert sich nur die **Folge**, kein Stich: die Bedingungen sind dieselben (Überlappung hält
+die Reihenfolge, Farbe bleibt in der Nadel, Flächen vor Konturen).
+
+**Gemessen** *(sechs Läufe, 26.09.2026)*: Trims je 1000 Stiche bei Köln 90 mm 6,70 → **5,60**,
+bei STUTTGART 80 mm 4,64 → **4,13**; Sprünge 20,6 → **17,9** und 12,9 → **12,3**. Bei den
+großen Motiven sind die Sprünge besser und die Trims gleich. **Preis**: der zweite Durchgang
+rechnet die Überlappungen erneut — STUTTGART 250 mm braucht 20,4 statt 17,4 Sekunden.
+
+Ein früherer Versuch, das Ende zu **schätzen** (Mitte der oberen Kante), hat alle Kennzahlen
+verschlechtert und ist zurückgenommen worden: eine falsche Schätzung ist schlechter als eine
+grobe, die auf der Form liegt.
+
 ### 10.2 Verbindung zweier Blöcke
 Entscheidung zwischen Blockende A und Blockanfang B:
 
