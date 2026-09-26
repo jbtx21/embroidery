@@ -20,8 +20,11 @@ import {
 } from "../test/fixtures/shapes.js";
 import { fillObject } from "../test/fixtures/designs.js";
 import {
+  bestFillAngle,
   CONTOUR_MIN_WIDTH_MM,
+  FILL_ANGLE_CANDIDATES,
   contourUnderlay,
+  rowBreaks,
   DOUBLE_UNDERLAY_EDGE_MM,
   FILL_TINY_MM2,
   fillRegion,
@@ -528,5 +531,50 @@ describe("the contour underlay leaves the splinters alone (spec §8.6, 26.09.202
   it("still stitches the outline of a proper area", () => {
     const u = contourUnderlay(polygonOf(rect(0, 0, 20, 10)), 0.4, 2.5);
     expect(u.points.length).toBeGreaterThan(10);
+  });
+});
+
+describe("fewest-break angle (spec §8.2, 26.09.2026)", () => {
+  const comb = polygonOf([
+    pt(0, 0),
+    pt(20, 0),
+    pt(20, 12),
+    pt(16, 12),
+    pt(16, 4),
+    pt(12, 4),
+    pt(12, 12),
+    pt(8, 12),
+    pt(8, 4),
+    pt(4, 4),
+    pt(4, 12),
+    pt(0, 12),
+  ]);
+
+  it("leaves a convex shape at the angle it was given", () => {
+    // Nothing breaks on a rectangle, whatever the angle — so §5.1 keeps its
+    // diagonal and this rule stays quiet.
+    for (const shape of [polygonOf(rect(0, 0, 40, 4)), polygonOf(rect(0, 0, 10, 10))]) {
+      expect(rowBreaks(shape, 45, 0.4)).toBe(0);
+      expect(bestFillAngle(shape, 0.4)).toBe(45);
+      expect(bestFillAngle(shape, 0.4, 30)).toBe(30);
+    }
+  });
+
+  it("turns a comb along its teeth, not across them", () => {
+    // A spine along the top with three teeth hanging down (y points down):
+    // rows at 0° run across the teeth and break twice each, at 90° not at all.
+    expect(rowBreaks(comb, 0, 0.4)).toBeGreaterThan(10 * rowBreaks(comb, 90, 0.4));
+    expect(bestFillAngle(comb, 0.4)).toBe(90);
+  });
+
+  it("answers with one of the candidates, or with the preferred angle", () => {
+    for (const shape of [comb, annulus(0, 0, 12, 6)]) {
+      const angle = bestFillAngle(shape, 0.4);
+      expect(FILL_ANGLE_CANDIDATES.includes(angle) || angle === 45).toBe(true);
+    }
+  });
+
+  it("gives the same answer twice (rule 3)", () => {
+    expect(bestFillAngle(comb, 0.4)).toBe(bestFillAngle(comb, 0.4));
   });
 });

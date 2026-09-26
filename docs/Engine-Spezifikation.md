@@ -543,6 +543,27 @@ verändert (Regel 8).
 - Reihen im Abstand `rowSpacingMm` von unten nach oben.
 - Je Reihe `clipLine` → Liste von Segmenten, sortiert nach x.
 
+**Der Winkel folgt der Form** *(26.09.2026)*. Gewählt wird der Winkel, bei dem die Reihen am
+seltensten **brechen** — gezählt werden die Stücke jenseits des ersten in jeder Reihe, über
+die Kandidaten 0° bis 165° in Schritten von 15° (`bestFillAngle`, `rowBreaks`). Nicht die Zahl
+der Stücke: die misst nur, wie weit die Form quer zu den Reihen reicht, und auf einem
+Rechteck gewänne immer die kurze Seite.
+
+**Gedreht wird nur bei deutlichem Gewinn** — ein Kandidat muss die Brüche mindestens
+**halbieren** (`ANGLE_GAIN` = 0,5), sonst bleibt der Winkel aus §5.1 stehen. Grund: Die
+Diagonale ist das, was die Praxis gegen Verzug einsetzt; Reihen parallel zum Gewebe ziehen am
+stärksten. Ein Kreisring bricht bei jedem Winkel ungefähr gleich oft — welcher dort gewänne,
+entschiede die Rundung, nicht die Form.
+
+**Gemessen** *(vier Logos, 26.09.2026)*: die Regel greift bei 6 von 23 bis 18 von 78 Flächen
+und senkt deren Brüche um 67 bis 94 % (Köln 90 mm: 235 → 32). Stichzahl −2,7 % (STUTTGART
+80 mm), Nadelhäufung dort von 7 auf **5** Einstiche je 0,2 mm und von 2 auf **0** Zellen,
+Rechenzeit unverändert. **Sprünge und Trims bleiben gleich** — sie entstehen zwischen den
+Objekten, nicht innerhalb einer Fläche (§10.2).
+
+Verfahren von Buttery Stitches („fewest-fragments"), Kriterium auf Brüche statt Stücke
+geändert — `docs/verfahren-aus-open-source.md`.
+
 ### 8.3 Sektionen
 - Segmente aufeinanderfolgender Reihen sind verbunden, wenn sie sich in x überlappen.
 - Zusammenhängende Ketten ohne Verzweigung = Sektion. Bei Verzweigung (ein Segment überlappt zwei in der nächsten Reihe) endet die Sektion.

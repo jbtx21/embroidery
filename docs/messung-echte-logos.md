@@ -630,3 +630,24 @@ weniger Sprünge gegen mehr Einstiche auf einem Fleck.
 Laufstich zu sticken. Jede zweite ist konstruktionsbedingt doppelt, und eine doppelte Bahn
 liegt exakt auf ihrer eigenen Spur — Eislingen ging von Dichte 23 auf **205** Stiche/mm² und
 von 6 auf **78** Einstiche je 0,2-mm-Zelle.
+
+## Stichwinkel nach den wenigsten Brüchen (26.09.2026)
+
+§8.2: der Winkel, bei dem die Reihen am seltensten brechen, wenn er die Brüche mindestens
+halbiert — sonst bleibt die Diagonale aus §5.1.
+
+| Motiv                    | Flächen, davon gedreht | Brüchesumme dieser Flächen |              Stiche |      Dichte |         Nadel |
+| ------------------------ | ---------------------: | -------------------------: | ------------------: | ----------: | ------------: |
+| STUTTGART 80 mm          |              23, **6** |               250 → **82** | 13.725 → **13.351** | 28 → **27** | 7/2 → **5/0** |
+| Berufsfeuerwehr Köln 90  |              44, **8** |               235 → **32** | 19.602 → **19.409** | 25 → **24** | 7/8 → **7/4** |
+| Eislingen Print 200 mm   |             47, **13** |               119 → **22** |     22.969 → 23.048 |     23 → 23 |     6/2 → 6/2 |
+| Atzensport Hofbräu 80 mm |             78, **18** |                 66 → **4** |     11.331 → 11.370 |     18 → 18 |     5/0 → 6/1 |
+
+**Was die Regel tut, tut sie gründlich**: wo sie greift, verschwinden 67 bis 94 % der Brüche.
+Stichzahl und Nadelhäufung gehen bei den beiden Motiven mit großen Flächen zurück.
+
+**Was sie nicht tut: Sprünge und Trims senken.** Sie bleiben, wo sie waren (Atzensport 80 mm:
+10,9 Trims je 1000 Stiche, Archiv-Median 1,9). Der Grund steht in derselben Messung: Atzensport
+80 mm hat **78 Füllflächen** auf 80 × 115 mm — die Trims entstehen zwischen den Objekten, nicht
+innerhalb einer Fläche. Der nächste Hebel ist damit benannt: die Zahl der Objekte (Import,
+Fragmentzusammenfassung) und die Verbindungen zwischen ihnen (§10.2), nicht der Fill.

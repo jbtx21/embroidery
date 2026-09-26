@@ -92,6 +92,69 @@ export function scanlines(poly: Polygon, rowSpacingMm: number): Segment[][] {
   return rows;
 }
 
+/**
+ * Angles the fill may choose from when nothing else says otherwise (spec §8.2,
+ * 26.09.2026). Multiples of 15° — finer steps change the count barely and cost a
+ * `scanlines` run each.
+ */
+export const FILL_ANGLE_CANDIDATES = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165];
+
+/**
+ * How much better a candidate has to be before the shape is turned at all.
+ *
+ * Half, not a fifth: turning has a price. The diagonal of §5.1 is what the trade
+ * uses against distortion — rows parallel to the weave pull the most. So the
+ * rule speaks up only where a shape is plainly striped in one direction (combs,
+ * ladders, letters with long bars), not where it merely counts out a little
+ * better.
+ */
+export const ANGLE_GAIN = 0.5;
+
+/**
+ * How often the rows BREAK at this angle — the number of pieces beyond the first
+ * one in each row (spec §8.2).
+ *
+ * Not the number of pieces: that would only measure how far the shape reaches
+ * across the rows, and on a plain rectangle the shortest side would always win.
+ * What costs travel paths is a row falling into several pieces, and that happens
+ * at the concavities — a comb stitched across its teeth breaks every row twice,
+ * along them not at all.
+ */
+export function rowBreaks(poly: Polygon, angleDeg: number, rowSpacingMm: number): number {
+  const rotated = applyToPolygon(rotator(-angleDeg), poly);
+  return scanlines(rotated, rowSpacingMm).reduce((sum, row) => sum + row.length - 1, 0);
+}
+
+/**
+ * The stitch angle at which the rows break least (spec §8.2, 26.09.2026).
+ *
+ * Every break is a travel path, and travel paths are where our files stand out
+ * against the archive: Atzensport 80 mm has 10,9 trims per 1000 stitches against
+ * a median of 1,9. Where no angle is better than the preset one — on any convex
+ * shape, where nothing breaks at all — `preferredDeg` stays, so the diagonal of
+ * §5.1 remains the rule and this only speaks up where it has something to say.
+ *
+ * Verfahren von Buttery Stitches („fewest-fragments method"), Kriterium auf
+ * Brüche statt Stücke geändert — siehe docs/verfahren-aus-open-source.md.
+ */
+export function bestFillAngle(poly: Polygon, rowSpacingMm: number, preferredDeg = 45): number {
+  const atPreferred = rowBreaks(poly, preferredDeg, rowSpacingMm);
+  if (atPreferred === 0) return preferredDeg;
+  let best = preferredDeg;
+  let bestBreaks = atPreferred;
+  for (const angleDeg of FILL_ANGLE_CANDIDATES) {
+    const breaks = rowBreaks(poly, angleDeg, rowSpacingMm);
+    if (breaks < bestBreaks) {
+      best = angleDeg;
+      bestBreaks = breaks;
+    }
+  }
+  // A ring breaks at every angle, and which one wins is then a matter of
+  // rounding. Turning a shape needs a reason, so the preset angle stays unless
+  // a candidate halves the breaks.
+  return bestBreaks < atPreferred * ANGLE_GAIN ? best : preferredDeg;
+}
+
 // ---------------------------------------------------------------------------
 // Sections (spec §8.3)
 // ---------------------------------------------------------------------------

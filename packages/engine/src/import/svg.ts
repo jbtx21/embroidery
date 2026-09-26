@@ -29,6 +29,7 @@ import {
 } from "@texma-stitch/geometry";
 import type { Design, PresetId, StitchObject, Thread, Warning } from "../types.js";
 import { autoSatin } from "../auto-satin.js";
+import { bestFillAngle } from "../fill.js";
 import { PRESETS } from "../presets.js";
 import { warn, WARNING } from "../warnings.js";
 import type { Matrix } from "./matrix.js";
@@ -478,10 +479,18 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
           );
         }
 
-        // 45 degrees by default; a shape that covers or touches an earlier one
-        // gets -45 so the directions cross at the seam (spec §5.1).
+        // The angle at which the rows break least (§8.2) — every break is a
+        // fragment, and fragments are what our files have too many of against
+        // the archive. A shape that covers or touches an earlier one is turned
+        // away from it, so the directions cross at the seam (§5.1).
         const crosses = placed.some((p) => touchesOrCovers(p, shape));
         placed.push(shape);
+        const spacing =
+          Number.isFinite(rowSpacing) && rowSpacing > 0 ? rowSpacing : preset.fillRowSpacingMm;
+        // Where the break count says nothing, §5.1 keeps its word: 45°, and −45°
+        // for a shape lying on another so the directions cross at the seam.
+        const fewest = bestFillAngle(shape, spacing, DEFAULT_ANGLE_DEG);
+        const chosen = fewest === DEFAULT_ANGLE_DEG && crosses ? -DEFAULT_ANGLE_DEG : fewest;
 
         objects.push({
           id: objId,
@@ -491,13 +500,8 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
           locked: false,
           trimAfter,
           shape,
-          angleDeg: Number.isFinite(angle)
-            ? angle
-            : crosses
-              ? -DEFAULT_ANGLE_DEG
-              : DEFAULT_ANGLE_DEG,
-          rowSpacingMm:
-            Number.isFinite(rowSpacing) && rowSpacing > 0 ? rowSpacing : preset.fillRowSpacingMm,
+          angleDeg: Number.isFinite(angle) ? angle : chosen,
+          rowSpacingMm: spacing,
           stitchLengthMm:
             Number.isFinite(stitchLength) && stitchLength > 0
               ? stitchLength
