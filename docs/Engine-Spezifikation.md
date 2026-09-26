@@ -398,8 +398,30 @@ einem Ende ausläuft, soll nicht überall so breit behandelt werden.
 - Breite < 1 mm: Warnung `SATIN_TOO_NARROW`. Breite < 0,6 mm: Vorschlag Running.
 - Breite > 12 mm: Warnung `SATIN_TOO_WIDE`, Vorschlag Fill.
 
-### 7.5 Kurzstiche
-- In Kurven mit Innenradius < 1 mm jeden zweiten Stich auf der Innenseite auf 70 % verkürzen (Fadenberg vermeiden). Aktiv wenn `shortStitches = true`.
+### 7.5 Kurzstiche *(26.09.2026 neu gefasst — vorher: Innenradius < 1 mm, jeder zweite Stich auf 70 %)*
+
+Das Kriterium liegt am **Abstand zwischen zwei Einstichen auf derselben Rail**, nicht an der
+Krümmung. Was den Stoff aufreißt, ist die Nadel neben ihrem eigenen Loch — und das passiert
+auf einer breiten Spalte in einer flachen Biegung genauso wie auf einer schmalen in einer
+engen. Aktiv, wenn `shortStitches = true`.
+
+- **Auslöser: Abstand < 0,25 mm** zum letzten Einstich derselben Rail, der **stehen geblieben**
+  ist. Nicht zum direkten Vorgänger: bei mehreren gedrängten Stichen hintereinander sähe
+  jeder zweite weit genug entfernt aus, und die Häufung wäre nur halb aufgelöst.
+- **Versatz: 15 % der Spaltenbreite** an dieser Stelle, nach innen. Ein Anteil, kein fester
+  Faktor — auf einer 6-mm-Spalte sind das 0,9 mm, auf einer 1-mm-Spalte 0,15 mm.
+- Beide Rails werden **getrennt** beurteilt. Ein Punkt, der stehen bleibt, wird zum neuen
+  Bezugspunkt seiner Rail.
+- Herkunft der Werte: Ink/Stitch-Voreinstellungen (`short_stitch_distance_mm` 0,25,
+  `short_stitch_inset` 15 %) — die genaueste veröffentlichte Angabe zu diesem Verfahren.
+  **Gelesen, nicht übernommen** (GPL-3.0, siehe `docs/verfahren-aus-inkstitch.md`).
+
+**Gemessen** *(26.09.2026, vier Logos)*: Einstiche unter 0,25 mm auf derselben Rail gehen um
+17 bis 43 % zurück (STUTTGART 80 mm 736 → 420, Atzensport 200 mm 1.057 → 678). Die
+Nadelhäufung auf 0,2 mm bleibt gleich oder sinkt. **Preis**: die Dichtespitze steigt bei zwei
+Motiven von 18 auf 26 bzw. 23 Stiche/mm² — betroffen sind 1 von 18.522 und 3 von 11.157
+Zellen, also 0,01 bzw. 0,03 %. Das ist der erwartete Effekt: die Einstiche wandern von der
+Kante ins Innere der Spalte. Beide bleiben weit unter der Fehlerschwelle aus §11.
 
 ### 7.6 Unterlage
 Reihenfolge: center → contour → zigzag → Deckstiche.

@@ -18,8 +18,8 @@ import {
   SATIN_MAX_WIDTH_MM,
   SATIN_MIN_WIDTH_MM,
   SATIN_RUNNING_HINT_MM,
-  SHORT_STITCH_FACTOR,
-  SHORT_STITCH_RADIUS_MM,
+  SHORT_STITCH_DISTANCE_MM,
+  SHORT_STITCH_INSET,
   splitWideStitches,
   zigzagSequence,
 } from "./satin.js";
@@ -117,17 +117,52 @@ describe("zigzag and split (spec §7.3, §7.4)", () => {
   });
 });
 
-describe("short stitches (spec §7.5)", () => {
-  it("shortens every second inner stitch in tight curves", () => {
-    // Tight bend: inner rail r = 0.5 mm, outer rail r = 2.5 mm
+describe("short stitches (spec §7.5, 26.09.2026)", () => {
+  /** How close two penetrations on the same rail come, at worst. */
+  const tightestOnRail = (rungs: { a: Point; b: Point }[]): number => {
+    let worst = Infinity;
+    for (let i = 1; i < rungs.length; i++) {
+      worst = Math.min(
+        worst,
+        dist(rungs[i]!.a, rungs[i - 1]!.a),
+        dist(rungs[i]!.b, rungs[i - 1]!.b),
+      );
+    }
+    return worst;
+  };
+
+  it("pulls back the penetrations that crowd on the inner rail", () => {
+    // Tight bend: inner rail r = 0.5 mm, outer rail r = 2.5 mm. On the inside
+    // the needle comes down far closer than the zigzag spacing.
+    const pairs = pairRails(arc(0, 0, 0.5, 0, 180, 12), arc(0, 0, 2.5, 0, 180, 12), [], 0.4);
+    expect(tightestOnRail(pairs)).toBeLessThan(SHORT_STITCH_DISTANCE_MM);
+    const shortened = applyShortStitches(pairs);
+    expect(tightestOnRail(shortened)).toBeGreaterThan(tightestOnRail(pairs));
+  });
+
+  it("insets by a share of the column width, not by a fixed factor", () => {
     const pairs = pairRails(arc(0, 0, 0.5, 0, 180, 12), arc(0, 0, 2.5, 0, 180, 12), [], 0.4);
     const shortened = applyShortStitches(pairs);
-    const before = pairs.map((r) => dist(r.a, r.b));
-    const after = shortened.map((r) => dist(r.a, r.b));
-    expect(after.filter((n, i) => n < before[i]! - 1e-9).length).toBeGreaterThan(0);
-    for (let i = 0; i < after.length; i++) {
-      expect(after[i]!).toBeGreaterThanOrEqual(before[i]! * SHORT_STITCH_FACTOR - 1e-6);
+    for (const [i, r] of shortened.entries()) {
+      const moved = dist(r.a, pairs[i]!.a) + dist(r.b, pairs[i]!.b);
+      const width = dist(pairs[i]!.a, pairs[i]!.b);
+      expect(moved).toBeLessThanOrEqual(width * SHORT_STITCH_INSET + 1e-6);
     }
+  });
+
+  it("measures against the last penetration that stayed put", () => {
+    // Penetrations at 0, 0.1, 0.2, 0.3 mm. Measured against the NEIGHBOUR, only
+    // every second one would look crowded. Measured against the last one that
+    // stayed — the point at 0 — the two at 0.1 and 0.2 are pulled back, and the
+    // one at 0.3 has finally earned its place and becomes the new reference.
+    const rail = [pt(0, 0), pt(0.1, 0), pt(0.2, 0), pt(0.3, 0), pt(3, 0)];
+    const other = [pt(0, 3), pt(0.1, 3), pt(0.2, 3), pt(0.3, 3), pt(3, 3)];
+    const rungs = rail.map((a, i) => ({ a, b: other[i]! }));
+    const out = applyShortStitches(rungs);
+    expect(out[1]!.a.y).toBeCloseTo(3 * SHORT_STITCH_INSET, 6);
+    expect(out[2]!.a.y).toBeCloseTo(3 * SHORT_STITCH_INSET, 6);
+    expect(out[3]!.a.y).toBe(0);
+    expect(out[4]!.a.y).toBe(0);
   });
 
   it("leaves a straight column untouched", () => {
@@ -136,6 +171,11 @@ describe("short stitches (spec §7.5)", () => {
       pairs.map((r) => dist(r.a, r.b)),
     );
   });
+
+  it("gives the same answer twice (rule 3)", () => {
+    const pairs = pairRails(arc(0, 0, 0.5, 0, 180, 12), arc(0, 0, 2.5, 0, 180, 12), [], 0.4);
+    expect(applyShortStitches(pairs)).toEqual(applyShortStitches(pairs));
+  });
 });
 
 describe("documented thresholds (spec §7)", () => {
@@ -143,8 +183,8 @@ describe("documented thresholds (spec §7)", () => {
     expect(SATIN_MIN_WIDTH_MM).toBe(1.0);
     expect(SATIN_RUNNING_HINT_MM).toBe(0.6);
     expect(SATIN_MAX_WIDTH_MM).toBe(12.0);
-    expect(SHORT_STITCH_RADIUS_MM).toBe(1.0);
-    expect(SHORT_STITCH_FACTOR).toBe(0.7);
+    expect(SHORT_STITCH_DISTANCE_MM).toBe(0.25);
+    expect(SHORT_STITCH_INSET).toBe(0.15);
     expect(CENTER_UNDERLAY_STITCH_MM).toBe(2.5);
   });
 });

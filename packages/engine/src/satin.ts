@@ -27,8 +27,23 @@ export const SATIN_MIN_WIDTH_MM = 1.0;
 export const SATIN_RUNNING_HINT_MM = 0.6;
 export const SATIN_MAX_WIDTH_MM = 12.0;
 /** Inner radius below which short stitches kick in (spec §7.5). */
-export const SHORT_STITCH_RADIUS_MM = 1.0;
-export const SHORT_STITCH_FACTOR = 0.7;
+/**
+ * A penetration this close to the last one on the same rail crowds it (spec
+ * §7.5, 26.09.2026 — before: curve radius under 1 mm).
+ *
+ * The criterion belongs on the DISTANCE between penetrations, not on the radius
+ * of the curve: what tears the fabric is the needle coming down next to its own
+ * hole, and that happens on a wide column in a gentle bend as well as on a
+ * narrow one in a tight bend. The value is Ink/Stitch's default, which is the
+ * most precise figure published for this (read, not copied — GPL-3.0).
+ */
+export const SHORT_STITCH_DISTANCE_MM = 0.25;
+/**
+ * How far such a penetration is pulled back, as a share of the column width at
+ * that point. A share, not a fixed factor: on a 6 mm column 15 % is 0,9 mm, on a
+ * 1 mm column 0,15 mm — the same visual effect on both.
+ */
+export const SHORT_STITCH_INSET = 0.15;
 export const CENTER_UNDERLAY_STITCH_MM = 2.5;
 
 // ---------------------------------------------------------------------------
@@ -262,21 +277,26 @@ function outwardSign(self: Polyline, other: Polyline): number {
 export function applyShortStitches(rungs: SatinRung[]): SatinRung[] {
   if (rungs.length < 2) return rungs;
   const out = rungs.map((r) => ({ a: { ...r.a }, b: { ...r.b } }));
+  // Each rail is judged on its own, and against the last penetration that was
+  // allowed to stay where it was. That matters in a run of crowded stitches:
+  // measured against the neighbour, every second one would look far enough away
+  // and the crowd would only be half resolved.
+  let restA = rungs[0]!.a;
+  let restB = rungs[0]!.b;
   for (let i = 1; i < out.length; i++) {
-    if (i % 2 === 0) continue; // only every second stitch
-    const cur = out[i]!;
-    const prev = rungs[i - 1]!;
-    const dA = dist(rungs[i]!.a, prev.a);
-    const dB = dist(rungs[i]!.b, prev.b);
-    const w = dist(cur.a, cur.b);
-    if (w < 1e-9) continue;
-    const dInner = Math.min(dA, dB);
-    const dOuter = Math.max(dA, dB);
-    if (dOuter - dInner < 1e-9) continue;
-    const r = (w * dInner) / (dOuter - dInner);
-    if (r >= SHORT_STITCH_RADIUS_MM) continue;
-    if (dA < dB) cur.a = lerp(cur.a, cur.b, 1 - SHORT_STITCH_FACTOR);
-    else cur.b = lerp(cur.b, cur.a, 1 - SHORT_STITCH_FACTOR);
+    const cur = rungs[i]!;
+    const width = dist(cur.a, cur.b);
+    if (width < 1e-9) continue;
+    if (dist(cur.a, restA) < SHORT_STITCH_DISTANCE_MM) {
+      out[i]!.a = lerp(cur.a, cur.b, SHORT_STITCH_INSET);
+    } else {
+      restA = cur.a;
+    }
+    if (dist(cur.b, restB) < SHORT_STITCH_DISTANCE_MM) {
+      out[i]!.b = lerp(cur.b, cur.a, SHORT_STITCH_INSET);
+    } else {
+      restB = cur.b;
+    }
   }
   return out;
 }

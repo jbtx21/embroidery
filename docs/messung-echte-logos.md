@@ -570,3 +570,28 @@ lang liegt.
 
 Stand aller sechs Läufe nach Schritt 3: Nadelhäufung 5 bis 7 Einstiche je Zelle, 0 bis 8
 Zellen ab 6 — das Archiv liegt bei 4 bis 8 und 0 bis 8. **Kein Motiv meldet einen Fehler.**
+
+## Kurzstiche am Einstichabstand (26.09.2026)
+
+§7.5 neu gefasst: Auslöser ist der Abstand zum letzten stehengebliebenen Einstich derselben
+Rail (< 0,25 mm), Versatz 15 % der Spaltenbreite — statt Krümmungsradius < 1 mm und jedem
+zweiten Innenstich auf 70 %. Herkunft der Werte und Verfahren:
+`docs/verfahren-aus-inkstitch.md`.
+
+| Motiv                     | Einstiche < 0,25 mm auf derselben Rail |  Dichte max | Zellen > 18 | Nadel max/Zellen |
+| ------------------------- | -------------------------------------: | ----------: | ----------: | ---------------: |
+| STUTTGART 80 mm           |          736 (5,4 %) → **420 (3,1 %)** |     28 → 28 | 14 → **10** |        7/2 → 7/2 |
+| Berufsfeuerwehr Köln 90   |          948 (5,0 %) → **783 (4,1 %)** |     25 → 25 |       7 → 7 |        7/8 → 7/8 |
+| Eislingen Print 200 mm    |      1.613 (7,5 %) → **1.343 (6,2 %)** | 18 → **23** |   0 → **3** |    7/1 → **6**/2 |
+| Atzensport Hofbräu 200 mm |        1.057 (2,5 %) → **678 (1,6 %)** | 18 → **26** |   0 → **1** |    6/3 → 6/**2** |
+
+**Das Ziel ist erreicht**: die Häufung auf der Rail geht um 17 bis 43 % zurück. Die
+Nadelhäufung auf 0,2-mm-Raster bleibt gleich oder sinkt.
+
+**Der Preis steht daneben und wird nicht kleingeredet**: bei zwei Motiven steigt die
+Dichtespitze von 18 auf 26 bzw. 23 Stiche/mm². Betroffen sind **1 von 18.522** und **3 von
+11.157** Zellen — 0,01 und 0,03 %. Der Grund ist der erwartete: die Einstiche wandern von der
+Kante ins Innere der Spalte, und wo mehrere eingezogene Punkte zusammentreffen, steht eine
+einzelne heiße Zelle. Die Fehlerschwelle aus §11 liegt bei 2 % der Zellen oder einer Zelle
+über 40; beide Motive bleiben Warnung. Bei STUTTGART sinkt die Zahl der Zellen über 18 sogar
+von 14 auf 10.
