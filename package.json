@@ -2,7 +2,7 @@
   "name": "texma-stitch",
   "version": "0.1.0",
   "private": true,
-  "description": "TEXMA Stitch — Stickerei-Engine: Stickobjekte (Pfade + Parameter) deterministisch zu Stichen. Siehe docs/engine-spezifikation.md.",
+  "description": "TEXMA Stitch \u2014 Stickerei-Engine: Stickobjekte (Pfade + Parameter) deterministisch zu Stichen. Siehe docs/engine-spezifikation.md.",
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=20"
@@ -15,7 +15,8 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "bench": "pnpm run build && node packages/engine/bench/run.mjs",
-    "demo": "pnpm run build && node tools/demo.mjs"
+    "demo": "pnpm run build && node tools/demo.mjs",
+    "kennzahlen": "node tools/kennzahlen.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
