@@ -245,3 +245,42 @@ Prozentrechnung, Deckel, Millimeter-Override und der Vergleich schmal gegen brei
   addiert: fester Millimeterwert plus prozentualer Anteil. Unsere Klammer aus Boden (0,2)
   und Deckel (0,4) bildet das an den Rändern ab; die saubere Addition ist eine offene
   Änderung in `docs/neuplanung-punchprogramm.md`.
+
+## Nadelhäufung abgestellt (26.09.2026)
+
+Anlass: „Die Programme sind alle nicht stickbar." Vier Schritte, jeder einzeln gemessen.
+
+1. **Die Kennzahl gebaut** (`needleClusters`, §11). Einstiche je 0,2-mm-Zelle — die Dichte
+   auf 1-mm-Raster sieht eine Häufung nicht, weil sie sie wegmittelt. Schwellen am Archiv
+   kalibriert (192 Produktionsdateien): warn ab 6, error ab 12 oder mehr als 20 Zellen.
+2. **Reisewege streuen** (§8.7.2). Durchlaufender Stichtakt, erzwungene Ecken treten auf der
+   äußeren Winkelhalbierenden zur Seite, stetig aus der gelaufenen Weglänge.
+3. **Keine Konturunterlage auf Splittern** (§8.6, `keepWide`). Der eigentliche Verursacher.
+4. **Reisestichlänge zurück auf 2,0** (§8.5); Fill-Stichlänge bleibt bei 4,0 — beides
+   gemessen, nicht angenommen.
+
+| Kennzahl (STUTTGART 80 mm)         | vorher |    nachher |  Archiv |
+| ---------------------------------- | -----: | ---------: | ------: |
+| Einstiche in der schlimmsten Zelle |     22 |      **7** |   4 – 8 |
+| Zellen ab 6 Einstichen             |     82 |      **2** |   0 – 8 |
+| Dichtespitze je mm²                |     36 |     **28** | 11 – 31 |
+| Stiche                             | 14.778 | **13.738** |         |
+
+Alle sechs Läufe melden nur noch Warnungen, kein Fehler.
+
+### Beim Bauen gefunden
+
+- **Die Ursache war nicht der Deckstich.** Die Messung, die es entschieden hat, war das
+  phasenweise Abschalten: ohne Gitterunterlage blieb die Häufung (14/10), ohne
+  Konturunterlage verschwand sie (5/0). Ohne diese Messung hätte ich weiter an der
+  Wegeplanung gedreht.
+- **Rückkopplung beim Streuen.** Der erste Entwurf leitete den Eckversatz aus dem Stichtakt
+  ab — den der Versatz selbst verändert. Die Wege sammelten sich dann an den Fixpunkten
+  dieser Rückkopplung (4 von 8 auf einem Punkt) statt zu streuen. Seither entscheidet die
+  gelaufene Weglänge, die von Versätzen unberührt bleibt.
+- **Mehr Kandidaten prüfen bringt nichts.** `NEAREST_CHECKED` von 8 auf 64 erhöht: keine
+  Verbesserung (13 → 14 Einstiche), dafür 3 % mehr Rechenzeit. Die Sektionsreihenfolge ist
+  nicht das Problem, die Zahl der Phasen war es.
+- **Die Rechenzeit ist unabhängig davon zu hoch.** STUTTGART 250 mm braucht 19,5 s für einen
+  Plan; gemessen gegen den Stand vor diesen Änderungen (20,2 s) liegt das nicht an ihnen.
+  Regel 9 (< 300 ms) ist weit verfehlt und bleibt offen.

@@ -20,16 +20,21 @@ Erste echte Abnahme der Engine.
 
 ### Was die Engine vorhat (Soll)
 
-| Kennzahl                               |                                      Wert |
-| -------------------------------------- | ----------------------------------------: |
-| Stiche                                 |                                    17.314 |
-| Sprünge / Trims / Farbwechsel          |                              168 / 58 / 6 |
-| Größe                                  |                            80,3 × 74,9 mm |
-| Dichte, Spitze                         |      32 Stiche/mm² (Warnung, kein Fehler) |
-| Maschinenzeit (800 U/min, rechnerisch) |                                  25,8 min |
-| Objekte                                | 80 — davon 74 Satinspalten, 6 Füllflächen |
+| Kennzahl                               |                                           Wert |
+| -------------------------------------- | ---------------------------------------------: |
+| Stiche                                 |                                         13.738 |
+| Sprünge / Trims / Farbwechsel          |                                   175 / 66 / 6 |
+| Größe                                  |                                 80,0 × 75,0 mm |
+| Dichte, Spitze                         |           28 Stiche/mm² (Warnung, kein Fehler) |
+| Nadelhäufung                           | 7 Einstiche je 0,2 mm, 2 Zellen ab 6 (Warnung) |
+| Maschinenzeit (800 U/min, rechnerisch) |                                       21,7 min |
+| Objekte                                |                                             68 |
 
-_(21.09.2026 dreimal nachgezogen: nach dem Reisewege-Fix (§8.7.1), nach der Trim-Regel für
+_(26.09.2026 neu erzeugt — die Datei ist auszutauschen, falls sie schon gedruckt wurde:
+Nadelhäufung als Kennzahl (§11), gestreute Reisewege (§8.7.2), keine Konturunterlage auf
+Splittern (§8.6), Reisestichlänge zurück auf 2,0 (§8.5). Von 17.314 auf 13.738 Stiche,
+Dichtespitze 32 → 28, und die schlimmste Nadelstelle von 22 auf 7 Einstiche je 0,2 mm —
+das Archiv liegt bei 4 bis 8. Vorher, 21.09.2026, dreimal nachgezogen: nach dem Reisewege-Fix (§8.7.1), nach der Trim-Regel für
 Sprünge (§10.2) samt Reisestichlänge 3,0 mm (§8.5), zuletzt nach den EPCwin-Presets (§14,
 Stichlänge 4,0) und dem prozentualen Satin-Zugausgleich (§7.2). Am Anfang standen hier 17.966
 Stiche, 135 Sprünge, 38 Trims und Dichte 24 — mit Laufstichen, die bis zu 55 mm über
@@ -133,9 +138,9 @@ einer.
 
 | Kennzahl    | Engine | Puncher |   Δ |
 | ----------- | -----: | ------: | --: |
-| Stiche      | 17.314 | _offen_ |     |
-| Sprünge     |    168 | _offen_ |     |
-| Trims       |     58 | _offen_ |     |
+| Stiche      | 13.738 | _offen_ |     |
+| Sprünge     |    175 | _offen_ |     |
+| Trims       |     66 | _offen_ |     |
 | Farbwechsel |      6 | _offen_ |     |
 
 ### Ergebnis
