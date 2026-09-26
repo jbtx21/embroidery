@@ -52,7 +52,17 @@ writeFileSync(
   await renderPlanPng(plan, { threads: design.threads }),
 );
 
-const { stitches, jumps, trims, colorChanges, bboxMm, runtimeSec, densityMax } = plan.stats;
+const {
+  stitches,
+  jumps,
+  trims,
+  colorChanges,
+  bboxMm,
+  runtimeSec,
+  densityMax,
+  needleMax,
+  needleCells,
+} = plan.stats;
 console.log(`Datei       ${svgPath}`);
 console.log(`Preset      ${presetArg}`);
 console.log(`Maßstab     ${mmPerUnit.toFixed(4)} mm je SVG-Einheit`);
@@ -64,6 +74,7 @@ console.log(`Farbwechsel ${colorChanges}`);
 console.log(`Größe       ${bboxMm.w.toFixed(1)} × ${bboxMm.h.toFixed(1)} mm`);
 console.log(`Laufzeit    ${Math.round(runtimeSec)} s`);
 console.log(`Dichte max  ${densityMax} Stiche/mm²`);
+console.log(`Nadel max   ${needleMax} Einstiche je 0,2 mm, ${needleCells} Zellen ab 6`);
 
 const allWarnings = [...importWarnings, ...plan.warnings];
 if (allWarnings.length === 0) {

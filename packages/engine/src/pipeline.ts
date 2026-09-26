@@ -103,6 +103,8 @@ const EMPTY_STATS = {
   bboxMm: { w: 0, h: 0 },
   runtimeSec: 0,
   densityMax: 0,
+  needleMax: 0,
+  needleCells: 0,
 };
 
 export function planDesign(design: Design, opts: PlanOptions = {}): StitchPlan {

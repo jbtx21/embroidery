@@ -427,3 +427,45 @@ Archiv ist 1,30, das 90. Perzentil 2,37. Der Abstand ist damit größer als vor 
 Korrektur — die Korrektur war trotzdem richtig, weil die Buchstaben sonst nicht lesbar
 sind. Woher der Überschuss kommt und in welcher Reihenfolge er abgetragen wird, steht in
 der Neuplanung, §1.3.
+
+## Nadelhäufung: die Kennzahl steht (26.09.2026)
+
+Anlass war der Satz „die Programme sind alle nicht stickbar". Durchgemessen wurden unsere
+sechs Läufe und vier Produktionsdateien aus dem TEXMA-Archiv mit derselben Prüfung. Was im
+Feld der Puncher liegt: Stichlängen (Median 1,70–1,98 mm gegen 1,00–3,30 im Archiv), der
+Anteil unter 1 mm (21–26 % gegen 2–50 %) und die Sprunglängen. Was **nicht** im Feld liegt,
+ist die Häufung der Einstiche auf Nadeldurchmesser-Raster — deshalb steht sie jetzt als
+eigene Kennzahl in `analyze()` (§11, `needleClusters`).
+
+| Datei                      | max je 0,2 mm² | Zellen ≥ 6 | max je mm² | Meldung   |
+| -------------------------- | -------------: | ---------: | ---------: | --------- |
+| STUTTGART 80 mm            |         **22** |     **82** |         36 | **error** |
+| STUTTGART 250 mm           |         **13** |    **221** |         34 | **error** |
+| Berufsfeuerwehr Köln 90 mm |         **13** |     **36** |         29 | **error** |
+| Atzensport Hofbräu 200 mm  |         **10** |     **37** |         18 | **error** |
+| Eislingen Print 200 mm     |              7 |          1 |         18 | warn      |
+| Atzensport Hofbräu 80 mm   |              6 |          1 |         20 | warn      |
+| Archiv: Willi Lutz Brust   |              5 |          0 |         15 | —         |
+| Archiv: Stadt Herrenberg   |              4 |          0 |         13 | —         |
+| Archiv: VVS Rücken         |              7 |          1 |         11 | warn      |
+| Archiv: Willi Wolf Brust   |              8 |          8 |         31 | warn      |
+
+Die Archivdateien bleiben durchweg unter der Fehlerschwelle, und zwar mit Abstand: die
+schlechteste gestickte Datei hat 8 Einstiche in der schlimmsten Zelle, unsere schlechteste 22. Die Schwellen (warn ab 6, error ab 12 oder mehr als 20 Zellen ab 6) sind genau an
+dieser Verteilung gesetzt, nicht aus einem Handbuch.
+
+**Der Befund ist härter als erwartet.** Der Plan rechnete damit, dass nur STUTTGART 80 mm
+den Fehler auslöst. Es sind **vier von sechs** — und STUTTGART 250 mm hat mit 221 betroffenen
+Zellen die breiteste Häufung, obwohl ihr Spitzenwert niedriger liegt. Die Häufung ist also
+kein Einzelfehler in einem Motiv, sondern ein Verfahrensproblem: sie wächst mit der Fläche.
+
+Verursacher ist bekannt und unverändert: die Reisewege im Fill sammeln sich in den schmalen
+Stegen zwischen ausgeschnittenen Formen (§8.7.1). Die drei Kandidaten für das Abstellen —
+Wege streuen, Wege vermeiden (Bänder-Wegeplanung), Unterlage nach Regel — stehen in
+`docs/neuplanung-punchprogramm.md` §4.1. Jeder wird einzeln gemessen, mit allen Kennzahlen
+vorher/nachher; die Zielmarke ist der schlechteste Archivwert: unter 8 Einstiche je Zelle
+und unter 10 Zellen ab 6.
+
+Die Dichte je mm² bleibt daneben stehen und misst weiter das Aussehen. Sie hätte den Befund
+nicht geliefert: Atzensport 200 mm liegt mit 18/mm² im grünen Bereich und hat trotzdem 37
+Zellen, in denen die Nadel sechsmal ins selbe Loch geht.

@@ -32,6 +32,7 @@ import {
   textMinFactor,
 } from "./presets.js";
 import { warn, WARNING } from "./warnings.js";
+import { NEEDLE_ERROR, NEEDLE_WARN, needleClusters } from "./analyze.js";
 
 const raw = (
   id: string,
@@ -278,6 +279,34 @@ describe("statistics (spec §11)", () => {
         (w) => w.code,
       ),
     ).toContain("OBJECT_OUTSIDE_HOOP");
+  });
+});
+
+describe("needle clustering (spec §11, 26.09.2026)", () => {
+  // Measured against the TEXMA archive: a production file puts at most 8
+  // penetrations into one 0,2 mm cell and has 0 to 8 cells with six or more.
+  // STUTTGART 80 mm had 24 in one cell and 80 such cells — the needle goes
+  // into the same hole over and over, which tears the fabric.
+  const at = (x: number, y: number): Stitch => ({ x, y, cmd: "stitch" });
+
+  it("counts penetrations on the needle grid", () => {
+    // Twelve stitches inside one tenth of a millimetre.
+    const stitches = Array.from({ length: 12 }, (_, i) => at(5 + i * 0.005, 5));
+    const r = needleClusters(stitches);
+    expect(r.max).toBe(12);
+    expect(r.cells).toBe(1);
+  });
+
+  it("keeps a normal row apart", () => {
+    const stitches = Array.from({ length: 20 }, (_, i) => at(i * 2, 0));
+    const r = needleClusters(stitches);
+    expect(r.max).toBe(1);
+    expect(r.cells).toBe(0);
+  });
+
+  it("warns from six and errors from twelve", () => {
+    expect(NEEDLE_WARN).toBe(6);
+    expect(NEEDLE_ERROR).toBe(12);
   });
 });
 

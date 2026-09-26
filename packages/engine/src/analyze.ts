@@ -39,6 +39,53 @@ export function densityProfile(stitches: Stitch[]): {
   return { max, cells: cells.size, overError };
 }
 
+/**
+ * Needle penetrations on a grid finer than the needle itself (spec §11,
+ * 26.09.2026).
+ *
+ * The density of §11 measures on 1 mm cells and averages a pile-up away. What
+ * decides whether a file can be sewn at all is how often the needle goes into
+ * the SAME hole: a needle is 0,7 to 0,8 mm across, so a 0,2 mm cell holds
+ * penetrations that land on top of each other. Measured against the TEXMA
+ * archive, a production file puts at most 8 into one such cell and has between
+ * 0 and 8 cells with six or more. STUTTGART 80 mm had 24 in one cell and 80
+ * such cells — the fabric tears there and the needle breaks.
+ */
+export const NEEDLE_GRID_MM = 0.2;
+/** One cell this full is worth a warning — the archive's own maximum. */
+export const NEEDLE_WARN = 6;
+/** This full, or too many warned cells, and the file is not sewable. */
+export const NEEDLE_ERROR = 12;
+/** Number of cells at or above NEEDLE_WARN that still counts as an error. */
+export const NEEDLE_ERROR_CELLS = 20;
+
+export function needleClusters(stitches: Stitch[]): {
+  /** Most penetrations in one cell. */
+  max: number;
+  /** Cells holding NEEDLE_WARN or more. */
+  cells: number;
+  /** Where the worst cell sits, for the editor. */
+  worst?: { x: number; y: number };
+} {
+  const grid = new Map<string, number>();
+  let max = 0;
+  let worst: { x: number; y: number } | undefined;
+  for (const s of stitches) {
+    if (s.cmd !== "stitch") continue;
+    const gx = Math.round(s.x / NEEDLE_GRID_MM);
+    const gy = Math.round(s.y / NEEDLE_GRID_MM);
+    const n = (grid.get(`${gx}:${gy}`) ?? 0) + 1;
+    grid.set(`${gx}:${gy}`, n);
+    if (n > max) {
+      max = n;
+      worst = { x: s.x, y: s.y };
+    }
+  }
+  let cells = 0;
+  for (const n of grid.values()) if (n >= NEEDLE_WARN) cells++;
+  return worst === undefined ? { max, cells } : { max, cells, worst };
+}
+
 /** Stitches per cell on a 1 mm grid; the maximum is returned. */
 export function maxDensity(stitches: Stitch[]): number {
   return densityProfile(stitches).max;
@@ -98,6 +145,7 @@ export function analyze(
   const empty = !Number.isFinite(minX);
   const density = densityProfile(all);
   const densityMax = density.max;
+  const needle = needleClusters(all);
   const stats: Stats = {
     stitches,
     jumps,
@@ -106,6 +154,8 @@ export function analyze(
     bboxMm: empty ? { w: 0, h: 0 } : { w: maxX - minX, h: maxY - minY },
     runtimeSec: stitches / (machine.rpm / 60) + trims * 3 + colorChanges * 12,
     densityMax,
+    needleMax: needle.max,
+    needleCells: needle.cells,
   };
 
   // Error only when a whole area is overfilled, or one cell is far past the
@@ -125,6 +175,30 @@ export function analyze(
       warn(
         WARNING.DENSITY_HIGH,
         `Up to ${densityMax} stitches per mm² in ${density.overError} of ${density.cells} cells.`,
+        "warn",
+      ),
+    );
+  }
+  // The needle grid decides sewability, the density grid decides look (§11).
+  if (needle.max >= NEEDLE_ERROR || needle.cells > NEEDLE_ERROR_CELLS) {
+    const where = needle.worst
+      ? ` (worst at ${needle.worst.x.toFixed(1)}, ${needle.worst.y.toFixed(1)} mm)`
+      : "";
+    warnings.push(
+      warn(
+        WARNING.NEEDLE_CLUSTER,
+        `Up to ${needle.max} penetrations in one ${NEEDLE_GRID_MM} mm cell, ` +
+          `${needle.cells} cells at ${NEEDLE_WARN} or more${where} — the needle goes into ` +
+          `the same hole and the fabric tears.`,
+        "error",
+      ),
+    );
+  } else if (needle.cells > 0) {
+    warnings.push(
+      warn(
+        WARNING.NEEDLE_CLUSTER,
+        `${needle.cells} cells with ${NEEDLE_WARN} or more penetrations per ` +
+          `${NEEDLE_GRID_MM} mm, worst ${needle.max}.`,
         "warn",
       ),
     );

@@ -54,6 +54,8 @@ export function stringifyNeutralJson(neutral: NeutralPlan, indent = 0): string {
           bboxMm: { w: neutral.plan.stats.bboxMm.w, h: neutral.plan.stats.bboxMm.h },
           runtimeSec: neutral.plan.stats.runtimeSec,
           densityMax: neutral.plan.stats.densityMax,
+          needleMax: neutral.plan.stats.needleMax,
+          needleCells: neutral.plan.stats.needleCells,
         },
         warnings: neutral.plan.warnings.map((w) => ({
           objectId: w.objectId,

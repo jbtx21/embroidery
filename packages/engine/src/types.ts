@@ -171,6 +171,10 @@ export type Stats = {
   runtimeSec: number;
   /** Stitches per mm^2 in the densest 1 mm cell. */
   densityMax: number;
+  /** Most needle penetrations in one 0,2 mm cell — sewability (spec §11). */
+  needleMax: number;
+  /** Cells with six or more penetrations on that grid. */
+  needleCells: number;
 };
 
 export type WarningSeverity = "info" | "warn" | "error";
