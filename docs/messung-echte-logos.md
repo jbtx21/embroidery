@@ -678,3 +678,30 @@ von Regel 9 entfernt und bleibt ein eigener Punkt im Backlog.
 Enden verkürzt die Wegsumme um 36 bis 53 %. Davon kommt weniger an, weil `autoOrder` nicht nur
 den Weg kennt — Farbe halten, Flächen vor Konturen, Überlappungen nicht vertauschen. Das ist
 richtig so; was übrig bleibt, holt Schritt 2 (weniger Objekte).
+
+### Warum die Trims bleiben, wo sie sind (26.09.2026)
+
+Der Plan sah nach dem Zwei-Pass zwei weitere Schritte vor. Beide sind **vor dem Bauen
+gemessen und daraufhin gestrichen**:
+
+**Berührende Flächen derselben Farbe vereinigen** — kein Fall. Die Bounding-Boxen überlappen
+reichlich (Köln: 78 Paare), aber geprüft mit einer echten Vereinigung verschmelzen bei Köln
+**0** Paare, bei Atzensport 80 mm 7 von 78 Flächen, bei Eislingen 2. Die Fragmente sind keine
+zerstückelten Flächen, sondern wirklich getrennte Teile: Sterne, Buchstaben, Details.
+
+**Verbindungen unter vorhandener Deckung führen** — kaum ein Fall. Von den Trims verlaufen
+nur **3 bis 7 %** unter einer Fläche, die später darüber gestickt wird (Atzensport 6 von 122,
+Köln 8 von 108, Eislingen 5 von 183). Der Rest geht über blanken Stoff; dort ist der Trim die
+richtige Antwort und kein Versäumnis.
+
+**Was die Trims treibt, ist die Stückelung der Vorlage.** Atzensport 80 mm besteht aus 151
+Objekten auf 80 × 115 mm, davon 41 Füllflächen unter 4 mm². STUTTGART 80 mm, dieselbe Größe,
+hat 68 Objekte und genau eine solche Fläche — und ein Drittel der Trims. Das Verhältnis von
+Sprüngen zu Trims ist dabei dasselbe wie im Archiv (rund 4 : 1); nur die absolute Zahl ist
+höher, weil mehr Teile gestickt werden.
+
+Das Archiv ist an dieser Stelle auch kein ganz fairer Maßstab: es sind Puncher-Dateien aus
+sauberen Vorlagen, unsere Testmotive sind **vektorisierte Druckgrafiken**. Wer 151 Teile
+stickt, trimmt öfter als wer 68 stickt. Der Hebel dafür liegt nicht in der Wegeplanung,
+sondern davor — beim Vereinfachen der Vorlage, und später im Editor, wo ein Mensch Teile
+zusammenfasst.

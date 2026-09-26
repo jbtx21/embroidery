@@ -3,6 +3,22 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Trims und Sprünge — der Rest hängt an der Vorlage (26.09.2026)
+
+- **Zwei-Pass-Reihenfolge ist eingebaut** (§10.1) und hat geholfen, wo es weh tat: Köln −16 %
+  Trims, STUTTGART 80 mm −11 %. Der Preis ist ein zweiter `precedence`-Lauf (STUTTGART 250 mm
+  17,4 → 20,4 s).
+- **Gemessen und verworfen**: berührende Flächen vereinigen (Köln: 0 von 78 Paaren verschmelzen
+  wirklich) und Verbindungen unter Deckung legen (nur 3–7 % der Trims laufen unter einer
+  späteren Fläche). Beides steht mit Zahlen in `docs/messung-echte-logos.md`.
+- **Was bleibt, ist die Stückelung**: Atzensport 80 mm hat 151 Objekte und 41 Füllflächen unter
+  4 mm²; STUTTGART 80 mm bei gleicher Größe 68 Objekte und ein Drittel der Trims. Der Hebel
+  liegt vor der Engine (Vorlage vereinfachen) und später im Editor. _(Offen, nicht als
+  Engine-Aufgabe.)_
+- **Ein Maßstab mit Vorbehalt**: das Archiv sind Puncher-Dateien aus sauberen Vorlagen, unsere
+  Testmotive vektorisierte Druckgrafiken. Das Verhältnis Sprünge zu Trims stimmt (4 : 1 wie im
+  Archiv), die absolute Zahl nicht.
+
 ## Füllung als Graph — halb fertig (26.09.2026)
 
 - **`fill-graph.ts` liegt gebaut und getestet im Repo, ist aber nicht im Stichweg.** Reihen und
