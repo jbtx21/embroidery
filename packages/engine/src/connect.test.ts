@@ -378,17 +378,17 @@ describe("order (spec §10.1)", () => {
   });
 
   it("works from the centre outwards within one rank", () => {
-    // Centre of the bounding box is x = 50; "mid" sits on it, "edge" at the rim.
+    // Centre of the bounding box is x = 50; "mid" sits on it, "edge" and "far"
+    // at the rim, both about as far out. Which of the two follows is a question
+    // of the way, not of the ring, so only the centre is fixed here.
     const objects = [
       runningObject("edge", [pt(0, 0), pt(4, 0)]),
       runningObject("mid", [pt(48, 0), pt(52, 0)]),
       runningObject("far", [pt(96, 0), pt(100, 0)]),
     ];
-    expect(autoOrder(objects, { centreOut: true }).map((o) => o.id)).toEqual([
-      "mid",
-      "edge",
-      "far",
-    ]);
+    const ids = autoOrder(objects, { centreOut: true }).map((o) => o.id);
+    expect(ids[0]).toBe("mid");
+    expect([...ids.slice(1)].sort()).toEqual(["edge", "far"]);
   });
 
   it("takes the lower object first at equal distance from the centre", () => {

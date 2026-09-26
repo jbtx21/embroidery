@@ -3,6 +3,35 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Aus dem zweiten Prozess-Abgleich (26.09.2026)
+
+Vollständig in `docs/profi-abgleich.md`, Abschnitt „Zweiter Abgleich".
+
+- **Die Reihenfolge braucht die echten Endpunkte, nicht bessere Schätzwerte.** `autoOrder`
+  misst vom Anfang des zuletzt gewählten Objekts. Beide naheliegenden Korrekturen sind
+  gemessen und **verschlechtern** (Köln 90 mm: Dichte 25 → 28, Nadel 7 → 10). Der Weg wäre
+  ein zweiter Durchgang: Objekte generieren, echte Endpunkte einsammeln, dann ordnen — und
+  Spalten/Konturen umdrehen (`reverse`), wenn das Ende näher am nächsten Objekt liegt. Das
+  ist der Profi-Mechanismus „Auto Start/End". _(Mittel; misst sich an Sprüngen und Trims.)_
+- **Laufstiche binden die Reihenfolge nicht.** `precedence` kennt nur Objekte mit Fläche
+  (`object.ts:33`), eine Kontur kann damit vor der Fläche landen, die sie überdeckt. An vier
+  Logos gemessen: tritt nicht auf (0 von 406 Laufstichen). _(Niedrig, aber echtes Risiko.)_
+- **Keine Verriegelung vor einem Farbwechsel ohne Trim.** §10.3 nennt nur `trim` und `end`;
+  bei `trimAfter: "never"` plus Farbwechsel endet ein Block unvernäht, obwohl die Maschine
+  den Faden physisch unterbricht. _(Klein, Spec-Frage.)_
+- **Kleinschrift ist eine Warnung, kein Verfahren.** Weder Dichte noch Spaltenbreite hängen
+  an `heightMm`; `font-choice.ts` (Schriftwahl nach Höhe, §9.4) wird nur in Tests aufgerufen,
+  nicht in `expand`. Der Kurzstich-Abstand der Schrift wird gelesen und dann verworfen
+  (`import-inkstitch.ts:156` → `satin.ts` rechnet mit Festwerten). _(Hoch — der Fachtext
+  nennt Kleinschrift den kritischsten Punkt der manuellen Nacharbeit.)_
+- **Kein Arbeitsformat.** Objekte lassen sich nicht speichern und wieder öffnen; das neutrale
+  JSON trägt nur Stiche. Damit widerspricht das Repo seiner eigenen Regel 5 („Stiche werden
+  nie gespeichert, nur Objekte") — gespeichert wird bisher ausschließlich das Gegenteil.
+  _(Hoch, Voraussetzung für den Editor.)_
+- **Kein Stich-Simulator.** `upToStitch` ist ein Standbild, kein Player. _(Editor-Phase.)_
+- **Nur DST.** PES/JEF/EXP/VP3 weder lesen noch schreiben; §2 verspricht einen PES-Reader.
+  _(Mittel — für TEXMA-Maschinen reicht DST, für Kundenvergleiche nicht.)_
+
 ## Aus dem Abgleich mit EPCwin (21.09.2026)
 
 - **Satin-Ecküberstich.** _(Phase 3.)_ An einer Ecke einer Satinspalte muss die äußere Rail

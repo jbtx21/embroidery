@@ -157,3 +157,81 @@ Zahlen in `docs/messung-echte-logos.md`.
 6. §6 krümmungsabhängige Stichlänge?
 7. Kein Preset für dünne Jersey-Ware (0,45 mm) — die Praxis nennt den Wert, wir haben
    keinen Platz dafür.
+
+---
+
+# Zweiter Abgleich: der ganze Prozess (26.09.2026)
+
+Der erste Abgleich oben hielt die Engine gegen **Stichparameter**. Dieser hier hält sie gegen
+den **Arbeitsablauf**, wie ihn Wilcom/Hatch/Tajima-Anwender beschreiben: Setup → Import →
+Sequenz → Unterlage → Hauptstiche → Befehle → Simulation → Export → Probestick. Belegt mit
+Datei:Zeile, gemessen an den sechs Läufen.
+
+## Der Ablauf, Schritt für Schritt
+
+| Schritt im Profi-Programm                     | TEXMA Stitch                                                                  | Stand                                                                            |
+| --------------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Maschine + Rahmen wählen                      | `MachineProfile` (`presets.ts:164`), `OBJECT_OUTSIDE_HOOP` (`analyze.ts:215`) | ✔ — aber die Prüfung fällt erst nach dem vollen Rechenlauf an, nicht beim Setzen |
+| Stoff vorwählen, Werte ziehen nach            | sechs Presets (`presets.ts:60-162`), Garnstärke über `presetForMachine:221`   | ✔                                                                                |
+| Grafik laden, auf mm skalieren, Ebene sperren | `importSvg`, `mmPerUnit`                                                      | ✔ (ohne Editor: keine Ebene zum Sperren)                                         |
+| Vektorisierung von Rastergrafik               | —                                                                             | **fehlt** (Engine erwartet Pfade)                                                |
+| Reihenfolge: Farben gruppieren                | `autoOrder` (`order.ts:141`) — STUTTGART 12 → 1 Farbwechsel                   | ✔                                                                                |
+| Reihenfolge: hinten → vorne                   | `precedence` (`order.ts:37`) friert überlappende Paare ein; `orderRank`       | ✔ mit Lücke: Laufstiche binden nichts (`object.ts:33`)                           |
+| Reihenfolge: innen → außen                    | `centreOut` (`order.ts:104`) — nur über das Cap-Preset (`pipeline.ts:129`)    | teilweise                                                                        |
+| Unterlage je Stichart                         | Fill: contour/single/double (§8.6); Satin: center/contour/zigzag (§7.6)       | ✔                                                                                |
+| Stichrichtung variieren                       | Import: 45°, überdeckende Fläche −45° (`import/svg.ts:480-496`)               | ✔ (zwei Winkel, keine formabhängige Wahl)                                        |
+| Dichte je Stoff                               | 0,38–0,45 mm (§14) gegen Praxis 0,38–0,48                                     | ✔                                                                                |
+| Zugausgleich                                  | prozentual mit Boden/Deckel (§7.2), Fill getrennt Zug/Schub (§8.1.1)          | ✔ — Satin-Push fehlt, asymmetrisch fehlt                                         |
+| Satin nicht über 7–9 mm                       | Split-Satin ab 7 mm (§7.4)                                                    | ✔ — ohne Streuung der Teilungsnaht                                               |
+| Text ab 4–5 mm, sonst vereinfachen            | `TEXT_TOO_SMALL` (`expand.ts:115`), Schriftgrenzen aus der Schrift            | **nur Warnung** — keine Dichte- oder Breitenregel nach Höhe                      |
+| Ein-/Austrittspunkte setzen                   | `objectStart` (`object.ts:8`), fest, nie am Nachbarn ausgerichtet             | **fehlt**                                                                        |
+| Verbindungsstich statt Trim                   | ≤ 3 mm und überdeckt → Laufstich (`connect.ts:95`)                            | ✔                                                                                |
+| Trim ab 2–3 mm                                | Trim erst über 5 mm (`connect.ts:106`)                                        | bewusst anders — §10.2 lässt Sprünge bis 5 mm stehen, wenn sie überdeckt werden  |
+| Vernähstiche                                  | `tie.ts` — Anfang, vor jedem Trim, am Ende                                    | ✔ — außer vor einem Farbwechsel ohne Trim                                        |
+| Stich-Simulator / TrueView                    | `upToStitch` als Standbild (`render.ts:24`)                                   | **fehlt**                                                                        |
+| Arbeitsdatei speichern (.EMB)                 | —                                                                             | **fehlt** — das neutrale JSON trägt nur Stiche (`json.ts:3`)                     |
+| Maschinendatei exportieren                    | DST, byte-identisch gegen pyembroidery (`dst.test.ts:319`)                    | ✔ — PES/JEF/EXP/VP3 fehlen                                                       |
+| Probestick                                    | `docs/probesticks.md`, Datei liegt bereit                                     | wartet                                                                           |
+
+## Drei Befunde, nachgemessen statt geglaubt
+
+**1. „Die Kontur verschwindet unter der Fläche" — tritt bei uns nicht auf.** Im Code ist die
+Lücke echt: `precedence` bindet nur Objekte mit einer Fläche, und ein Laufstich hat keine
+(`object.ts:33`). Gemessen an vier Logos: **null** Laufstiche werden von einer später
+gestickten Fläche anderer Farbe zugedeckt (Eislingen hat 379 Laufstiche, STUTTGART 2). Die
+Lücke bleibt als Risiko im Backlog, nicht als Fehler in der Datei.
+
+**2. Die Wegmetrik ist theoretisch falsch und praktisch besser.** §10.1 verlangt „der
+kürzeste Weg vom zuletzt gestickten Objekt", `autoOrder` misst aber vom **Anfang** des
+zuletzt gewählten Objekts (`order.ts:198`), und für Flächen nimmt es die Ecke der
+**ungedrehten** Bbox, obwohl der Fill in einem gedrehten Rahmen startet (`fill.ts:363`).
+Beides korrigiert und gemessen:
+
+| Variante                          | STUTTGART 80: Sprünge / Dichte / Nadel |                  Köln 90 | Atzensport 200 |
+| --------------------------------- | -------------------------------------: | -----------------------: | -------------: |
+| heute                             |                        175 / 28 / 7 /2 |   388 / **25** / **7**/8 | 720 / 18 / 6/3 |
+| Fill-Einstieg im gedrehten Rahmen |                         179 / 28 / 7/2 | 388 / **28** / **10**/10 | 684 / 18 / 6/3 |
+| Ende-zu-Start-Metrik              |                         188 / 28 / 7/2 | 400 / **28** / **10**/10 | 747 / 18 / 6/3 |
+
+Beide „Korrekturen" verschlechtern. Der Grund ist dieselbe Sache: Die Ecke der gedrehten Bbox
+liegt bei 45° bis zu einer halben Formbreite **außerhalb** der Fläche, und das geschätzte
+Ende einer zerklüfteten Fläche ist schlicht geraten. Eine falsche Schätzung ist schlechter als
+eine grobe, die wenigstens auf der Form liegt. **Zurückgenommen.** Die saubere Lösung ist
+kein besserer Schätzwert, sondern ein zweiter Durchgang: erst generieren, dann mit den echten
+Endpunkten ordnen. Steht im Backlog.
+
+**3. Zwei Trim-Schwellen, die sich widersprachen.** `decideConnection` ließ einen Sprung bis
+5,0 mm ungeschnitten, `cutLongJumps` schnitt ihn ab 4,7 mm doch (`connect.ts:184`) — die
+Reserve stammte aus der Zeit, als die Verriegelung nach dieser Stufe lief; seit dem 21.09.
+läuft sie davor (`pipeline.ts:162-168`). Korrigiert: eine Schwelle, 5,0 mm. Wirkung: STUTTGART
+80 mm 66 → 63 Trims, Köln 125 → 121, Atzensport 200 mm 164 → 163. Alle anderen Kennzahlen
+unverändert.
+
+## Was das über den Rest sagt
+
+Die Engine deckt den **Rechenteil** des Profi-Ablaufs breit ab — Sticharten, Unterlagen,
+Kompensation, Dichte, Reihenfolge, Befehle, DST. Was fehlt, ist fast alles, was im
+Profi-Programm **zwischen** Rechnen und Sticken liegt: Arbeitsdatei, Objektliste, Simulator,
+Ein-/Austrittspunkte, Kleinschrift-Regeln. Genau das ist im Fachtext die Arbeit, die „der
+Mensch nach der KI" macht. Bei uns gibt es dafür bisher keinen Ort — `apps/editor` existiert
+nicht.

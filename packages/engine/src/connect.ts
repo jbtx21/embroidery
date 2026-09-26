@@ -16,7 +16,7 @@
 import type { Point, Polygon } from "@texma-stitch/geometry";
 import { dist, insideTravel, segmentInside } from "@texma-stitch/geometry";
 import { runningStitches } from "./running.js";
-import { direction, lockStitches, TIE_LENGTH_MM } from "./tie.js";
+import { direction, lockStitches } from "./tie.js";
 import type { Stitch, StitchBlock, TrimAfter } from "./types.js";
 
 export type ConnectOptions = {
@@ -177,11 +177,13 @@ export function cutLongJumps(
         atBlock = bi;
         atIndex = i;
       }
-      // The lock stitches of §10.3 go in after this stage and move the start of
-      // a jump by up to TIE_LENGTH_MM. Without that reserve a jump of 5,0 mm
-      // grows into one of 5,3 mm that nobody cut — measured on STUTTGART
-      // 250 mm. The reserve only ever cuts earlier, never later.
-      if (dist(from, s) <= opts.jumpTrimMm - TIE_LENGTH_MM) continue;
+      // The same threshold as `decideConnection` (§10.2). It used to sit
+      // a lock stitch lower, as a reserve for stitches that were thought to
+      // come afterwards — since 21.09.2026 `tieBlocks` runs BEFORE this stage
+      // (`pipeline.ts`), so the distance measured here is already the one the
+      // machine drives, and the reserve only cut jumps between 4,7 and 5,0 mm
+      // that §10.2 deliberately leaves alone.
+      if (dist(from, s) <= opts.jumpTrimMm) continue;
       // Only a LATER object can cover the line — the one being stitched is
       // where the needle already is (§10.2 uses `index + 1` for the same
       // reason).
