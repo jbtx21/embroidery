@@ -165,13 +165,13 @@ Vollständig in `docs/profi-abgleich.md`, Abschnitt „Zweiter Abgleich".
   schreibt dieselben Formate unter Zlib-Lizenz — brauchbar als Kreuzprüfung oder als
   Format-Referenz. `frno7/libpes` wäre genauer für PES, steht aber unter GPL-3.0 und
   scheidet damit für uns aus.
-- **Ink/Stitch ist GPL-3.0.** Der Code taugt zum Verstehen eines Verfahrens, **nicht zum
-  Übernehmen**. Das gilt besonders für den offenen Punkt `railsForBranch`: die Lösung
-  (Kontur zwischen den Astenden in zwei Ketten teilen) ist Standard-Geometrie und wird bei
-  uns aus §7.1 heraus gebaut, nicht abgeschrieben.
-- **Nur `caffeine_tiny` liegt im Repo.** Das Ink/Stitch-Repo hat 142 Schriften; hereingeholt
-  ist die eine, die der Test braucht (820 KB). Weitere kommen einzeln dazu, jede mit ihrer
-  `LICENSE` — siehe `packages/fonts/src/inkstitch/README.md`.
+- **Ink/Stitch ist GPL-3.0 — seit 26.09.2026 entschärft.** `texma-stitch` bleibt ein internes
+  TEXMA-Werkzeug (Entscheidung J. Boekle), damit entsteht keine Weitergabe und keine
+  Offenlegungspflicht. Verfahren dürfen im Detail übernommen werden; eng nachgebildete Stellen
+  tragen den Vermerk `Abgeleitet aus Ink/Stitch (GPL-3.0)`, damit sie auffindbar bleiben, falls
+  das Werkzeug doch einmal das Haus verlässt. **Unverändert gesperrt** bleiben die neun
+  Schriften unter CC BY-NC (Nutzungsbeschränkung, greift auch intern) und PEmbroider.
+  Einzelheiten: `docs/verfahren-aus-inkstitch.md`.
 
 ## Offen nach der zweiten Welle (19.09.2026)
 

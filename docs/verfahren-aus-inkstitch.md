@@ -4,14 +4,31 @@ Stand: 26.09.2026.
 
 ## Wie diese Datei zu lesen ist
 
-Ink/Stitch steht unter **GPL-3.0**. Das heißt: Der Quellcode darf gelesen werden, und die
-**Verfahren** darin sind keine geschützte Ausdrucksform — Tatsachen, Schwellenwerte und
-Algorithmen sind frei. Geschützt ist der Code selbst. Eine Übersetzung nach TypeScript wäre
-ein abgeleitetes Werk und würde `texma-stitch` bei einer Weitergabe unter GPL-3.0 zwingen.
+Ink/Stitch steht unter **GPL-3.0**. Die Pflicht daraus — alles offenlegen — entsteht bei der
+**Weitergabe**, nicht bei der Nutzung.
 
-Deshalb dieses Dokument: Was Ink/Stitch tut, **in eigenen Worten und mit Zahlen**, als
-Vorlage für unsere eigene Umsetzung. Kein Codeauszug, keine Übersetzung. Die Zeilenangaben
-dienen dem Nachprüfen, nicht dem Abschreiben.
+**Entscheidung vom 26.09.2026 (J. Boekle): `texma-stitch` bleibt ein internes TEXMA-Werkzeug.**
+Damit findet keine Weitergabe statt, und abgeleiteter Code wäre zulässig, ohne dass TEXMA
+etwas offenlegen muss.
+
+Trotzdem bleibt dieses Dokument die Arbeitsform, und zwar aus zwei praktischen Gründen:
+
+1. **Die Entscheidung kann kippen.** Sobald das Werkzeug das Haus verlässt — an einen Kunden,
+   als Teil eines Portals zum Herunterladen, bei einem Verkauf oder einer Ausgründung —,
+   müsste GPL-Code wieder heraus. Je später das auffällt, desto teurer wird das Trennen.
+2. **Der Zeitgewinn ist kleiner, als er klingt.** Ink/Stitch rechnet auf `shapely` und
+   `networkx`; wir auf `clipper2` und eigener Geometrie. Eine Zeile-für-Zeile-Übersetzung gibt
+   es nicht, die Verfahren muss man ohnehin verstehen.
+
+**Regel seit dem 26.09.2026:** Verfahren dürfen im Detail übernommen werden — Schwellen,
+Reihenfolgen, Sonderfälle, Datenstrukturen. Wo eine Stelle unserem Code **eng** nachgebildet
+ist, steht ein Vermerk am Kopf der Funktion: `Abgeleitet aus Ink/Stitch (GPL-3.0)`. Dann ist
+später auffindbar, was bei einer Weitergabe zu ersetzen wäre.
+
+**Wovon das nichts ändert:** Lizenzen, die die **Nutzung** einschränken, greifen auch intern.
+Die neun Ink/Stitch-Schriften unter CC BY-**NC** bleiben für Kundenaufträge gesperrt (TEXMA
+stickt kommerziell, auch wenn das Werkzeug intern läuft), und PEmbroider bleibt wegen seiner
+Anti-Capitalist-Klausel außen vor. Siehe `docs/open-source-landschaft.md`.
 
 Quelle: `inkstitch-src` (im Arbeitscontainer geklont), Stand 09.2026.
 
