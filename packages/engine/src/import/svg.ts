@@ -20,15 +20,18 @@ import {
   parsePathData,
   intersect,
   medialAxis,
+  normalizeRing,
   offset,
+  offsetPolyline,
   polygonArea,
   polygonBbox,
   rings,
   ringsToPolygons,
+  union,
   arcLength,
 } from "@texma-stitch/geometry";
 import type { Design, PresetId, StitchObject, Thread, Warning } from "../types.js";
-import { autoSatin } from "../auto-satin.js";
+import { autoSatin, SATIN_MIN_COLUMN_MM } from "../auto-satin.js";
 import { bestFillAngle } from "../fill.js";
 import { PRESETS } from "../presets.js";
 import { warn, WARNING } from "../warnings.js";
@@ -330,6 +333,23 @@ export const RAIL_BUDGET_SLACK = 1.3;
 export const RAIL_EXTENT_MAX = 4.0;
 
 /**
+ * How much of the shape the columns have to cover to be taken (spec §5.1,
+ * 27.09.2026).
+ *
+ * Measured with `columnCoverage` on 27.09.2026: a bar 40 x 3 mm reaches 91 %,
+ * one of 20 x 1,5 mm 94 %, an arc 2,5 mm wide 97 %, a strip that becomes a
+ * running stitch 99 %. None of them reaches 100 — the rail polygon stops at the
+ * last rung, so the end caps are missing. Branching shapes fall away sharply
+ * because the crossing belongs to no column: an L measures 84 %, a T 77 %, a
+ * block T 71 %. The letters of STUTTGART 80 mm came out at 37 to 52 %.
+ *
+ * So the line sits at 85 %: above it everything a column can do honestly, below
+ * it everything that leaves fabric bare. A fill covers all of it — less shine,
+ * but the letter is there.
+ */
+export const COLUMN_COVERAGE_MIN = 0.85;
+
+/**
  * Rail length of a proposal against the outline it was read from (spec §5.1).
  *
  * `railsForBranch` picks its rail points off the BOUNDARY of the shape, so both
@@ -372,6 +392,44 @@ export function worstRailExtent(columns: StitchObject[]): number {
     worst = Math.max(worst, (arcLength(o.railA) + arcLength(o.railB)) / (2 * diag));
   }
   return worst;
+}
+
+/**
+ * How much of the shape the proposal actually puts thread on (spec §5.1,
+ * 27.09.2026).
+ *
+ * The two bounds above measure the rails — how LONG they are. Neither asks the
+ * question a looker-on asks first: is the shape covered? A block letter of
+ * "STUTTGART" 80 mm came out with columns over 50 % of its area and bare fabric
+ * in the rest; the banner lettering over 31 %. Both passed the rail bounds,
+ * because wedges that leave half the letter out have perfectly short rails.
+ *
+ * A running stitch counts as the column it replaced (§7.4): its corridor is as
+ * wide as the narrowest column we still stitch as satin.
+ */
+export function columnCoverage(shape: Polygon, columns: StitchObject[]): number {
+  const total = Math.abs(polygonArea(shape));
+  if (total <= 0) return 0;
+  const patches: Polygon[] = [];
+  for (const o of columns) {
+    if (o.type === "satin") {
+      patches.push(...normalizeRing([...o.railA, ...[...o.railB].reverse()]));
+    } else if (o.type === "running" && o.path.length >= 2) {
+      const half = SATIN_MIN_COLUMN_MM / 2;
+      patches.push(
+        ...normalizeRing([
+          ...offsetPolyline(o.path, half),
+          ...offsetPolyline(o.path, -half).reverse(),
+        ]),
+      );
+    }
+  }
+  if (patches.length === 0) return 0;
+  const covered = intersect(union(patches), [shape]).reduce(
+    (sum, p) => sum + Math.abs(polygonArea(p)),
+    0,
+  );
+  return covered / total;
 }
 
 export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport {
@@ -455,13 +513,18 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
           });
           const mixed = r.warnings.some((w) => w.code === WARNING.SATIN_TOO_WIDE);
           const columns = r.objects.filter((o) => o.type === "satin");
-          const fit = mixed || columns.length === 0 ? Infinity : railBudgetRatio(shape, columns);
-          const worst = mixed || columns.length === 0 ? Infinity : worstRailExtent(columns);
+          // A shape that comes back as running stitches alone is a line, not a
+          // failure (spec §7.4) — what counts is whether thread lands on it.
+          const empty = r.objects.length === 0;
+          const bad = mixed || empty;
+          const fit = bad ? Infinity : railBudgetRatio(shape, columns);
+          const worst = bad ? Infinity : worstRailExtent(columns);
+          const covered = bad ? 0 : columnCoverage(shape, r.objects);
           if (
-            !mixed &&
-            columns.length > 0 &&
+            !bad &&
             fit <= RAIL_BUDGET_SLACK &&
-            worst <= RAIL_EXTENT_MAX
+            worst <= RAIL_EXTENT_MAX &&
+            covered >= COLUMN_COVERAGE_MIN
           ) {
             for (const o of r.objects) objects.push({ ...o, trimAfter });
             placed.push(shape);
@@ -469,11 +532,15 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
           }
           const why = mixed
             ? `"${objId}" has branches wider than the satin limit`
-            : columns.length === 0
+            : empty
               ? `Auto-satin found no column in "${objId}"`
-              : `Auto-satin rails wind instead of following "${objId}": ` +
-                `${(fit * 100).toFixed(0)} % of its outline, worst column ` +
-                `${worst.toFixed(1)}x its own extent`;
+              : fit > RAIL_BUDGET_SLACK || worst > RAIL_EXTENT_MAX
+                ? `Auto-satin rails wind instead of following "${objId}": ` +
+                  `${(fit * 100).toFixed(0)} % of its outline, worst column ` +
+                  `${worst.toFixed(1)}x its own extent`
+                : `Auto-satin leaves "${objId}" bare: its columns cover ` +
+                  `${(covered * 100).toFixed(0)} % of the shape, ` +
+                  `${(COLUMN_COVERAGE_MIN * 100).toFixed(0)} % is the least that counts`;
           warnings.push(
             warn(WARNING.AUTOSATIN_MIXED, `${why} — stitched as a fill.`, "info", objId),
           );

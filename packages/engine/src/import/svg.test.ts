@@ -5,6 +5,8 @@ import { applyMatrix, IDENTITY, multiply, parseTransform } from "./matrix.js";
 
 import {
   AUTOSATIN_MAX_WIDTH_MM,
+  COLUMN_COVERAGE_MIN,
+  columnCoverage,
   DEFAULT_ANGLE_DEG,
   importSvg,
   lengthToMm,
@@ -374,6 +376,51 @@ describe("import decisions (spec §5.1)", () => {
     // The extent bound is a backstop since 21.09.2026, not the main test — a
     // column that genuinely curves reaches the same figures (spec §5.1).
     expect(worstRailExtent(wound)).toBeGreaterThan(2);
+  });
+
+  it("measures how much of the shape the columns cover (spec §5.1)", () => {
+    const bar = polygonOf(rect(0, 0, 40, 3));
+    const sound = autoSatin(bar, { idPrefix: "b" }).objects;
+    // A clean column reaches 91 to 99 % — the rail polygon has no end caps.
+    expect(columnCoverage(bar, sound)).toBeGreaterThanOrEqual(COLUMN_COVERAGE_MIN);
+    // A column over half the bar covers half of it, rails as short as ever.
+    const half = [
+      {
+        ...(sound[0] as SatinObject),
+        railA: [pt(0, 0), pt(20, 0)],
+        railB: [pt(0, 3), pt(20, 3)],
+      },
+    ];
+    expect(columnCoverage(bar, half)).toBeCloseTo(0.5, 1);
+    expect(columnCoverage(bar, half)).toBeLessThan(COLUMN_COVERAGE_MIN);
+    // Rails that wind are long AND leave the shape bare — the bound the two
+    // older ones miss.
+    expect(columnCoverage(bar, [])).toBe(0);
+    // Same answer twice (rule 3).
+    expect(columnCoverage(bar, half)).toBe(columnCoverage(bar, half));
+  });
+
+  it("counts a running stitch as the column it stands in for (spec §7.4)", () => {
+    // A strip this thin comes back as a running stitch (§7.4) — that is thread
+    // on the shape, not a gap, and the coverage has to see it that way. The
+    // switch sits at 0,8 mm measured, not at the nominal 1,2: the end caps
+    // widen what `columnWidthMm` averages.
+    const thin = polygonOf(rect(0, 0, 20, 0.7));
+    const r = autoSatin(thin, { idPrefix: "t" });
+    expect(r.objects.some((o) => o.type === "running")).toBe(true);
+    expect(columnCoverage(thin, r.objects)).toBeGreaterThanOrEqual(COLUMN_COVERAGE_MIN);
+  });
+
+  it("takes a fill when the columns leave the shape bare (spec §5.1)", () => {
+    // A block letter T: three columns, and the crossing belongs to none of
+    // them. Measured 71 % on 27.09.2026 — the letters of STUTTGART came out at
+    // 37 to 52 % and were unreadable.
+    const r = importSvg(
+      svg('<path d="M0 0 L14 0 L14 4 L9 4 L9 20 L5 20 L5 4 L0 4 Z" fill="#000"/>', 30, 30),
+    );
+    expect(r.design.objects.every((o) => o.type === "fill")).toBe(true);
+    const why = r.warnings.find((w) => w.code === "AUTOSATIN_MIXED");
+    expect(why?.message).toContain("%");
   });
 
   it("falls back to a fill when the proposal does not fit", () => {
