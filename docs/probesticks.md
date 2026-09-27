@@ -20,30 +20,40 @@ Erste echte Abnahme der Engine.
 
 ### Was die Engine vorhat (Soll)
 
-| Kennzahl                               |                                           Wert |
-| -------------------------------------- | ---------------------------------------------: |
-| Stiche                                 |                                         13.738 |
-| Sprünge / Trims / Farbwechsel          |                                   175 / 66 / 6 |
-| Größe                                  |                                 80,0 × 75,0 mm |
-| Dichte, Spitze                         |           28 Stiche/mm² (Warnung, kein Fehler) |
-| Nadelhäufung                           | 7 Einstiche je 0,2 mm, 2 Zellen ab 6 (Warnung) |
-| Maschinenzeit (800 U/min, rechnerisch) |                                       21,7 min |
-| Objekte                                |                                             68 |
+| Kennzahl                               |                                    Wert |
+| -------------------------------------- | --------------------------------------: |
+| Stiche                                 |                                  13.314 |
+| Sprünge / Trims / Farbwechsel          |                            164 / 55 / 6 |
+| Größe                                  |                          80,0 × 74,8 mm |
+| Dichte, Spitze                         |    24 Stiche/mm² (Warnung, kein Fehler) |
+| Nadelhäufung                           | 5 Einstiche je 0,2 mm, keine Zelle ab 6 |
+| Maschinenzeit (800 U/min, rechnerisch) |                                20,6 min |
+| Objekte                                |     68 — 43 Satin, 23 Fill, 2 Laufstich |
 
-_(26.09.2026 neu erzeugt — die Datei ist auszutauschen, falls sie schon gedruckt wurde:
-Nadelhäufung als Kennzahl (§11), gestreute Reisewege (§8.7.2), keine Konturunterlage auf
-Splittern (§8.6), Reisestichlänge zurück auf 2,0 (§8.5). Von 17.314 auf 13.738 Stiche,
-Dichtespitze 32 → 28, und die schlimmste Nadelstelle von 22 auf 7 Einstiche je 0,2 mm —
-das Archiv liegt bei 4 bis 8. Vorher, 21.09.2026, dreimal nachgezogen: nach dem Reisewege-Fix (§8.7.1), nach der Trim-Regel für
-Sprünge (§10.2) samt Reisestichlänge 3,0 mm (§8.5), zuletzt nach den EPCwin-Presets (§14,
-Stichlänge 4,0) und dem prozentualen Satin-Zugausgleich (§7.2). Am Anfang standen hier 17.966
-Stiche, 135 Sprünge, 38 Trims und Dichte 24 — mit Laufstichen, die bis zu 55 mm über
-blanken Stoff liefen, und Sprüngen, die den Faden oben liegen ließen. Zahlen und
-Begründung in `docs/messung-echte-logos.md`.)_
+_(27.09.2026 neu erzeugt — jede frühere Datei ist auszutauschen: Stichwinkel nach den
+wenigsten Reihenbrüchen statt fest 45° (§8.2) und die Reihenfolge in zwei Durchgängen über
+die echten Start- und Endpunkte statt über den Objektanfang (§10.1). Von 13.738 auf 13.314
+Stiche, 175 → 164 Sprünge, 66 → 55 Trims, Dichtespitze 28 → 24, Nadelhäufung 7 → 5
+Einstiche je 0,2 mm — keine Zelle mehr ab 6, das Archiv liegt bei 4 bis 8. Einordnung gegen
+die 192 Archivdateien (`pnpm kennzahlen`): 4,13 Trims und 12,32 Sprünge je 1000 Stiche,
+2,22 Stiche/mm² — alles im Feld bis p90, nichts darüber.
+Vorher, 26.09.2026: Nadelhäufung als Kennzahl (§11), gestreute Reisewege (§8.7.2), keine
+Konturunterlage auf Splittern (§8.6), Reisestichlänge zurück auf 2,0 (§8.5) — von 17.314 auf
+13.738 Stiche, Dichtespitze 32 → 28 und die schlimmste Nadelstelle von 22 auf 7 Einstiche je
+0,2 mm. Vorher, 21.09.2026, dreimal nachgezogen: nach dem Reisewege-Fix (§8.7.1), nach der
+Trim-Regel für Sprünge (§10.2) samt Reisestichlänge 3,0 mm (§8.5), zuletzt nach den
+EPCwin-Presets (§14, Stichlänge 4,0) und dem prozentualen Satin-Zugausgleich (§7.2). Am
+Anfang standen hier 17.966 Stiche, 135 Sprünge, 38 Trims und Dichte 24 — mit Laufstichen,
+die bis zu 55 mm über blanken Stoff liefen, und Sprüngen, die den Faden oben liegen ließen.
+Zahlen und Begründung in `docs/messung-echte-logos.md`.)_
 
-Satinbreiten über alle 74 Spalten: min 0,23 mm · 25 % 1,17 mm · **median 1,68 mm** ·
-75 % 2,63 mm · **max 9,81 mm**. Vier Spalten liegen über 4 mm, eine über 6 mm, achtzehn
-unter 1 mm.
+Satinbreiten über alle 43 Spalten: min 1,21 mm · 25 % 1,50 mm · **median 2,23 mm** ·
+75 % 2,43 mm · **max 4,24 mm**. Zwei Spalten liegen über 4 mm, keine über 6 mm, keine im
+Mittel unter 1 mm — sechs verengen sich örtlich darunter, die schmalste Sprosse auf 0,75 mm.
+Am 21.09. standen hier 74 Spalten von 0,23 bis 9,81 mm; seit der Mindestbreite aus §7.4
+(25.09.) gibt Auto-Satin Formen, in denen es gar keine Spalte findet, als Fill weiter (17 ×
+`AUTOSATIN_MIXED`) und stickt eine einzelne zu schmale Spalte als dreifachen Laufstich
+(hier zwei Objekte).
 
 Preset Piqué, die Werte, an denen im Zweifel gedreht wird:
 
@@ -58,17 +68,21 @@ Preset Piqué, die Werte, an denen im Zweifel gedreht wird:
 | Fill-Unterlage                           |  Kontur + einfach, 2,0 mm, Inset 0,4 |
 | Satin-Unterlage                          | Kontur + Zickzack, 3,0 mm, Inset 0,4 |
 
-Die 65 Warnungen des Laufs, nach Code:
+Die 103 Meldungen des Laufs (17 Hinweise und eine Warnung beim Import, 85 beim Rechnen,
+kein Fehler), nach Code:
 
-| Code                      | Anzahl | Wo hinsehen                                                  |
-| ------------------------- | -----: | ------------------------------------------------------------ |
-| `SATIN_TOO_NARROW`        |     35 | die Spalten unter 1 mm Breite                                |
-| `SELF_INTERSECTING_RAILS` |     15 | Ecken und enge Bögen                                         |
-| `EDGE_GAP_RISK`           |      4 | Fill-Kante an Satin-Rail, unter 0,3 mm ohne Überlappung      |
-| `FILL_TINY`               |      4 | Reste über 1 mm², unter 4 mm²                                |
-| `TRAVEL_OUTSIDE`          |      4 | Stellen, an denen der Fill springt statt zu sticken (§8.7.1) |
-| `SHAPE_SPLIT`             |      2 | Form zerfiel beim Normieren                                  |
-| `DENSITY_HIGH`            |      1 | Warnung: 1,9 % der Zellen über 18/mm², Spitze 33 (§11)       |
+| Code                      | Anzahl | Wo hinsehen                                         |
+| ------------------------- | -----: | --------------------------------------------------- |
+| `EDGE_GAP_RISK`           |     28 | Fill-Kante an Satin-Rail, engste Stelle 0,01 mm     |
+| `AUTOSATIN_MIXED`         |     17 | Formen ohne Spalte, als Fill gestickt (Import)      |
+| `FILL_TOO_NARROW`         |     13 | über 4 mm², Reihen durchweg unter 1 mm              |
+| `FILL_TINY`               |     12 | Reste über 1 mm², unter 4 mm²                       |
+| `SELF_INTERSECTING_RAILS` |     11 | Ecken und enge Bögen                                |
+| `SHAPE_SPLIT`             |      9 | Form zerfiel beim Ausschneiden, bis zu 6 Teile      |
+| `SATIN_TOO_NARROW`        |      6 | örtlich unter 1 mm, schmalste Sprosse 0,75 mm       |
+| `TRAVEL_OUTSIDE`          |      5 | Fill springt statt zu sticken (§8.7.1), bis 22,4 mm |
+| `IMPORT_DROPPED_TINY`     |      1 | zwei Flächen unter 1 mm² weggelassen (Import)       |
+| `DENSITY_HIGH`            |      1 | 11 von 3532 Zellen über 18/mm², Spitze 24 (§11)     |
 
 ### Die Punkte für die Auswertung
 
@@ -78,8 +92,10 @@ Je Punkt: was man ansieht, was es bedeutet, welcher Knopf.
 Blitzer?**
 Ein Blitzer ist Stoff, der zwischen Fill-Kante und Satinkontur durchscheint. Die Engine
 gibt dem Fill 0,20 mm Unterlappung unter die Kontur (`underlapMm`) und weitet den Satin um
-0,20 mm je Seite (`pullCompMm`). Vier Stellen hat sie selbst als knapp gemeldet
-(`EDGE_GAP_RISK`) — dort zuerst hinsehen. Blitzer → `underlapMm` auf 0,3 und/oder
+0,20 mm je Seite (`pullCompMm`). 28 Stellen hat sie selbst als knapp gemeldet
+(`EDGE_GAP_RISK`), die engste mit 0,01 mm Abstand — dort zuerst hinsehen. Dass es 28 statt
+der vier vom 21.09. sind, liegt an den 17 Formen, die jetzt als Fill statt als Satin laufen:
+sie haben Kanten, wo vorher Rails waren. Blitzer → `underlapMm` auf 0,3 und/oder
 `pullCompMm` auf 0,25. Satin steht über und die Kontur wirkt fett → `pullCompMm` runter,
 nicht die Unterlappung.
 
@@ -94,33 +110,35 @@ Reihenabstand lockern, nicht nur eines.
 - Befund: _offen_
 
 **3. Satinbreite an den Bannerenden (4 mm) — sauber oder Schlaufen?**
-Schlaufen entstehen, wenn die Spalte breiter ist, als der Stich hält. Vier Spalten liegen
-über 4 mm, die breiteste bei **9,81 mm** — das ist die eigentliche Kandidatin. §7.4 nennt
-`maxWidthMm`; greift die Breite nicht, fehlt entweder die Teilung oder der Grenzwert steht
-zu hoch.
+Schlaufen entstehen, wenn die Spalte breiter ist, als der Stich hält. Zwei Spalten liegen
+über 4 mm, die breiteste bei **4,24 mm** — deutlich entspannter als die 9,81 mm vom 21.09.,
+weil die breiten Formen inzwischen als Fill laufen. §7.4 nennt `maxWidthMm`; greift die
+Breite nicht, fehlt entweder die Teilung oder der Grenzwert steht zu hoch.
 
 - Befund: _offen_
 
 **4. Ecken der Buchstaben — sauber gedeckt oder offen?**
-Fünfzehn Spalten melden `SELF_INTERSECTING_RAILS`; das sind die Stellen, an denen sich die
+Elf Spalten melden `SELF_INTERSECTING_RAILS`; das sind die Stellen, an denen sich die
 Rails in einer Ecke kreuzen. Offene Ecken heißen: die Spalte endet vor der Ecke. Zu dicke
 Ecken heißen: sie wird doppelt gedeckt.
-Dazu ein zweiter Verdacht aus dem Plan: **sechs von 47 Formen werden auseinandergerissen**
-(eine viermal) — ihre Spalten werden nicht hintereinander gestickt, weil der Import den
-Spalten einer Form kein gemeinsames `sequence` gibt, anders als §10.1 es beschreibt. Wenn
-eine Ecke einen Ansatz zeigt, ist das der erste Verdächtige (siehe `docs/backlog.md`).
+Der Verdacht aus dem Plan vom 21.09. — Formen, die `autoOrder` auseinanderreißt — ist
+abgearbeitet: seit dem 25.09. tragen alle Teile einer Form eine gemeinsame Folge (`sequence`,
+§10.1), in diesem Motiv 13 Formen mit zwei bis fünf Objekten. Zeigt eine Ecke trotzdem einen
+Ansatz, liegt es an der Spalte selbst, nicht an der Reihenfolge.
 
 - Befund: _offen_
 
 **5. Die graue Schildfläche — ein Grat an den Stegen?**
 Ihre Reisewege sammeln sich in den schmalen Stegen zwischen den ausgeschnittenen
-Buchstaben; dort ist die dichteste Stelle des Motivs (32 Stiche/mm²). Mit 3,0 mm
-Reisestichlänge liegt sie wieder unter der Fehlerschwelle aus §11 — ob das reicht,
-entscheidet der Stoff. Zeigt er einen Grat oder wird steif, werden die Wege gestreut.
+Buchstaben; dort ist die dichteste Stelle des Motivs (24 Stiche/mm², 11 von 3532 Zellen
+über 18). Die Wege werden inzwischen an den Ecken gestreut (§8.7.2) und die Konturunterlage
+liegt nicht mehr auf Splittern (§8.6) — die Nadelhäufung ist damit auf 5 Einstiche je
+0,2-mm-Zelle gefallen, keine Zelle erreicht 6. Ob das reicht, entscheidet der Stoff: zeigt
+er einen Grat oder wird steif, muss der Reihenabstand in den Stegen lockern.
 
 - Befund: _offen_
 
-**6. Fadenreste — 56 Trims statt 38.**
+**6. Fadenreste — 55 Trims statt 38.**
 Der Faden wird jetzt überall dort geschnitten, wo ein Sprung ihn sonst über blanken Stoff
 ziehen würde (§10.2). Auf dem Stoff heißt das: keine Verbindungsfäden zwischen den Teilen.
 Schneidet die Maschine schlecht, heißt es stattdessen: mehr Reste zum Nacharbeiten. Beides
@@ -138,9 +156,9 @@ einer.
 
 | Kennzahl    | Engine | Puncher |   Δ |
 | ----------- | -----: | ------: | --: |
-| Stiche      | 13.738 | _offen_ |     |
-| Sprünge     |    175 | _offen_ |     |
-| Trims       |     66 | _offen_ |     |
+| Stiche      | 13.314 | _offen_ |     |
+| Sprünge     |    164 | _offen_ |     |
+| Trims       |     55 | _offen_ |     |
 | Farbwechsel |      6 | _offen_ |     |
 
 ### Ergebnis

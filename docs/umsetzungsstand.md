@@ -284,3 +284,43 @@ Alle sechs Läufe melden nur noch Warnungen, kein Fehler.
 - **Die Rechenzeit ist unabhängig davon zu hoch.** STUTTGART 250 mm braucht 19,5 s für einen
   Plan; gemessen gegen den Stand vor diesen Änderungen (20,2 s) liegt das nicht an ihnen.
   Regel 9 (< 300 ms) ist weit verfehlt und bleibt offen.
+
+## Winkel, Reihenfolge und ein Player (27.09.2026)
+
+Zwei Schritte aus `docs/verfahren-aus-open-source.md`, jeder einzeln gemessen: der
+**Stichwinkel nach den wenigsten Reihenbrüchen** statt fest 45° (§8.2) und die
+**Reihenfolge in zwei Durchgängen** — erst rechnen, dann mit den echten Start- und
+Endpunkten der Blöcke neu sortieren statt mit dem Objektanfang (§10.1).
+
+| Kennzahl (STUTTGART 80 mm)         | 26.09. |       27.09. |  Archiv |
+| ---------------------------------- | -----: | -----------: | ------: |
+| Stiche                             | 13.738 |   **13.314** |         |
+| Sprünge / Trims                    | 175/66 | **164 / 55** |         |
+| Dichtespitze je mm²                |     28 |       **24** | 11 – 31 |
+| Einstiche in der schlimmsten Zelle |      7 |        **5** |   4 – 8 |
+| Zellen ab 6 Einstichen             |      2 |        **0** |   0 – 8 |
+
+Danach alle sechs Motive neu gerechnet. Jede DST wurde mit `readDst` zurückgelesen und gegen
+den Plan gehalten — Stichzahl, Farbwechsel und Größe stimmen bei sechs von sechs. Einordnung
+gegen die 192 Archivdateien (`pnpm kennzahlen`):
+
+| Lauf                      | Trims/1000 | Sprünge/1000 | Stiche/mm² | Nadel | Einordnung           |
+| ------------------------- | ---------: | -----------: | ---------: | ----: | -------------------- |
+| STUTTGART 250 mm          |   **1,39** |     **6,26** |       1,24 |     6 | alles bis Median     |
+| Atzensport Hofbräu 200 mm |       3,89 |        16,13 |       0,76 |     7 | bis p90              |
+| STUTTGART 80 mm           |       4,13 |        12,32 |       2,23 |     5 | bis p90              |
+| Berufsfeuerwehr Köln 90   |       5,60 |        17,93 |       2,38 |     7 | Stichmenge > p90     |
+| Eislingen Print 200 mm    |       7,95 |        42,65 |       0,37 |     6 | Trims, Sprünge > p90 |
+| Atzensport Hofbräu 80 mm  |  **10,74** |        30,82 |       1,22 |     5 | Trims **über allem** |
+
+Die Nadelhäufung liegt bei allen sechs im Archivfeld (4 – 8). Was heraussticht, sind Trims
+und Sprünge der **kleinen** Motive — und die folgen aus der Stückelung der Vorlage, nicht aus
+der Wegeplanung: Atzensport 80 mm sind 151 Objekte, davon 41 Fills unter 4 mm². Messung in
+`docs/messung-echte-logos.md`.
+
+Zum Ansehen vor dem Abstecken gibt es jetzt einen **Stich-Player** (Artifact, aus den
+neutralen JSONs erzeugt): Abspielen, Slider über alle Stiche, Sprung- und Trim-Marker,
+Nadelposition, Garnfolge. Er rechnet nichts nach, er zeichnet, was in der Datei steht.
+
+Offen bleibt die **Rechenzeit**: STUTTGART 250 mm braucht 17,7 s für einen Plan, Regel 9
+nennt 0,3 s.

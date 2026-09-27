@@ -113,9 +113,10 @@ Vollständig in `docs/profi-abgleich.md`, Abschnitt „Zweiter Abgleich".
 
 ## Aus der Abnahme vor dem ersten Probestick (21.09.2026)
 
-- **61 Warnungen für ein Logo sind für den Editor zu viel.** Nach Code gruppieren, mit
-  Anzahl, Details aufklappbar — STUTTGART 80 mm sind 34 × `SATIN_TOO_NARROW`, 15 ×
-  `SELF_INTERSECTING_RAILS` und vier weitere Codes, das sind sechs Zeilen statt sechzig.
+- **Über hundert Warnungen für ein Logo sind für den Editor zu viel.** Nach Code gruppieren,
+  mit Anzahl, Details aufklappbar — STUTTGART 80 mm sind (Stand 27.09.2026) 28 ×
+  `EDGE_GAP_RISK`, 17 × `AUTOSATIN_MIXED` und acht weitere Codes, das sind zehn Zeilen statt
+  hundertdrei.
   **Gehört in Phase 2 (Editor), nicht in die Engine:** die Engine meldet jeden Fall einzeln,
   weil jeder Fall ein Objekt hat; das Zusammenfassen ist Darstellung.
 - **Importierte Buchstabenformen unter 5 mm bekommen keine Warnung.** `TEXT_TOO_SMALL`
@@ -125,14 +126,14 @@ Vollständig in `docs/profi-abgleich.md`, Abschnitt „Zweiter Abgleich".
   weglassen. **Vorschlag:** `SATIN_GROUP_SMALL`, wenn eine Gruppe von Satinspalten aus einer
   Form unter 5 mm Ausdehnung kommt. Voraussetzung ist der nächste Punkt — ohne gemeinsames
   `sequence` gibt es keine Gruppe, nur einzelne Spalten.
-- **Der Import gibt den Spalten einer Form kein gemeinsames `sequence`.** §10.1 sagt: „auch
+- ~~**Der Import gibt den Spalten einer Form kein gemeinsames `sequence`.** §10.1 sagt: „auch
   die Spalten eines Auto-Satin-Vorschlags sind bereits geordnet". `expand` setzt es für
   Texte (`sequence: obj.id`), der SVG-Import und `autoSatin` setzen es nicht — gemessen an
   STUTTGART 80 mm: 74 Spalten, keine einzige mit `sequence`. Folge: **sechs von 47 Formen
-  werden von `autoOrder` auseinandergerissen**, eine viermal; ihre Spalten werden nicht
-  hintereinander gestickt. Kandidat für Ansätze an Buchstabenecken, siehe
-  `docs/probesticks.md`. Das ist eine Abweichung zwischen Code und Spec, also ein Fehler,
-  keine Frage — aber erst nach dem Probestick anzufassen, damit die Messung nicht wandert.
+  werden von `autoOrder` auseinandergerissen**, eine viermal.~~ _(25.09.2026 behoben,
+  Commit `c8e50ec`: `autoSatin` setzt `sequence: idPrefix` auf jedes Teil einer Form — Spalte
+  wie Laufstich. STUTTGART 80 mm hat jetzt 13 Formen mit zwei bis fünf Objekten, jede in
+  einer Folge; `autoOrder` reißt keine mehr auseinander.)_
 
 ## Offen nach der vierten Welle (21.09.2026)
 
