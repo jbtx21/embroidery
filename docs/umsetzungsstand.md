@@ -268,6 +268,11 @@ Anlass: „Die Programme sind alle nicht stickbar." Vier Schritte, jeder einzeln
 
 Alle sechs Läufe melden nur noch Warnungen, kein Fehler.
 
+_(Richtigstellung 28.09.2026: stimmt nicht für STUTTGART 250 mm, Eislingen 200 mm und
+Atzensport Hofbräu 200 mm — sie melden seit der `OBJECT_OUTSIDE_HOOP`-Prüfung (18.09.2026)
+einen Fehler, weil die Motive höher sind als der Standardrahmen 360 × 200 mm. Kein
+Rechenfehler, eine Rahmenfrage. Siehe „Schrift der Kundenlogos (27./28.09.2026)" unten.)_
+
 ### Beim Bauen gefunden
 
 - **Die Ursache war nicht der Deckstich.** Die Messung, die es entschieden hat, war das
@@ -324,3 +329,50 @@ Nadelposition, Garnfolge. Er rechnet nichts nach, er zeichnet, was in der Datei 
 
 Offen bleibt die **Rechenzeit**: STUTTGART 250 mm braucht 17,7 s für einen Plan, Regel 9
 nennt 0,3 s.
+
+## Schrift der Kundenlogos (27./28.09.2026)
+
+**Abnahme am Stich-Player: alle sechs Läufe abgelehnt.** Der Nutzer hat sie geprüft und als
+„alle unbrauchbar" zurückgewiesen. Die beiden Schritte unten sind Messung, keine Freigabe —
+Einzelheiten und alle Zahlen in `docs/messung-echte-logos.md`.
+
+Anlass: „Die Schrift wird gar nicht mehr richtig gestickt. Man erkennt nichts mehr." Zwei
+Schritte:
+
+1. **Deckungsprüfung für Auto-Satin** (`columnCoverage`, §5.1). Die vorhandenen Schranken
+   maßen nur die Rail-Länge; ein Keil, der die halbe Buchstabenform ausspart, hatte kurze
+   Rails und kam durch — gemessen deckten die Spalten bei STUTTGART 80 mm nur 37 bis 52 %
+   der Buchstabenkerne. Neu: `COLUMN_COVERAGE_MIN` = 0,85, darunter wird die Form ein Fill.
+   Ein zweiter Fehler im selben Tor (`columns.length === 0` warf reine
+   Laufstich-Ergebnisse weg) ist mitbehoben.
+2. **Durchgänge nach Breite** (Variante D, `SINGLE_PASS_MAX_MM`, §7.4). Ein Durchgang bis
+   0,7 mm, sonst drei (Bohnenstich). Die Grenze stand zunächst bei 0,6 mm; korrigiert, weil
+   die Breitenmessung dünne Eckringe überschätzt (ein 0,45-mm-Rahmen misst dort bis
+   0,62 mm).
+
+**Sackgasse, gemessen und verworfen:** die Zierlinie über Lücken unter 0,5 mm schließen.
+Nadelhäufung sank dabei von 8 auf 6, aber bei dieser Schrift trägt die Zierlinie Form — Beine
+des A, Balken des G, Bein des R stehen nur als Zierlinie in der Vorlage und wären
+verschwunden.
+
+| Motiv                      | Stiche | Trims/1000 | Sprünge/1000 | Nadel (max / ab 6) | 27.09.: Stiche |
+| -------------------------- | -----: | ---------: | -----------: | -----------------: | -------------: |
+| STUTTGART 80 mm            | 11.192 |       4,20 |        11,35 |              6 / 2 |         13.314 |
+| STUTTGART 250 mm           | 73.651 |       1,48 |         6,25 |              6 / 4 |         72.478 |
+| Berufsfeuerwehr Köln 90 mm | 19.668 |       4,02 |        11,95 |             11 / 8 |         19.301 |
+| Eislingen Print 200 mm     | 27.304 |       3,96 |        13,92 |              5 / 0 |         23.024 |
+| Atzensport Hofbräu 80 mm   | 10.269 |      10,22 |        26,58 |              5 / 0 |         11.355 |
+| Atzensport Hofbräu 200 mm  | 42.592 |       3,43 |        16,13 |              7 / 1 |         43.460 |
+
+Jede DST mit `readDst` zurückgelesen: Stichzahl, Farbwechsel, Breite und Höhe stimmen bei
+24 von 24 Werten. Vollständige Tabelle (Sprünge, Trims, Farbwechsel, Stiche/mm², Dichte) und
+Einordnung gegen das Archiv in `docs/messung-echte-logos.md`.
+
+Offen: Köln bei Nadelhäufung 11 (Archiv-Max 8, Ursache vermutlich `tie.ts`), „CYS SPORTS" im
+Banner weiterhin kaum lesbar, `medianShapeWidthMm` an sich, `OBJECT_OUTSIDE_HOOP` bei drei
+Motiven (siehe Richtigstellung oben) und die Auto-Satin-Wurzel bei Kreuzungen. Alles mit
+Zahlen in `docs/backlog.md`.
+
+**Die Abnahme steht über alledem:** eine gemessene Verbesserung ist kein „geht jetzt". Ohne
+eine gepunchte Profi-Datei desselben Motivs im selben Player fehlt der Maßstab, woran
+„unbrauchbar" hängt.

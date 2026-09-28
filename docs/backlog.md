@@ -3,6 +3,48 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Abnahme 28.09.: alle sechs Läufe unbrauchbar — Ursachen gegen eine Profi-Datei in derselben Darstellung klären
+
+- **Alle sechs Läufe abgelehnt.** Der Nutzer hat sie im Stich-Player geprüft und als „alle
+  unbrauchbar" zurückgewiesen — trotz gemessener Verbesserungen (Deckungsprüfung für
+  Auto-Satin, Durchgänge nach Breite; Zahlen in `docs/messung-echte-logos.md` und
+  `docs/umsetzungsstand.md`). Eine Messung ist keine Abnahme.
+- ~~**Nächster Schritt: Ursachen gegen eine Profi-Datei in derselben Darstellung klären.**~~
+  _(28.09.2026 erledigt: drei professionell gepunchte Stickvoll-Dateien im selben Player
+  erscheinen satt und sauber — Flächen geschlossen, Schrift als Satin, 13–49 Sprünge. Unsere
+  Läufe nicht: Flächen wirken schraffiert, Schrift ohne Satin, 127–235 Sprünge und 47–79
+  Trims. Der Player ist also nicht die Ursache, die Stichgenerierung ist es.)_
+- **Entscheidung 28.09.2026: Ink/Stitch als Stich-Engine.** Die eigene Stichgenerierung ist
+  vom Profi-Stand weit entfernt; der Nutzer hat entschieden, die Stiche von Ink/Stitch
+  (GPL-3.0, interne Nutzung seit 26.09.2026 geklärt) erzeugen zu lassen. Erst ein Probelauf
+  mit den sechs Motiven im selben Player, dann der Einbau — Plan und Ergebnis folgen in
+  `docs/umsetzungsstand.md`.
+
+## Offen aus der Schriftarbeit (27./28.09.2026)
+
+- **Köln 90 mm: Nadelhäufung 11** (vorher 7, Archiv-Max 8). In der schlimmsten Zelle sind 8
+  von 11 Einstichen Blockenden mehrerer Fill-Stücke, die übereinander verriegeln (`tie.ts`).
+  Ursache belegen, dann ändern.
+- **„CYS SPORTS" im Banner kaum lesbar** — bestand schon vor den Änderungen dieses
+  Wochenendes. 5,3–5,8 mm hohe Buchstaben mit 0,9–1,2 mm Strich; der Fill-Zugausgleich von
+  0,2 mm je Seite macht die kleinen Punzen von S und O zu.
+- **`medianShapeWidthMm` überschätzt dünne Ringe an den Ecken** (0,45-mm-Wand: 10-mm-Ring
+  0,50 mm, 20-mm-Ring 0,62 mm). Die Grenze `SINGLE_PASS_MAX_MM` = 0,7 mm fängt nur das
+  Symptom ab; die Wurzel liegt in der Messfunktion selbst.
+- **`OBJECT_OUTSIDE_HOOP` bei drei Motiven** (STUTTGART 250 mm, Eislingen Print 200 mm,
+  Atzensport Hofbräu 200 mm): über 200 mm Höhe gegen den Standardrahmen 360 × 200 mm. Kein
+  Engine-Fehler — eine Rahmenfrage (größerer Rahmen oder Teilung). `docs/umsetzungsstand.md`
+  war an dieser Stelle falsch und ist berichtigt.
+- **Auto-Satin-Wurzel: Blockbuchstaben mit Kreuzungen (T, L) werden Keile statt
+  überlappender Spalten.** Die Deckungsprüfung (§5.1) fängt das heute ab und schickt sie als
+  Fill weiter — weniger Glanz, aber die eigentliche Ursache in `auto-satin.ts` bleibt
+  unbehoben.
+- **Sackgasse, verworfen:** die Zierlinie über Lücken unter 0,5 mm schließen (Modul
+  `close-gaps`, gebaut, nicht eingecheckt). Nadelhäufung sank von 8 auf 6, aber bei dieser
+  Schrift trägt die Zierlinie Form — Beine des A, Balken des G, Bein des R stehen nur als
+  Zierlinie in der Vorlage und wären verschwunden. Wiederaufnahme nur für Schriften, deren
+  Zierlinie keine Form trägt.
+
 ## Trims und Sprünge — der Rest hängt an der Vorlage (26.09.2026)
 
 - **Zwei-Pass-Reihenfolge ist eingebaut** (§10.1) und hat geholfen, wo es weh tat: Köln −16 %

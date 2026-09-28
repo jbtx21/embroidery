@@ -705,3 +705,109 @@ sauberen Vorlagen, unsere Testmotive sind **vektorisierte Druckgrafiken**. Wer 1
 stickt, trimmt öfter als wer 68 stickt. Der Hebel dafür liegt nicht in der Wegeplanung,
 sondern davor — beim Vereinfachen der Vorlage, und später im Editor, wo ein Mensch Teile
 zusammenfasst.
+
+## Die Schrift der Kundenlogos (27./28.09.2026)
+
+Befund am Stich-Player: „Die Schrift wird gar nicht mehr richtig gestickt. Man erkennt
+nichts mehr." Zwei Fixes folgen, mit Zahlen — **aber die Abnahme am Stich-Player hat danach
+alle sechs neu gerechneten Läufe als „alle unbrauchbar" abgelehnt** (Einzelheiten am Ende
+dieses Abschnitts). Was folgt, ist die Messung dazu, nicht deren Freigabe.
+
+### Ursache 1: Auto-Satin zerlegte Blockbuchstaben in Keile
+
+Gemessen deckten die Spalten die Buchstabenkerne bei STUTTGART 80 mm nur zu 37 bis 52 %
+ihrer Fläche (Schnitt 50 %), beim Banner „CYS SPORTS" zu 31 % — der Rest blieb blanker
+Stoff. Die beiden vorhandenen Schranken (`railBudgetRatio`, `worstRailExtent`) messen nur
+die LÄNGE der Rails; ein Keil, der die halbe Form ausspart, hat kurze Rails und kam durch.
+
+Neu: `columnCoverage` (Deckung der Form durch Spalten und Laufstiche) mit
+`COLUMN_COVERAGE_MIN` = 0,85. Gemessen: Balken 40 × 3 mm 91 %, Balken 20 × 1,5 mm 94 %,
+Bogen 2,5 mm 97 %, Streifen als Laufstich 99 % — gegen L-Form 84 %, T-Form 77 %, Block-T
+71 %. Unter der Grenze wird die Form ein Fill: weniger Glanz, aber der Buchstabe ist da.
+
+Zweiter Fehler im selben Tor: `columns.length === 0` warf ein Ergebnis weg, das nur aus
+Laufstichen bestand (jede Spalte unter 1,2 mm, §7.4), und stickte die Form stattdessen als
+Fill — die 0,45 mm schmalen Ränder wurden so zur ausgefransten Einzelreihe. Jetzt zählt ein
+Laufstich als die Spalte, die er ersetzt.
+
+Der Fehler ist keine Regression vom Wochenende: der Stand vom 21.09.2026 neu gerechnet zeigt
+dieselbe unlesbare Schrift. Er lag im Auto-Satin-Import, seit es ihn gibt — nur bemerkt hat
+ihn bislang niemand.
+
+### Ist ein 80-mm-Logo überhaupt stickbar?
+
+Frage des Nutzers: „Vielleicht ist das Logo mit 8 cm einfach nicht stickbar?" Gemessen an
+der Vorlage nach mittlerer Strichbreite (`medianShapeWidthMm`):
+
+| Strichbreite       | Flächen | Anteil der Fläche | Beispiel                                              |
+| ------------------ | ------: | ----------------: | ----------------------------------------------------- |
+| ab 5 mm (Fläche)   |       6 |              85 % | Schild, Pferd                                         |
+| 1,2 – 5 mm (Satin) |      17 |               9 % | STUTTGART-Kerne, 10,6–11,6 mm hoch, Strich 2,2–2,4 mm |
+| 0,5 – 1,2 mm       |      12 |               5 % | „CYS SPORTS", 5,3–5,8 mm hoch, Strich 0,9–1,2 mm      |
+| unter 0,5 mm       |      11 |               2 % | 9 Buchstabenränder 0,44–0,48 mm, 2 Punkte im Pferd    |
+
+Dazu die Zierlinie zwischen Rand und Kern: 0,23 bis 0,24 mm — schmaler als jeder Faden.
+
+**Antwort: stickbar ja, 1:1 nein.** Voll 1:1 (Rand als Satin ≥ 1,2 mm, Lücke ≥ 0,5 mm) trägt
+die Vorlage erst ab rund 22 cm Breite. Bei 80 mm bleibt nur die Wahl zwischen „als Fill
+stickbar machen" (dieser Abschnitt) und „Vorlage vereinfachen" (Editor, später).
+
+### Sackgasse C: die Zierlinie schließen
+
+Geprüft und verworfen: Flächen derselben Farbe über Lücken unter 0,5 mm vereinigen (Modul
+`close-gaps`, gebaut, nicht eingecheckt). Die Zahlen waren gut — Nadelhäufung 8 → 6 —, das
+Bild war es nicht: bei dieser Schrift trägt die Zierlinie Form. Die Beine des A, der Balken
+des G und das Bein des R stehen nur als Zierlinie in der Vorlage; sie hätten sich in die
+Fläche aufgelöst und wären verschwunden. Wiederaufnahme nur für Schriften, deren Zierlinie
+keine Form trägt.
+
+### Variante D: Durchgänge nach Breite, 0,6 → 0,7 mm
+
+Umgesetzt (Commits ab65c73, 9f5c084): die Zahl der Durchgänge des schmalen Laufstichs folgt
+jetzt der Breite — bis `SINGLE_PASS_MAX_MM` ein Durchgang, darüber drei (Bohnenstich).
+
+Die Grenze steht bei 0,7 statt 0,6 mm, weil `medianShapeWidthMm` dünne Ringe an den Ecken
+überschätzt: eine 0,45-mm-Wand misst als 10-mm-Quadratring 0,50 mm, als 20-mm-Ring 0,62 mm;
+die Rahmen der Bandenden messen 0,61 bis 0,62 mm. Bei 0,6 mm liefen diese Rahmen dreifach
+und stapelten sich in den Ecken. Gerade Linien misst die Funktion richtig (0,75 mm →
+0,78 mm).
+
+**Korrektur einer eigenen Zahl:** Die Commit-Nachricht von ab65c73 nannte 10.836 Stiche und
+Nadelhäufung 6 — das war ein Versuchswert, bei dem versehentlich alle schmalen Läufe einfach
+liefen. Mit der tatsächlich eingebauten Grenze 0,6 mm waren es 11.408 Stiche und
+Nadelhäufung 8. Richtig, mit der jetzigen Grenze 0,7 mm: **11.192 Stiche, Nadelhäufung 6.**
+
+### Sechs Läufe neu gegen 27.09.2026
+
+Alle sechs Motive neu gerechnet, jede DST mit `readDst` zurückgelesen: Stichzahl,
+Farbwechsel, Breite und Höhe stimmen bei 24 von 24 Werten.
+
+| Motiv                      | Stiche | Sprünge | Trims | Farbw. | Trims/1000 | Sprünge/1000 | Stiche/mm² | Dichte, Spitze | Nadel (max / ab 6) | 27.09.: Stiche · Trims/1000 · Sprünge/1000 · Nadel |
+| -------------------------- | -----: | ------: | ----: | -----: | ---------: | -----------: | ---------: | -------------: | -----------------: | -------------------------------------------------- |
+| STUTTGART 80 mm            | 11.192 |     127 |    47 |      4 |       4,20 |        11,35 |       1,90 |             22 |              6 / 2 | 13.314 · 4,13 · 12,32 · 5                          |
+| STUTTGART 250 mm           | 73.651 |     460 |   109 |      6 |       1,48 |         6,25 |       1,26 |             24 |              6 / 4 | 72.478 · 1,39 · 6,26 · 6                           |
+| Berufsfeuerwehr Köln 90 mm | 19.668 |     235 |    79 |     11 |       4,02 |        11,95 |       2,42 |             21 |             11 / 8 | 19.301 · 5,60 · 17,93 · 7                          |
+| Eislingen Print 200 mm     | 27.304 |     380 |   108 |      5 |       3,96 |        13,92 |       0,44 |             14 |              5 / 0 | 23.024 · 7,95 · 42,65 · 6                          |
+| Atzensport Hofbräu 80 mm   | 10.269 |     273 |   105 |      7 |      10,22 |        26,58 |       1,15 |             18 |              5 / 0 | 11.355 · 10,74 · 30,82 · 5                         |
+| Atzensport Hofbräu 200 mm  | 42.592 |     687 |   146 |      8 |       3,43 |        16,13 |       0,75 |             18 |              7 / 1 | 43.460 · 3,89 · 16,13 · 7                          |
+
+Archiv-Perzentile (Median / p90 / Max): Trims/1000 1,9 / 5,6 / 10,1 · Sprünge/1000
+7,8 / 18,9 / 67,7 · Nadel 6 / 8 / 8. STUTTGART 80 mm: 79,3 × 74,2 mm, Maschinenzeit
+1028 s = 17,1 min.
+
+Offen bleiben, gemessen und noch ungeklärt: Köln 90 mm bei Nadelhäufung 11 (Archiv-Max 8),
+„CYS SPORTS" im Banner weiterhin kaum lesbar, `medianShapeWidthMm` an sich (die Grenze 0,7
+fängt nur das Symptom ab), `OBJECT_OUTSIDE_HOOP` bei drei der sechs Motive und die
+Auto-Satin-Wurzel bei Kreuzungen (T, L). Mit dem nächsten Schritt in `docs/backlog.md`.
+
+### Abnahme am Stich-Player (28.09.2026): alle sechs Läufe abgelehnt
+
+Der Nutzer hat alle sechs neu gerechneten Läufe im Stich-Player geprüft und **als „alle
+unbrauchbar" abgelehnt.** Das ist der Stand, nicht die Tabelle oben: die gemessenen
+Verbesserungen dieses Abschnitts — Deckungsprüfung, Durchgänge nach Breite, die Kennzahlen —
+bleiben als Messung richtig, sie sind aber **keine Abnahme** und kein Beleg dafür, dass die
+Schrift damit stickbar ist.
+
+Ohne eine gepunchte Profi-Datei desselben Motivs im selben Player fehlt der Maßstab, woran
+„unbrauchbar" genau hängt — Stichbild, Dichte, Objektaufteilung oder etwas Viertes. Nächster
+Schritt dazu in `docs/backlog.md`.
