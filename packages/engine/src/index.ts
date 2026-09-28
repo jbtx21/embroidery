@@ -19,6 +19,7 @@ export * from "./font-choice.js";
 export * from "./hash.js";
 export * from "./pipeline.js";
 export * from "./import/svg.js";
+export * from "./inkstitch/index.js";
 
 import { initGeometry } from "@texma-stitch/geometry";
 

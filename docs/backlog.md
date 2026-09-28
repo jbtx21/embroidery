@@ -3,6 +3,40 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Satin für Schrift und schmale Formen — offen (28.09.2026)
+
+Eigene Satinsäulen (`packages/engine/src/inkstitch/`: `strokes.ts` Strichplan,
+`columns.ts` Säulen, `template.ts` Vorlage) statt `fill_to_satin`; `pnpm inkstitch` setzt
+Schrift jetzt als Satin, `--tatami` behält den reinen Tatami-Lauf.
+
+- **Blöcke an Strichenden sind keine eigenen Säulen.** Fuß des Varsity-„T", Zunge des
+  „G", Tropfenserifen: der Block gehört zum Ende des Strichs, der ihn trägt, die Stiche
+  fächern über ihn. Ein Puncher setzt ihn quer als eigene kurze Säule. Braucht eine Regel,
+  wann ein Block (Achse kürzer als 1,5 × Radius) eine eigene Säule wird.
+- **Glätten stickt Kerben unter 2 × Radius zu.** Gewollt für die Pinseltextur von „SEGEN
+  SEIN" (Löcher, Kanten); beim „R" von „CYS SPORTS" (0,2 mm geglättet) schließt es auch den
+  Schlitz zwischen den Beinen am Fuß. Am Stickbild prüfen, ob 0,4 mm als Obergrenze hält.
+- **Kreis in der Stichfolge** (Kontur-Bänder mit Einschnürung, z. B. `z13-bebebe-010` in
+  STUTTGART 250 mm): zwei Striche enden jeweils unter dem anderen. Heute Tatami; auflösbar,
+  indem ein Ende obenauf liegt statt darunter.
+- **Nadelhäufung stammt aus gestapelten Flächen**, nicht aus der Satin: STUTTGART 80/250 mm,
+  Pferd (Tatami) über zwei Schildflächen (54 der 102 Zellen ab 6 Einstichen im 250-mm-Lauf)
+  — gleich im reinen Tatami-Lauf. Satin auf Tatami-Grund (CYS SPORTS auf dem Banner) kommt
+  dazu; Aussparen des Grunds unter der Schrift ist nicht Teil dieser Arbeit.
+- **Ink/Stitch stickt eine Kontur ohne Strichmuster als schmalen Zickzack**, nicht als
+  Laufstich (0,2-mm-Schritte, mit Bean dreifach). Die Vorlage setzt deshalb
+  `inkstitch:stroke_method="running_stitch"` ausdrücklich. Der reine Tatami-Lauf
+  (`--tatami`) reicht die Quelle unverändert durch und hat das Problem bei Konturlinien
+  weiterhin.
+- **Glätten nur bei rauer Kontur.** Das rote Band mit den drei Kronen (Köln) ist nach Breite
+  „schmal", seine Kronen sind Löcher; Glätten hätte sie zugestickt (+20 % Fläche). Regel:
+  geglättet wird nur, wenn die Öffnung ≥ 0,5 % Fläche abnimmt (Textur) oder die Schließung
+  ≤ 5 % dazugibt (`isTextureSmoothing`) — sonst Tatami mit Grund. Schwellen an sechs Logos
+  gemessen, nicht an mehr.
+- **Laufzeit:** `auto_satin` braucht je Folge 0,6–27 s, davon nur ~0,6 s Start; ein
+  Ein-Prozess-Umbau von `inkstitch/run.py` spart bei 15 Folgen ~9 s von ~165 s und ist
+  deshalb nicht gemacht. Der erste Aufruf nach dem Booten braucht ~8 s (kalter Import).
+
 ## Abnahme 28.09.: alle sechs Läufe unbrauchbar — Ursachen gegen eine Profi-Datei in derselben Darstellung klären
 
 - **Alle sechs Läufe abgelehnt.** Der Nutzer hat sie im Stich-Player geprüft und als „alle

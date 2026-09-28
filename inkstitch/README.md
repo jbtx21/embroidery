@@ -43,7 +43,8 @@ Skript sie selbst, wenn `apt-get` und Root-Rechte vorhanden sind — sonst nennt
 ## Aufruf
 
 ```bash
-pnpm inkstitch <svg> [preset]        # Vorlage -> DST + PNG-Vorschau + Kennzahlen nach ./out/
+pnpm inkstitch <svg> [preset]        # Vorlage (Satin/Laufstich/Tatami) -> auto_satin -> DST + PNG + Kennzahlen nach ./out/
+pnpm inkstitch <svg> [preset] --tatami   # reiner Tatami-Lauf: die Quelle wie gezeichnet, nur Reihenabstand gesetzt
 ```
 
 Für einzelne Ink/Stitch-Erweiterungen direkt (z. B. zum Verketten mehrerer Schritte):

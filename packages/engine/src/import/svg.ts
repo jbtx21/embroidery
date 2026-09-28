@@ -12,7 +12,7 @@
  * Vectorisation is NOT part of the engine (spec §1). This importer takes paths
  * that already exist.
  */
-import type { Point, Polygon } from "@texma-stitch/geometry";
+import type { Point, Polygon, Polyline } from "@texma-stitch/geometry";
 import type { SubPath } from "@texma-stitch/geometry";
 import {
   dist,
@@ -429,12 +429,10 @@ export function worstRailExtent(columns: StitchObject[]): number {
  * wide as the narrowest column we still stitch as satin.
  */
 export function columnCoverage(shape: Polygon, columns: StitchObject[]): number {
-  const total = Math.abs(polygonArea(shape));
-  if (total <= 0) return 0;
   const patches: Polygon[] = [];
   for (const o of columns) {
     if (o.type === "satin") {
-      patches.push(...normalizeRing([...o.railA, ...[...o.railB].reverse()]));
+      patches.push(...railPatch(o.railA, o.railB));
     } else if (o.type === "running" && o.path.length >= 2) {
       const half = SATIN_MIN_COLUMN_MM / 2;
       patches.push(
@@ -445,7 +443,27 @@ export function columnCoverage(shape: Polygon, columns: StitchObject[]): number 
       );
     }
   }
-  if (patches.length === 0) return 0;
+  return patchCoverage(shape, patches);
+}
+
+/**
+ * The area a satin column puts thread on: the polygon between its rails, railA
+ * forward and railB back, self-intersections resolved (spec §5.1). Shared by
+ * `columnCoverage` and the check of the Ink/Stitch columns
+ * (`packages/engine/src/inkstitch/`).
+ */
+export function railPatch(railA: Polyline, railB: Polyline): Polygon[] {
+  if (railA.length < 2 || railB.length < 2) return [];
+  return normalizeRing([...railA, ...[...railB].reverse()]);
+}
+
+/**
+ * Share of `shape` the patches cover together — where two patches overlap, the
+ * area counts once (spec §5.1). 0 for an empty shape or no patches.
+ */
+export function patchCoverage(shape: Polygon, patches: Polygon[]): number {
+  const total = Math.abs(polygonArea(shape));
+  if (total <= 0 || patches.length === 0) return 0;
   const covered = intersect(union(patches), [shape]).reduce(
     (sum, p) => sum + Math.abs(polygonArea(p)),
     0,
@@ -453,10 +471,193 @@ export function columnCoverage(shape: Polygon, columns: StitchObject[]): number 
   return covered / total;
 }
 
-export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport {
-  const warnings: Warning[] = [];
+// ---------------------------------------------------------------------------
+// Reading paths, before any decision
+// ---------------------------------------------------------------------------
+
+/** A filled area, one polygon of a `<path>` (holes included). */
+export type ImportedAreaShape = {
+  kind: "area";
+  /** Source id — `${id}:${n}` when one `d` produced more than one polygon. */
+  id: string;
+  polygon: Polygon;
+  /** The fill that makes it an area, as it reaches the path (own or inherited). */
+  color: string;
+  /** Every attribute of the source `<path>`, `inkstitch:*` among them. */
+  attrs: Record<string, string>;
+  trimAfter: "auto" | "always";
+};
+
+/** A stroked (or unpainted) sub-path — a line, not an area (spec §4). */
+export type ImportedLineShape = {
+  kind: "line";
+  /** Source id — `${id}:${n}` when one `d` had more than one sub-path. */
+  id: string;
+  polyline: Polyline;
+  closed: boolean;
+  /** The stroke, `undefined` for a path with neither fill nor stroke. */
+  color: string | undefined;
+  attrs: Record<string, string>;
+  trimAfter: "auto" | "always";
+};
+
+export type ImportedShape = ImportedAreaShape | ImportedLineShape;
+
+export type ImportShapesResult = {
+  /** Document order — the stacking order (spec §5.1). */
+  shapes: ImportedShape[];
+  mmPerUnit: number;
+  /** The `<svg>` root's declared size in mm, 0 when it names none. */
+  widthMm: number;
+  heightMm: number;
+  warnings: Warning[];
+};
+
+/** One `<path>` as read, before `importSvg` decides fill, satin or running for it. */
+type PathRead =
+  | { kind: "empty"; warning: Warning }
+  | {
+      kind: "area";
+      id: string;
+      attrs: Attrs;
+      trimAfter: "auto" | "always";
+      color: string;
+      polygons: Polygon[];
+      /** Set when the rings enclose no area — reported, never dropped silently. */
+      warning?: Warning;
+    }
+  | {
+      kind: "line";
+      id: string;
+      attrs: Attrs;
+      trimAfter: "auto" | "always";
+      color: string | undefined;
+      lines: { polyline: Polyline; closed: boolean }[];
+    };
+
+function readPaths(text: string): { root: Attrs; mmPerUnit: number; paths: PathRead[] } {
   const { root, paths } = scan(text);
   const mmPerUnit = unitScale(root);
+  const out: PathRead[] = [];
+  for (const [pi, el] of paths.entries()) {
+    const id = el.attrs["id"] ?? `path${pi}`;
+    const subpaths = parsePathData(el.attrs["d"]!);
+    if (subpaths.length === 0) {
+      out.push({
+        kind: "empty",
+        warning: warn(WARNING.EMPTY_OBJECT, `Path "${id}" has no drawable segment.`, "warn", id),
+      });
+      continue;
+    }
+
+    const fill = el.paint["fill"];
+    const stroke = el.paint["stroke"];
+    const trimAfter = isTrue(inkstitch(el.attrs, "trim_after")) ? "always" : "auto";
+
+    // A filled path is an area, an outlined one is a line. With neither, treat
+    // it as a line: SVG would render an unpainted path as black fill, but in an
+    // embroidery source an unmarked path is an outline far more often than an
+    // area, and that is also what this importer did before it knew about fills.
+    if (isPaint(fill)) {
+      // Sub-paths of one `d` belong together: the inner ones are the holes.
+      const rings = subpaths
+        .map((sub) => ringInMm(sub, el.matrix, mmPerUnit))
+        .filter((r) => r.length >= 3);
+      const polygons = ringsToPolygons(rings);
+      out.push({
+        kind: "area",
+        id,
+        attrs: el.attrs,
+        trimAfter,
+        color: fill,
+        polygons,
+        ...(polygons.length === 0
+          ? {
+              warning: warn(
+                WARNING.EMPTY_OBJECT,
+                `Filled path "${id}" encloses no area.`,
+                "warn",
+                id,
+              ),
+            }
+          : {}),
+      });
+      continue;
+    }
+
+    out.push({
+      kind: "line",
+      id,
+      attrs: el.attrs,
+      trimAfter,
+      color: isPaint(stroke) ? stroke : undefined,
+      lines: subpaths.map((sub) => ({
+        polyline: flattenPath(sub.start, sub.segments).map((q) => {
+          const t = applyMatrix(el.matrix, q);
+          return { x: t.x * mmPerUnit, y: t.y * mmPerUnit };
+        }),
+        closed: sub.closed,
+      })),
+    });
+  }
+  return { root, mmPerUnit, paths: out };
+}
+
+/**
+ * Every path of an SVG as plain shapes in document order — the part of
+ * `importSvg` that comes BEFORE it decides fill, auto-satin or running for each
+ * one (spec §5.1). The Ink/Stitch preparation (`packages/engine/src/inkstitch/`)
+ * reads the same shapes and decides by its own rules.
+ *
+ * Decides nothing and drops nothing: the tiny-area drop and the stitch type
+ * belong to whoever reads the shapes, each with its own thresholds. Paths that
+ * yield no shape are reported, not skipped silently.
+ */
+export function importShapes(text: string): ImportShapesResult {
+  const { root, mmPerUnit, paths } = readPaths(text);
+  const shapes: ImportedShape[] = [];
+  const warnings: Warning[] = [];
+  for (const p of paths) {
+    if (p.kind === "empty") {
+      warnings.push(p.warning);
+    } else if (p.kind === "area") {
+      if (p.warning) warnings.push(p.warning);
+      p.polygons.forEach((polygon, si) => {
+        shapes.push({
+          kind: "area",
+          id: p.polygons.length === 1 ? p.id : `${p.id}:${si}`,
+          polygon,
+          color: p.color,
+          attrs: p.attrs,
+          trimAfter: p.trimAfter,
+        });
+      });
+    } else {
+      p.lines.forEach((line, si) => {
+        shapes.push({
+          kind: "line",
+          id: p.lines.length === 1 ? p.id : `${p.id}:${si}`,
+          polyline: line.polyline,
+          closed: line.closed,
+          color: p.color,
+          attrs: p.attrs,
+          trimAfter: p.trimAfter,
+        });
+      });
+    }
+  }
+  return {
+    shapes,
+    mmPerUnit,
+    widthMm: lengthToMm(root["width"]) ?? 0,
+    heightMm: lengthToMm(root["height"]) ?? 0,
+    warnings,
+  };
+}
+
+export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport {
+  const warnings: Warning[] = [];
+  const { root, mmPerUnit, paths } = readPaths(text);
   const preset = PRESETS[opts.preset ?? "pique"];
 
   const threads: Thread[] = [];
@@ -473,45 +674,27 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
   const placed: Polygon[] = [];
   /** Areas dropped for being under `DROP_TINY_MM2`, reported together. */
   const dropped: number[] = [];
-  for (const [pi, el] of paths.entries()) {
-    const id = el.attrs["id"] ?? `path${pi}`;
-    const subpaths = parsePathData(el.attrs["d"]!);
-    if (subpaths.length === 0) {
-      warnings.push(
-        warn(WARNING.EMPTY_OBJECT, `Path "${id}" has no drawable segment.`, "warn", id),
-      );
+  for (const p of paths) {
+    if (p.kind === "empty") {
+      warnings.push(p.warning);
       continue;
     }
+    const { id, trimAfter } = p;
 
-    const fill = el.paint["fill"];
-    const stroke = el.paint["stroke"];
-    const trimAfter = isTrue(inkstitch(el.attrs, "trim_after")) ? "always" : "auto";
+    if (p.kind === "area") {
+      const threadIndex = threadIndexOf(p.color);
+      const angle = Number(inkstitch(p.attrs, "angle"));
+      const rowSpacing = Number(inkstitch(p.attrs, "row_spacing_mm"));
+      const stitchLength = Number(inkstitch(p.attrs, "max_stitch_length_mm"));
+      const staggers = Number(inkstitch(p.attrs, "staggers"));
 
-    // A filled path is an area, an outlined one is a line. With neither, treat
-    // it as a line: SVG would render an unpainted path as black fill, but in an
-    // embroidery source an unmarked path is an outline far more often than an
-    // area, and that is also what this importer did before it knew about fills.
-    if (isPaint(fill)) {
-      const threadIndex = threadIndexOf(fill);
-      const angle = Number(inkstitch(el.attrs, "angle"));
-      const rowSpacing = Number(inkstitch(el.attrs, "row_spacing_mm"));
-      const stitchLength = Number(inkstitch(el.attrs, "max_stitch_length_mm"));
-      const staggers = Number(inkstitch(el.attrs, "staggers"));
-
-      // Sub-paths of one `d` belong together: the inner ones are the holes.
-      const rings = subpaths
-        .map((sub) => ringInMm(sub, el.matrix, mmPerUnit))
-        .filter((r) => r.length >= 3);
-      const polygons = ringsToPolygons(rings);
-      if (polygons.length === 0) {
-        warnings.push(
-          warn(WARNING.EMPTY_OBJECT, `Filled path "${id}" encloses no area.`, "warn", id),
-        );
+      if (p.warning) {
+        warnings.push(p.warning);
         continue;
       }
 
-      polygons.forEach((shape, si) => {
-        const objId = polygons.length === 1 ? id : `${id}:${si}`;
+      p.polygons.forEach((shape, si) => {
+        const objId = p.polygons.length === 1 ? id : `${id}:${si}`;
 
         // Too small to see, big enough to cost a trim (spec §5.1).
         const area = polygonArea(shape);
@@ -614,29 +797,24 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
       continue;
     }
 
-    const threadIndex = threadIndexOf(isPaint(stroke) ? stroke : undefined);
+    const threadIndex = threadIndexOf(p.color);
     const lengthAttr = Number(
-      inkstitch(el.attrs, "running_stitch_length_mm") ?? inkstitch(el.attrs, "stitch_length_mm"),
+      inkstitch(p.attrs, "running_stitch_length_mm") ?? inkstitch(p.attrs, "stitch_length_mm"),
     );
     const stitchLengthMm =
       Number.isFinite(lengthAttr) && lengthAttr > 0 ? lengthAttr : (opts.stitchLengthMm ?? 2.5);
-    const repeats = repeatsFrom(inkstitch(el.attrs, "repeats"));
+    const repeats = repeatsFrom(inkstitch(p.attrs, "repeats"));
 
-    subpaths.forEach((sub, si) => {
-      const flat = flattenPath(sub.start, sub.segments);
-      const path = flat.map((q) => {
-        const t = applyMatrix(el.matrix, q);
-        return { x: t.x * mmPerUnit, y: t.y * mmPerUnit };
-      });
+    p.lines.forEach((line, si) => {
       objects.push({
-        id: subpaths.length === 1 ? id : `${id}:${si}`,
+        id: p.lines.length === 1 ? id : `${id}:${si}`,
         type: "running",
         threadIndex,
         visible: true,
         locked: false,
         trimAfter,
-        path,
-        closed: sub.closed,
+        path: line.polyline,
+        closed: line.closed,
         stitchLengthMm,
         repeats,
       });

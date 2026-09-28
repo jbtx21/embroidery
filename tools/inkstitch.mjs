@@ -2,25 +2,44 @@
  * Ink/Stitch as the stitch generator, TEXMA Stitch as template prep + result
  * check (docs/adr/0001-inkstitch-als-stich-engine.md, decision 28.09.2026).
  *
- *   pnpm inkstitch <svg> [preset]
+ *   pnpm inkstitch <svg> [preset] [--tatami]
  *
- * 1. Copies <svg> to out/<name>.inkstitch.svg with the preset's fill row
- *    spacing set on every path (xmlns:inkstitch, inkstitch:row_spacing_mm --
- *    see withPresetAttributes below; today the only preset attribute this
- *    sets, matching the scratchpad probe run).
- * 2. Runs it through Ink/Stitch itself (--extension=output --format=dst, via
- *    tools/inkstitch-lauf.mjs -- a separate process, see inkstitch/README.md).
- * 3. Reads the resulting DST with @texma-stitch/formats and renders it to a
- *    PNG with @texma-stitch/render, so the result can be eyeballed like any
- *    of our own `pnpm demo` output.
- * 4. Prints the same archive-relative metrics `pnpm kennzahlen` does
- *    (tools/archiv.mjs) plus our own analyze() warnings over the result (the
- *    "prüft das Ergebnis" half of the 28.09.2026 decision) and whatever
- *    Ink/Stitch itself wrote to stderr, as hints.
+ * Satin (default) — lettering and narrow shapes set the way a puncher sets
+ * them:
+ *
+ * 1. Imports <svg> (importShapes) and writes the template
+ *    out/<name>.inkstitch.svg (@texma-stitch/engine buildInkstitchTemplate):
+ *    every shape classified by width — running stitch, native Ink/Stitch
+ *    satin columns (one per stroke of a letter: rails, rungs, the preset's
+ *    parameters), or tatami — plus the reason for every shape that was meant
+ *    for satin and stays tatami.
+ * 2. Routes every run of neighbouring same-coloured satin columns with
+ *    Ink/Stitch's auto_satin (--preserve_order=true: what ends under a
+ *    stroke is stitched first; --trim=true), one call per run, each call on
+ *    the previous call's result -> out/<name>.routed.svg.
+ * 3. output --format=dst -> out/<name>.dst.
+ *
+ * --tatami keeps the pure tatami run: the source SVG as drawn, with the
+ * preset's row spacing on every path (withPresetAttributes), straight to
+ * output. It is the baseline the satin run is measured against.
+ *
+ * Either way the DST is read back with @texma-stitch/formats, rendered to
+ * out/<name>.png with @texma-stitch/render, and measured: the archive-relative
+ * metrics `pnpm kennzahlen` prints (tools/archiv.mjs), our own analyze()
+ * warnings (the "prüft das Ergebnis" half of the 28.09.2026 decision), the
+ * time every Ink/Stitch call took, and whatever Ink/Stitch wrote to stderr.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
-import { analyze, densityProfile, needleClusters, PRESETS } from "@texma-stitch/engine";
+import {
+  analyze,
+  buildInkstitchTemplate,
+  densityProfile,
+  importShapes,
+  initEngine,
+  needleClusters,
+  PRESETS,
+} from "@texma-stitch/engine";
 import { readDst, unitsToMm } from "@texma-stitch/formats";
 import { renderPlanPng } from "@texma-stitch/render";
 import { zeile } from "./archiv.mjs";
@@ -88,10 +107,22 @@ function blocksFromForeignStitches(stitches) {
   return blocks.filter((b) => b.stitches.length > 0);
 }
 
-const [, , svgArg, presetArg = "pique"] = process.argv;
+/** One Ink/Stitch call; a failure ends the run with its message (no guessed result). */
+async function inkstitch(args) {
+  try {
+    return await runInkstitch(args);
+  } catch (err) {
+    console.error(`FEHLER: ${err.message}`);
+    process.exit(1);
+  }
+}
+
+const args = process.argv.slice(2);
+const tatamiOnly = args.includes("--tatami");
+const [svgArg, presetArg = "pique"] = args.filter((a) => !a.startsWith("--"));
 
 if (!svgArg) {
-  console.error("Aufruf: pnpm inkstitch <svg> [preset]");
+  console.error("Aufruf: pnpm inkstitch <svg> [preset] [--tatami]");
   console.error(`Presets: ${Object.keys(PRESETS).join(", ")}`);
   process.exit(1);
 }
@@ -110,31 +141,92 @@ const outDir = resolve("out");
 mkdirSync(outDir, { recursive: true });
 
 const preset = PRESETS[presetArg];
-const { text: templateSvg, pathCount } = withPresetAttributes(readFileSync(svgPath, "utf8"), {
-  rowSpacingMm: preset.fillRowSpacingMm,
-});
 const templatePath = resolve(outDir, `${name}.inkstitch.svg`);
-writeFileSync(templatePath, templateSvg);
+const sourceSvg = readFileSync(svgPath, "utf8");
+/** Every Ink/Stitch call: what it did and how long it took. */
+const calls = [];
+const stderrLines = [];
+let summary = [];
+let fallbacks = [];
+let smoothed = [];
+let templateMs = 0;
+let outputInput = templatePath;
 
-let stdout, stderr, ms;
-try {
-  ({ stdout, stderr, ms } = await runInkstitch({
-    extension: "output",
-    options: { format: "dst" },
-    svg: templatePath,
-  }));
-} catch (err) {
-  console.error(`FEHLER: ${err.message}`);
-  process.exit(1);
+if (tatamiOnly) {
+  const { text, pathCount } = withPresetAttributes(sourceSvg, {
+    rowSpacingMm: preset.fillRowSpacingMm,
+  });
+  writeFileSync(templatePath, text);
+  summary = [`Tatami-Lauf (--tatami): ${pathCount} Pfade wie gezeichnet`];
+} else {
+  await initEngine();
+  const started = performance.now();
+  const imported = importShapes(sourceSvg);
+  const template = buildInkstitchTemplate(imported.shapes, preset, {
+    widthMm: imported.widthMm,
+    heightMm: imported.heightMm,
+  });
+  templateMs = performance.now() - started;
+  writeFileSync(templatePath, template.svg);
+
+  const count = (kind) => template.objects.filter((o) => o.kind === kind).length;
+  const columns = template.objects.reduce(
+    (n, o) => n + (o.kind === "satin" ? o.columnIds.length : 0),
+    0,
+  );
+  summary = [
+    `Satin ${count("satin")} Formen (${columns} Säulen), Laufstich ${count("running")}, ` +
+      `Tatami ${count("tatami")}`,
+    `${template.satinRuns.length} Satin-Folgen für auto_satin`,
+  ];
+  fallbacks = template.objects.filter((o) => o.kind === "tatami" && o.reason);
+  smoothed = template.objects.filter((o) => o.kind === "satin" && o.smoothedMm > 0);
+
+  let current = templatePath;
+  for (const [i, ids] of template.satinRuns.entries()) {
+    const { stdout, stderr, ms } = await inkstitch({
+      extension: "auto_satin",
+      ids,
+      options: { preserve_order: true, trim: true },
+      svg: current,
+    });
+    calls.push({
+      what: `auto_satin ${i + 1}/${template.satinRuns.length} (${ids.length} Säulen)`,
+      ms,
+    });
+    if (stderr.trim())
+      stderrLines.push(
+        ...stderr
+          .trim()
+          .split("\n")
+          .map((l) => `auto_satin: ${l}`),
+      );
+    current = resolve(outDir, `${name}.routed.svg`);
+    writeFileSync(current, stdout);
+  }
+  outputInput = current;
 }
+
+const {
+  stdout,
+  stderr,
+  ms: outputMs,
+} = await inkstitch({
+  extension: "output",
+  options: { format: "dst" },
+  svg: outputInput,
+});
+calls.push({ what: "output --format=dst", ms: outputMs });
+if (stderr.trim()) stderrLines.push(...stderr.trim().split("\n"));
 
 const dstPath = resolve(outDir, `${name}.dst`);
 writeFileSync(dstPath, stdout);
 
+const inkstitchMs = calls.reduce((sum, c) => sum + c.ms, 0);
 const foreignStitches = unitsToMm(readDst(new Uint8Array(stdout)).stitches);
 const blocks = blocksFromForeignStitches(foreignStitches);
 const { stats: analyzedStats, warnings } = analyze(blocks);
-const stats = { ...analyzedStats, runtimeSec: ms / 1000 };
+const stats = { ...analyzedStats, runtimeSec: inkstitchMs / 1000 };
 const farbbloecke = stats.colorChanges + 1;
 
 const threads = blocks.map((_, i) => ({
@@ -154,11 +246,28 @@ const flaeche = Math.max(stats.bboxMm.w * stats.bboxMm.h, 1);
 
 console.log(`Datei       ${svgPath}`);
 console.log(
-  `Preset      ${presetArg} (Reihenabstand ${preset.fillRowSpacingMm} mm, ${pathCount} Pfade)`,
+  `Preset      ${presetArg} (Reihenabstand ${preset.fillRowSpacingMm} mm, ` +
+    `Satin-Abstand ${preset.satinSpacingMm} mm)`,
 );
 console.log(`Vorlage     out/${name}.inkstitch.svg`);
+if (!tatamiOnly && outputInput !== templatePath) console.log(`Geroutet    out/${name}.routed.svg`);
 console.log(`DST         out/${name}.dst`);
 console.log(`Vorschau    out/${name}.png`);
+for (const line of summary) console.log(`            ${line}`);
+
+if (fallbacks.length > 0) {
+  console.log(`\nBleibt Tatami (als Satin oder Laufstich vorgesehen, ${fallbacks.length})`);
+  for (const f of fallbacks) console.log(`  ${f.shapeId}: ${f.reason}`);
+}
+if (smoothed.length > 0) {
+  console.log(`\nSatin auf geglätteter Kontur (${smoothed.length})`);
+  for (const s of smoothed) {
+    console.log(
+      `  ${s.shapeId}: um ${s.smoothedMm} mm geglättet, Deckung ${(s.coverage * 100).toFixed(1)} %`,
+    );
+  }
+}
+
 console.log(`\n${name}  (${stats.bboxMm.w.toFixed(1)} × ${stats.bboxMm.h.toFixed(1)} mm)`);
 console.log(`  Stiche                 ${stats.stitches}`);
 console.log(`  Sprünge                ${stats.jumps}`);
@@ -177,7 +286,9 @@ console.log(
   `  ${"Zellen über 18".padEnd(22)} ${String(dichte.overError).padStart(8)} von ${dichte.cells}` +
     `        ${nadel.cells} Zellen ab 6 Einstichen`,
 );
-console.log(`  Laufzeit (Ink/Stitch)  ${(ms / 1000).toFixed(1)} s`);
+if (!tatamiOnly) console.log(`  Laufzeit Vorlage       ${(templateMs / 1000).toFixed(1)} s`);
+console.log(`  Laufzeit (Ink/Stitch)  ${(inkstitchMs / 1000).toFixed(1)} s`);
+for (const c of calls) console.log(`    ${c.what.padEnd(34)} ${(c.ms / 1000).toFixed(1)} s`);
 
 if (warnings.length === 0) {
   console.log("\nWarnungen   keine (eigene Prüfung, analyze())");
@@ -190,10 +301,9 @@ if (warnings.length === 0) {
   }
 }
 
-const stderrText = stderr.trim();
-if (stderrText.length === 0) {
+if (stderrLines.length === 0) {
   console.log("\nInk/Stitch  keine Hinweise (stderr leer)");
 } else {
   console.log("\nInk/Stitch-Hinweise (stderr)");
-  for (const line of stderrText.split("\n")) console.log(`  ${line}`);
+  for (const line of stderrLines) console.log(`  ${line}`);
 }

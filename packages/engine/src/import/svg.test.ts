@@ -8,12 +8,15 @@ import {
   COLUMN_COVERAGE_MIN,
   columnCoverage,
   DEFAULT_ANGLE_DEG,
+  importShapes,
   importSvg,
   lengthToMm,
   medianShapeWidthMm,
+  patchCoverage,
   RAIL_BUDGET_SLACK,
   RAIL_EXTENT_MAX,
   railBudgetRatio,
+  railPatch,
   SINGLE_PASS_MAX_MM,
   touchesOrCovers,
   unitScale,
@@ -284,6 +287,74 @@ describe("filled paths", () => {
   it("keeps the document order, which is the stacking order", () => {
     const ids = imported().design.objects.map((o) => o.id);
     expect(ids.indexOf("ring")).toBeLessThan(ids.indexOf("mit-parametern"));
+  });
+});
+
+describe("importShapes (the shapes before any decision)", () => {
+  it("reads areas and lines in document order, with colour, attributes and trim", () => {
+    const { shapes, warnings, widthMm, heightMm, mmPerUnit } = importShapes(SVG_FILLED);
+    expect(warnings).toHaveLength(0);
+    expect(widthMm).toBe(60);
+    expect(heightMm).toBe(40);
+    expect(mmPerUnit).toBe(1);
+    expect(shapes.map((s) => `${s.kind}:${s.id}`)).toEqual([
+      "area:ring",
+      "area:zwei-flaechen:0",
+      "area:zwei-flaechen:1",
+      "area:mit-parametern",
+      "line:kontur",
+      "line:ohne-farbe",
+      "area:stil",
+    ]);
+    const ring = shapes[0]!;
+    expect(ring.kind === "area" && ring.polygon.holes.length).toBe(1);
+    expect(ring.color).toBe("#c8102e");
+    const params = shapes[3]!;
+    expect(params.attrs["inkstitch:row_spacing_mm"]).toBe("0.4");
+    const line = shapes[4]!;
+    expect(line.kind === "line" && line.polyline.length).toBe(3);
+    expect(line.color).toBe("#2e3192");
+    expect(shapes[5]!.color).toBeUndefined();
+  });
+
+  it("gives the same geometry importSvg stitches", () => {
+    const { shapes } = importShapes(SVG_TWO_PATHS);
+    const { design } = importSvg(SVG_TWO_PATHS);
+    expect(shapes.map((s) => s.id)).toEqual(design.objects.map((o) => o.id));
+    const kontur = shapes[0]!;
+    expect(kontur.trimAfter).toBe("always");
+    expect(kontur.kind === "line" && kontur.polyline).toEqual(
+      design.objects[0]!.type === "running" && design.objects[0]!.path,
+    );
+  });
+
+  it("reports paths that yield no shape instead of dropping them silently", () => {
+    const { shapes, warnings } = importShapes(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="10mm" height="10mm" viewBox="0 0 10 10">
+        <path id="leer" d="Z" />
+        <path id="flach" d="M 0 0 L 5 0 Z" fill="#000" />
+      </svg>`,
+    );
+    expect(shapes).toHaveLength(0);
+    expect(warnings.map((w) => w.objectId)).toEqual(["leer", "flach"]);
+    expect(warnings.every((w) => w.code === "EMPTY_OBJECT")).toBe(true);
+  });
+});
+
+describe("railPatch and patchCoverage (spec §5.1)", () => {
+  it("builds the area between two rails, whichever way the second one runs", () => {
+    const [patch] = railPatch([pt(0, 0), pt(10, 0)], [pt(0, 2), pt(10, 2)]);
+    expect(polygonArea(patch!)).toBeCloseTo(20, 6);
+    expect(railPatch([pt(0, 0)], [pt(0, 2), pt(10, 2)])).toEqual([]);
+  });
+
+  it("counts an overlap once and ignores what lies outside the shape", () => {
+    const shape = polygonOf(rect(0, 0, 10, 2));
+    const left = railPatch([pt(-5, 0), pt(6, 0)], [pt(-5, 2), pt(6, 2)]);
+    const right = railPatch([pt(4, 0), pt(8, 0)], [pt(4, 2), pt(8, 2)]);
+    expect(patchCoverage(shape, [...left, ...right])).toBeCloseTo(0.8, 6);
+    expect(patchCoverage(shape, [])).toBe(0);
+    expect(patchCoverage(polygonOf([]), left)).toBe(0);
   });
 });
 

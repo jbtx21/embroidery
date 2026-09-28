@@ -334,3 +334,104 @@ export function hourglass(waistMm = 0.6, w = 20, h = 20): Polygon {
     holes: [],
   };
 }
+
+/**
+ * A "v" stroke with round ends and a round, blunt foot — only the crotch
+ * inside is a corner. Its medial axis has no spur into the foot (the outline
+ * there is round), just one branch that turns sharply round the crotch: the
+ * feet of the "w" in rounded sans lettering (Ink/Stitch template, `strokes.ts`
+ * step 0). `spread` is the half width at the top, `h` the height.
+ */
+export function bluntV(spread = 3, h = 8, stroke = 1.2, arcSegments = 16): Polygon {
+  const w = stroke / 2;
+  const top1 = pt(-spread, 0);
+  const foot = pt(0, h);
+  const top2 = pt(spread, 0);
+  const unit = (a: Point, b: Point): Point => {
+    const d = Math.hypot(b.x - a.x, b.y - a.y);
+    return pt((b.x - a.x) / d, (b.y - a.y) / d);
+  };
+  const d1 = unit(top1, foot); // down the left arm
+  const d2 = unit(foot, top2); // up the right arm
+  // Outer normals: to the left of the walk down the left arm and up the right one.
+  const n1 = pt(-d1.y, d1.x);
+  const n2 = pt(-d2.y, d2.x);
+  const arcAround = (c: Point, from: Point, to: Point, dir: 1 | -1): Polyline => {
+    const a0 = Math.atan2(from.y, from.x);
+    let a1 = Math.atan2(to.y, to.x);
+    if (dir > 0) while (a1 <= a0) a1 += 2 * Math.PI;
+    else while (a1 >= a0) a1 -= 2 * Math.PI;
+    return Array.from({ length: arcSegments + 1 }, (_, i) => {
+      const a = a0 + ((a1 - a0) * i) / arcSegments;
+      return pt(c.x + w * Math.cos(a), c.y + w * Math.sin(a));
+    });
+  };
+  // The crotch: where the two inner edges meet, on the bisector above the foot.
+  const half = Math.atan2(spread, h);
+  const crotch = pt(0, h - w / Math.sin(half));
+  const ring: Polyline = [
+    ...arcAround(top1, pt(-n1.x, -n1.y), n1, -1),
+    ...arcAround(foot, n1, n2, -1),
+    ...arcAround(top2, n2, pt(-n2.x, -n2.y), -1),
+    crotch,
+  ];
+  return { outer: orient(ring, true), holes: [] };
+}
+
+export const BLUNT_V = bluntV();
+
+/**
+ * A bar with a brush texture: small holes along its middle, as vectorised
+ * distressed lettering has them ("SEGEN SEIN" in the Eislingen logo). Every
+ * hole splits the medial axis into a ring; smoothing closes them.
+ */
+export function texturedBar(length = 20, width = 1.6, holes = 8, holeMm = 0.25): Polygon {
+  const step = length / (holes + 1);
+  return {
+    outer: rect(0, 0, length, width),
+    holes: Array.from({ length: holes }, (_, i) => {
+      const cx = step * (i + 1);
+      // Alternately above and below the middle, like a texture, not a seam.
+      const cy = width / 2 + (i % 2 === 0 ? -0.2 : 0.2);
+      return orient(rect(cx - holeMm / 2, cy - holeMm / 2, holeMm, holeMm), false);
+    }),
+  };
+}
+
+export const TEXTURED_BAR = texturedBar();
+
+/**
+ * A slab-serif "T" (varsity lettering, STUTTGART logo): drop serifs at both
+ * ends of the crossbar, a foot block under the stem. Between a serif and the
+ * stem the crossbar's axis is shorter than it is wide — the crossbar is a
+ * stroke only as a whole chain (`strokes.ts`, step 4).
+ */
+export function slabT(bar = 8, barH = 2.8, stem = 2.8, serifH = 4.8, h = 12): Polygon {
+  const mid = bar / 2;
+  return {
+    outer: orient(
+      [
+        pt(0, 0),
+        pt(bar, 0),
+        pt(bar, serifH),
+        pt(bar - stem, serifH),
+        pt(bar - stem, barH),
+        pt(mid + stem / 2, barH),
+        pt(mid + stem / 2, h - 1.6),
+        pt(mid + stem, h - 1.6),
+        pt(mid + stem, h),
+        pt(mid - stem, h),
+        pt(mid - stem, h - 1.6),
+        pt(mid - stem / 2, h - 1.6),
+        pt(mid - stem / 2, barH),
+        pt(stem, barH),
+        pt(stem, serifH),
+        pt(0, serifH),
+      ],
+      true,
+    ),
+    holes: [],
+  };
+}
+
+export const SLAB_T = slabT();

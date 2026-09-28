@@ -13,10 +13,14 @@
  * Fixtures are our own tiny templates under test/fixtures/inkstitch/ -- never
  * a customer logo (customer files stay out of the repo).
  */
-import { dirname, resolve } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { buildInkstitchTemplate, initEngine, PRESETS } from "@texma-stitch/engine";
 import { readDst, unitsToMm } from "@texma-stitch/formats";
+import { GLYPHS } from "../packages/engine/test/fixtures/glyphs.js";
 import { isInkstitchReady, runInkstitch } from "../tools/inkstitch-lauf.mjs";
 import { BBOX_TOLERANCE_MM, referenceBbox } from "./golden.js";
 
@@ -60,6 +64,72 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
       // One fill in colour A, one running-stitch line in colour B: exactly one change.
       expect(header.colorChanges).toBe(1);
       expect(mm.filter((s) => s.cmd === "color").length).toBe(1);
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
+
+  it(
+    "eigene Satinsäulen: Vorlage aus dem Fixture-„T“, auto_satin, output ergibt Satin in Buchstabengröße",
+    async () => {
+      // The chain `pnpm inkstitch` runs (tools/inkstitch.mjs), on one fixture
+      // letter: our own native satin columns (packages/engine/src/inkstitch/
+      // template.ts), routed by auto_satin, stitched by output.
+      await initEngine();
+      const letter = GLYPHS.T!;
+      const template = buildInkstitchTemplate(
+        [
+          {
+            kind: "area",
+            id: "T",
+            polygon: letter,
+            color: "#1f3a93",
+            attrs: {},
+            trimAfter: "auto",
+          },
+        ],
+        PRESETS.pique,
+        { widthMm: 12, heightMm: 12 },
+      );
+      expect(template.objects).toMatchObject([{ kind: "satin", columnIds: ["T-0", "T-1"] }]);
+      expect(template.satinRuns).toEqual([["T-0", "T-1"]]);
+
+      const dir = mkdtempSync(join(tmpdir(), "texma-satin-"));
+      try {
+        const templatePath = join(dir, "t.svg");
+        writeFileSync(templatePath, template.svg);
+        const routed = await runInkstitch({
+          extension: "auto_satin",
+          ids: template.satinRuns[0]!,
+          options: { preserve_order: true, trim: true },
+          svg: templatePath,
+        });
+        expect(routed.stderr.trim()).toBe("");
+        const routedPath = join(dir, "t.routed.svg");
+        writeFileSync(routedPath, routed.stdout);
+
+        const { stdout, stderr } = await runInkstitch({
+          extension: "output",
+          options: { format: "dst" },
+          svg: routedPath,
+        });
+        expect(stderr.trim()).toBe("");
+        const mm = unitsToMm(readDst(new Uint8Array(stdout)).stitches);
+        const box = referenceBbox(mm);
+        const xs = letter.outer.map((p) => p.x);
+        const ys = letter.outer.map((p) => p.y);
+        // Pull compensation widens each side by up to its lid (spec §7.2).
+        const slack = BBOX_TOLERANCE_MM + 2 * PRESETS.pique.pullCompMaxMm;
+        expect(box.w).toBeGreaterThan(Math.max(...xs) - Math.min(...xs) - BBOX_TOLERANCE_MM);
+        expect(box.w).toBeLessThan(Math.max(...xs) - Math.min(...xs) + slack);
+        expect(box.h).toBeGreaterThan(Math.max(...ys) - Math.min(...ys) - BBOX_TOLERANCE_MM);
+        expect(box.h).toBeLessThan(Math.max(...ys) - Math.min(...ys) + slack);
+        // A satin, not a fill: at 0.38 mm zigzag spacing a 10 mm T is a few hundred stitches.
+        const stitches = mm.filter((st) => st.cmd === "stitch").length;
+        expect(stitches).toBeGreaterThan(80);
+        expect(stitches).toBeLessThan(600);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     },
     SUBPROCESS_TIMEOUT_MS,
   );
