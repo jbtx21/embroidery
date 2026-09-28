@@ -401,11 +401,16 @@ einem Ende ausläuft, soll nicht überall so breit behandelt werden.
 **Zahl der Durchgänge folgt der Breite** *(28.09.2026)*. Der schmale Ast aus `autoSatin`
 (Spalte unter `SATIN_MIN_COLUMN_MM`, 1,2 mm) wird als Laufstich gestickt statt als Satin
 (25.09.2026); wie oft, entscheidet jetzt die gemessene Breite (`medianShapeWidthMm`,
-Konstante `SINGLE_PASS_MAX_MM` in `packages/engine/src/import/svg.ts`): bis 0,6 mm ein
+Konstante `SINGLE_PASS_MAX_MM` in `packages/engine/src/import/svg.ts`): bis 0,7 mm ein
 Durchgang — ein Faden deckt die Breite bereits —, darüber drei (Bean Stitch). Gemessen am
 Logo STUTTGART 80 mm: die 0,44–0,48 mm schmalen Ränder der Blockbuchstaben brauchen einen
-Durchgang, die 0,89–1,22 mm breiten Striche der Bannerschrift bleiben bei drei. Mit
-einfachem Rand am selben Logo: 10.836 statt 12.017 Stiche, Nadelhäufung 6 statt 8.
+Durchgang, die 0,89–1,22 mm breiten Striche der Bannerschrift bleiben bei drei. Die Grenze
+liegt bei 0,7 und nicht bei 0,6, weil die Breitenmessung dünne Ringe an den Ecken
+überschätzt: eine 0,45-mm-Wand misst als Quadratring 0,50 (10 mm Kante) bis 0,62 mm
+(20 mm Kante), die Rahmen der Bandenden im selben Logo 0,61–0,62 mm. Bei 0,6 liefen sie
+dreifach, und wo ihre Ecken sich treffen, stapelten sich 8 Einstiche. Gerade Striche misst
+sie genau (0,75 mm → 0,78). Ergebnis am selben Logo: 11.192 statt 12.017 Stiche,
+Nadelhäufung 6 statt 8.
 
 ### 7.5 Kurzstiche *(26.09.2026 neu gefasst — vorher: Innenradius < 1 mm, jeder zweite Stich auf 70 %)*
 

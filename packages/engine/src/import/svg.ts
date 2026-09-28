@@ -257,8 +257,16 @@ export const AUTOSATIN_MAX_WIDTH_MM = 5;
  * spot (8 instead of 6) without adding coverage. The same logo's banner
  * lettering has strokes of 0,89 to 1,22 mm, wide enough that three passes
  * are still the right call.
+ *
+ * The line sits at 0,7, not at 0,6, because the median width over-reads thin
+ * rings: their corners add diagonals. A square ring with a 0,45 mm wall
+ * measures 0,50 (10 mm side) to 0,62 mm (20 mm side), and the frames round the
+ * banner ends of the same logo measure 0,61 to 0,62 — the same 0,45 mm edge as
+ * the letters. At 0,6 they got three passes, and where their corners meet the
+ * penetrations stacked to 8 (28.09.2026). Straight strips measure true: 0,75 mm
+ * reads 0,78, so a real line of 0,7 mm and more keeps its bean stitch.
  */
-export const SINGLE_PASS_MAX_MM = 0.6;
+export const SINGLE_PASS_MAX_MM = 0.7;
 /**
  * Below this area a shape is dropped on import (spec §5.1). A square millimetre
  * does not show on fabric but costs a trim and two jumps; the Eislingen logo

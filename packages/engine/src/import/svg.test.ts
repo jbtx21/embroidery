@@ -432,6 +432,14 @@ describe("import decisions (spec §5.1)", () => {
       if (o.type !== "running") continue;
       expect(o.repeats).toBe(1);
     }
+    // The same wall on a 20 mm ring: its corners make the median read 0,62 mm,
+    // the frames of the STUTTGART banner ends read 0,61 to 0,62. Still one pass.
+    const big = importSvg(
+      svg('<path d="M5 5 H25 V25 H5 Z M5.45 5.45 V24.55 H24.55 V5.45 Z" fill="#000"/>', 30, 30),
+    );
+    const runs = big.design.objects.filter((o) => o.type === "running");
+    expect(runs.length).toBeGreaterThan(0);
+    for (const o of runs) expect(o.repeats).toBe(1);
   });
 
   it("keeps three passes for a running stitch whose median width is over SINGLE_PASS_MAX_MM (spec §7.4, 28.09.2026)", () => {
