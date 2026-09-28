@@ -81,3 +81,75 @@ pnpm demo <svg>      SVG → DST + PNG-Vorschau nach ./out/ (ab Woche 1)
 | Trim                             | Fadenschnitt                                          |
 | Jump / Sprung                    | Bewegung ohne Stich                                   |
 | Tie / Verriegelung               | Kurze Stiche gegen Auftrennen                         |
+
+## Arbeitsweise: Delegation und Modellwahl
+
+Gilt zusätzlich zu allem oben. Bei Widerspruch gehen die Projektregeln oben vor.
+
+### Grundregel
+
+Umfangreiche Umsetzungsarbeit nicht selbst erledigen, wenn sie sich sinnvoll delegieren lässt.
+Sub-Agenten für:
+
+- unabhängige Arbeitsstränge
+- parallelisierbare Recherche oder Umsetzung
+- Erkundung des Repos über mehrere Bereiche
+- abgegrenzte Aufgaben, die nicht den ganzen Gesprächskontext brauchen
+- Aufgaben, bei denen Delegation den Kontext des Hauptagenten entlastet
+
+Triviale Aufgaben, Einzeldatei-Edits, einfache Nachschlagungen und Arbeit, die stark am
+aktuellen Kontext hängt, direkt erledigen statt einen Sub-Agenten zu starten.
+
+### Modellwahl
+
+Nicht standardmäßig das teuerste oder stärkste Modell nehmen, sondern das günstigste, das die
+Aufgabe zuverlässig schafft:
+
+- **Haiku / leichtes Modell:** einfache Suchen, Dateien finden, Formatieren, Zusammenfassungen,
+  repetitive Edits, einfache Umformungen, Basischecks
+- **Sonnet / Mittelklasse:** normale Programmieraufgaben, Debugging, Umsetzung, Refactoring,
+  Repo-Analyse, die meiste Sub-Agenten-Arbeit
+- **Opus / stärkstes Modell:** komplexe Architektur, schwieriges Debugging, mehrdeutige
+  mehrstufige Abwägungen, folgenreiche Entscheidungen, oder wenn schwächere Modelle schon
+  gescheitert sind
+
+Beim Anlegen eines Sub-Agenten das Modell ausdrücklich wählen, wo das möglich ist. Für
+Sub-Agenten die günstigeren Modelle bevorzugen, außer die Aufgabe verlangt klar mehr.
+
+### Vorgehen beim Delegieren
+
+Vor einer größeren Aufgabe:
+
+1. In unabhängige Arbeitsstränge zerlegen.
+2. Entscheiden, welche davon delegiert werden.
+3. Jedem Strang das günstigste Modell geben, das ihn gut erledigt.
+4. Unabhängige Sub-Agenten parallel laufen lassen.
+5. Der Hauptagent bleibt bei Steuerung, Zusammenführung, Prüfung und Integration.
+
+Keine unnötigen Agenten: Delegation soll Kosten, Kontext oder Laufzeit sparen — nicht
+zusätzlichen Aufwand erzeugen.
+
+### Eskalation
+
+Mit dem niedrigsten sinnvollen Modell beginnen. Auf ein stärkeres wechseln nur, wenn
+
+- die Aufgabe tieferes Abwägen braucht,
+- das Ergebnis unvollständig oder unzuverlässig ist,
+- der Sub-Agent Unsicherheit meldet,
+- mehrere Versuche gescheitert sind,
+- Architektur- oder systemübergreifendes Urteil nötig ist.
+
+Opus nicht nehmen, nur weil es verfügbar ist.
+
+### Abschlussprüfung
+
+Der Hauptagent bleibt verantwortlich dafür, gelieferte Ergebnisse zu prüfen, die Konsistenz zu
+sichern, offensichtliche Fehler zu finden, die Änderungen zu integrieren und sicherzustellen,
+dass das Endergebnis die ursprüngliche Anfrage erfüllt.
+
+Reihenfolge der Ziele:
+
+1. Korrektheit
+2. wenig unnötiger Token- und Kontextverbrauch
+3. niedrige Modellkosten
+4. schnelle Ausführung
