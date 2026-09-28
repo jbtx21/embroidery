@@ -335,6 +335,32 @@ describe("columns too narrow to be satin become running stitch (spec §7.4, 25.0
   });
 });
 
+describe("narrowRepeats sets the running-stitch pass count (spec §7.4, 28.09.2026)", () => {
+  // A 20 x 0,7 mm strip is well under SATIN_MIN_COLUMN_MM either way — only
+  // the pass count is under test here.
+  const strip = polygonOf(rect(0, 0, 20, 0.7));
+
+  it("stitches one pass when narrowRepeats is 1", () => {
+    const r = autoSatin(strip, { narrowRepeats: 1 });
+    const runs = r.objects.filter((o) => o.type === "running");
+    expect(runs.length).toBeGreaterThan(0);
+    for (const run of runs) {
+      if (run.type !== "running") throw new Error("no running object");
+      expect(run.repeats).toBe(1);
+    }
+  });
+
+  it("keeps three passes when narrowRepeats is left out", () => {
+    const r = autoSatin(strip);
+    const runs = r.objects.filter((o) => o.type === "running");
+    expect(runs.length).toBeGreaterThan(0);
+    for (const run of runs) {
+      if (run.type !== "running") throw new Error("no running object");
+      expect(run.repeats).toBe(3);
+    }
+  });
+});
+
 describe("all parts of one shape share a sequence (spec §10.1, 25.09.2026)", () => {
   it("gives every object of a proposal the same sequence", () => {
     const r = autoSatin(LETTER_R, { idPrefix: "z1-abc" });

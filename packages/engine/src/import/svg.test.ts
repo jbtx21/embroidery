@@ -14,6 +14,7 @@ import {
   RAIL_BUDGET_SLACK,
   RAIL_EXTENT_MAX,
   railBudgetRatio,
+  SINGLE_PASS_MAX_MM,
   touchesOrCovers,
   unitScale,
   worstRailExtent,
@@ -409,6 +410,41 @@ describe("import decisions (spec §5.1)", () => {
     const r = autoSatin(thin, { idPrefix: "t" });
     expect(r.objects.some((o) => o.type === "running")).toBe(true);
     expect(columnCoverage(thin, r.objects)).toBeGreaterThanOrEqual(COLUMN_COVERAGE_MIN);
+  });
+
+  it("measures the median width against SINGLE_PASS_MAX_MM for the running-stitch pass count (spec §7.4, 28.09.2026)", () => {
+    // 0,45 mm nominal measures under the switch, 0,75 mm over it.
+    expect(medianShapeWidthMm(polygonOf(rect(0, 0, 20, 0.45)))).toBeLessThanOrEqual(
+      SINGLE_PASS_MAX_MM,
+    );
+    expect(medianShapeWidthMm(polygonOf(rect(0, 0, 20, 0.75)))).toBeGreaterThan(SINGLE_PASS_MAX_MM);
+  });
+
+  it("stitches a filled ring with a narrow wall as a single-pass running stitch (spec §7.4, 28.09.2026)", () => {
+    // A 10 mm square ring, 0,45 mm wall — the STUTTGART letter edge (0,44 to
+    // 0,48 mm) in miniature. One pass of thread already covers it.
+    const r = importSvg(
+      svg('<path d="M5 5 H15 V15 H5 Z M5.45 5.45 V14.55 H14.55 V5.45 Z" fill="#000"/>', 20, 20),
+    );
+    expect(r.design.objects.length).toBeGreaterThan(0);
+    expect(r.design.objects.every((o) => o.type === "running")).toBe(true);
+    for (const o of r.design.objects) {
+      if (o.type !== "running") continue;
+      expect(o.repeats).toBe(1);
+    }
+  });
+
+  it("keeps three passes for a running stitch whose median width is over SINGLE_PASS_MAX_MM (spec §7.4, 28.09.2026)", () => {
+    // 0,75 mm nominal still collapses to a running stitch — the switch to
+    // satin sits near 0,8 to 0,9 mm nominal, not at SATIN_MIN_COLUMN_MM's
+    // 1,2 mm — but its median width measures above SINGLE_PASS_MAX_MM.
+    const r = importSvg(svg('<path d="M5 5 H25 V5.75 H5 Z" fill="#000"/>', 40, 40));
+    expect(r.design.objects.length).toBeGreaterThan(0);
+    expect(r.design.objects.every((o) => o.type === "running")).toBe(true);
+    for (const o of r.design.objects) {
+      if (o.type !== "running") continue;
+      expect(o.repeats).toBe(3);
+    }
   });
 
   it("takes a fill when the columns leave the shape bare (spec §5.1)", () => {

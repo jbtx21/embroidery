@@ -247,6 +247,19 @@ function ringInMm(sub: SubPath, matrix: Matrix, mmPerUnit: number): Point[] {
 /** Below this median width a shape is a satin column, not an area (spec §5.1). */
 export const AUTOSATIN_MAX_WIDTH_MM = 5;
 /**
+ * Below this median width the narrow branch of `autoSatin` needs only one
+ * pass of its running stitch, not the usual three (spec §7.4, 28.09.2026).
+ *
+ * One strand of thread lays about 0,4 mm of visible width; a three-pass bean
+ * stitch covers 0,6 to 0,8 mm. Measured on the STUTTGART 80 mm logo: the
+ * 0,44–0,48 mm edge that outlines its block letters needs one pass — a
+ * second and third pass only stack more needle penetrations on the same
+ * spot (8 instead of 6) without adding coverage. The same logo's banner
+ * lettering has strokes of 0,89 to 1,22 mm, wide enough that three passes
+ * are still the right call.
+ */
+export const SINGLE_PASS_MAX_MM = 0.6;
+/**
  * Below this area a shape is dropped on import (spec §5.1). A square millimetre
  * does not show on fabric but costs a trim and two jumps; the Eislingen logo
  * carries over 2000 such leftovers from the vectorisation.
@@ -500,7 +513,8 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
         }
 
         // Narrow shapes are satin columns, not areas (spec §5.1).
-        if (!Number.isFinite(angle) && medianShapeWidthMm(shape) < AUTOSATIN_MAX_WIDTH_MM) {
+        const width = medianShapeWidthMm(shape);
+        if (!Number.isFinite(angle) && width < AUTOSATIN_MAX_WIDTH_MM) {
           const r = autoSatin(shape, {
             idPrefix: objId,
             threadIndex,
@@ -510,6 +524,10 @@ export function importSvg(text: string, opts: SvgImportOptions = {}): SvgImport 
             pullCompMinMm: preset.pullCompMinMm,
             pullCompMaxMm: preset.pullCompMaxMm,
             underlay: preset.satinUnderlay,
+            // A single thread already covers up to SINGLE_PASS_MAX_MM; above
+            // it, only the bean stitch's three passes give full coverage
+            // (spec §7.4, 28.09.2026).
+            narrowRepeats: width <= SINGLE_PASS_MAX_MM ? 1 : 3,
           });
           const mixed = r.warnings.some((w) => w.code === WARNING.SATIN_TOO_WIDE);
           const columns = r.objects.filter((o) => o.type === "satin");

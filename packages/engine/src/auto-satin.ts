@@ -70,6 +70,11 @@ export type AutoSatinOptions = {
    * decides; see docs/backlog.md.
    */
   pruneFactor?: number;
+  /**
+   * Passes of the running stitch that stands in for a column narrower than
+   * SATIN_MIN_COLUMN_MM; default 3 (spec §7.4, 28.09.2026).
+   */
+  narrowRepeats?: 1 | 3 | 5;
 };
 
 export type AutoSatinResult = { objects: StitchObject[]; warnings: Warning[] };
@@ -422,9 +427,17 @@ function fillProposal(shape: Polygon, opts: AutoSatinOptions): FillObject {
   };
 }
 
+/** "one pass", "three passes", "5 passes" — for the narrow-column warning. */
+function passWording(repeats: number): string {
+  if (repeats === 1) return "one pass";
+  if (repeats === 3) return "three passes";
+  return `${repeats} passes`;
+}
+
 export function autoSatin(shape: Polygon, opts: AutoSatinOptions = {}): AutoSatinResult {
   const warnings: Warning[] = [];
   const maxWidthMm = opts.maxWidthMm ?? 7;
+  const narrowRepeats = opts.narrowRepeats ?? 3;
   const idPrefix = opts.idPrefix ?? "auto";
   const sampleMm = opts.sampleMm ?? boundarySampleMm(shape);
 
@@ -533,7 +546,7 @@ export function autoSatin(shape: Polygon, opts: AutoSatinOptions = {}): AutoSati
         path: railMidline(railA, railB),
         closed: false,
         stitchLengthMm: NARROW_RUN_STITCH_MM,
-        repeats: 3,
+        repeats: narrowRepeats,
       };
     }
     return {
@@ -568,7 +581,7 @@ export function autoSatin(shape: Polygon, opts: AutoSatinOptions = {}): AutoSati
       warn(
         WARNING.SATIN_TOO_NARROW,
         `${narrow} of ${usable.length} columns are narrower than ${SATIN_MIN_COLUMN_MM} mm — ` +
-          `stitched as a running stitch (three passes) instead.`,
+          `stitched as a running stitch (${passWording(narrowRepeats)}) instead.`,
         "info",
       ),
     );

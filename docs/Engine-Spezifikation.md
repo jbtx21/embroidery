@@ -398,6 +398,15 @@ einem Ende ausläuft, soll nicht überall so breit behandelt werden.
 - Breite < 1 mm: Warnung `SATIN_TOO_NARROW`. Breite < 0,6 mm: Vorschlag Running.
 - Breite > 12 mm: Warnung `SATIN_TOO_WIDE`, Vorschlag Fill.
 
+**Zahl der Durchgänge folgt der Breite** *(28.09.2026)*. Der schmale Ast aus `autoSatin`
+(Spalte unter `SATIN_MIN_COLUMN_MM`, 1,2 mm) wird als Laufstich gestickt statt als Satin
+(25.09.2026); wie oft, entscheidet jetzt die gemessene Breite (`medianShapeWidthMm`,
+Konstante `SINGLE_PASS_MAX_MM` in `packages/engine/src/import/svg.ts`): bis 0,6 mm ein
+Durchgang — ein Faden deckt die Breite bereits —, darüber drei (Bean Stitch). Gemessen am
+Logo STUTTGART 80 mm: die 0,44–0,48 mm schmalen Ränder der Blockbuchstaben brauchen einen
+Durchgang, die 0,89–1,22 mm breiten Striche der Bannerschrift bleiben bei drei. Mit
+einfachem Rand am selben Logo: 10.836 statt 12.017 Stiche, Nadelhäufung 6 statt 8.
+
 ### 7.5 Kurzstiche *(26.09.2026 neu gefasst — vorher: Innenradius < 1 mm, jeder zweite Stich auf 70 %)*
 
 Das Kriterium liegt am **Abstand zwischen zwei Einstichen auf derselben Rail**, nicht an der
