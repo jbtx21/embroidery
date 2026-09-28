@@ -406,6 +406,37 @@ Vorlage und gleichem Commit deterministisch:
 Laufzeit mit Ink/Stitchs eigenem Stichspeicher 10–25 s je Logo; im ersten Lauf ohne ihn bis
 rund 4,5 min.
 
-Offen: Schrift als Satin (Schritt 2) — heute wird jede Fläche Tatami, auch die Schrift;
-verdeckte Flächen, Farbfolge und Fadenschnitte (Schritt 3). Die Probelauf-Dateien STUTTGART
-80 mm und Köln 90 mm sind zum Probesticken beim Nutzer.
+**Schritt 2 — Schrift als Satin, gebaut, Probestick offen.** `packages/engine/src/inkstitch/`
+teilt jede Form nach Breite ein (Satin ab 0,8 mm, darunter Laufstich, über 5 mm Tatami) und
+schreibt für Schrift und schmale Formen **eigene Ink/Stitch-Satinsäulen**: Strichplan aus der
+Mittelachse, an Kreuzungen läuft das gegenläufigste Paar durch, die übrigen Striche enden
+0,2 mm unter ihm; Rails aus der Kontur, über Öffnungen als gedachte Gerade; Deckung unter 0,85
+→ Tatami mit Grund. Ink/Stitchs eigenes „Füllung zu Satin" ist gemessen und verworfen — es
+lässt jedes Stückende in einem Punkt zusammenlaufen:
+
+| Testblatt, 13 Buchstaben (DejaVu Sans Bold) | eigene Säulen | Füllung zu Satin |
+| ------------------------------------------- | ------------: | ---------------: |
+| als Satin gesetzt                           |         13/13 |            10/13 |
+| Deckung                                     |    99,9–100 % |      97,5–99,9 % |
+| Dichtespitze                                |            12 |               21 |
+| Nadelhäufung                                |             4 |                7 |
+
+`pnpm inkstitch` setzt Satin jetzt als Standard (Vorlage → `auto_satin --trim` je
+Farbfolge → `output`), `--tatami` behält den reinen Tatami-Lauf. Alle fünf Schriftzüge werden
+Satin; Rückfälle stehen mit Grund in der Ausgabe (u. a. „/" in „NotSan 01/24" mit 0,73 mm als
+Laufstich). Satin gegen Tatami-Lauf:
+
+| Motiv                      | Stiche            | Trims   | Dichtespitze | Nadelhäufung |
+| -------------------------- | ----------------- | ------- | -----------: | -----------: |
+| STUTTGART 80 mm            | 15.449 (17.974)   | 31 (0)  |      25 (39) |        8 (8) |
+| STUTTGART 250 mm           | 110.858 (111.130) | 41 (0)  |      28 (26) |      10 (10) |
+| Berufsfeuerwehr Köln 90 mm | 25.008 (27.139)   | 56 (0)  |      30 (34) |       8 (15) |
+| Eislingen Print 200 mm     | 35.108 (46.806)   | 90 (0)  |      21 (39) |       8 (12) |
+| Atzensport Hofbräu 80 mm   | 13.873 (16.642)   | 68 (0)  |      26 (29) |        7 (9) |
+| Atzensport Hofbräu 200 mm  | 55.599 (58.432)   | 104 (0) |      24 (26) |        7 (7) |
+
+Die Trims kommen aus `auto_satin` und liegen je 1000 Stiche zwischen 0,4 und 4,9 (Archiv
+p90 5,6). Offen, mit Einzelheiten in `docs/backlog.md`: Blöcke an Strichenden (Varsity-„T",
+G-Zunge) fächern, das Glätten rauer Konturen schließt beim „R" von „CYS SPORTS" den
+Beinschlitz, Pinselreste in „SEGEN SEIN" werden kurze Laufstiche, Satin auf Tatami-Grund wird
+nicht ausgespart (Schritt 3). Farbfolge und verdeckte Flächen sind unverändert (Schritt 3).
