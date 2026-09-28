@@ -7,6 +7,10 @@
  * Sprünge je 1000 Stiche, Stiche je mm², Dichtespitze, Nadelhäufung — jeweils
  * mit der Einordnung gegen 192 Produktionsdateien. Die Dateien selbst liegen
  * nicht im Repo (Kundenlogos); hier stehen nur ihre Perzentile.
+ *
+ * Das Archiv (ARCHIV/einordnen/zeile) liegt in tools/archiv.mjs — gemeinsam
+ * mit tools/inkstitch.mjs, das dieselbe Tabelle gegen eine von Ink/Stitch
+ * gestickte DST hält.
  */
 import { readFileSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
@@ -18,25 +22,7 @@ import {
   planDesign,
   PRESETS,
 } from "@texma-stitch/engine";
-
-/** Perzentile aus dem TEXMA-Archiv 2016–2025, 192 Dateien. */
-const ARCHIV = {
-  trimsPer1000: { p10: 0.3, median: 1.9, p90: 5.6, max: 10.1 },
-  jumpsPer1000: { p10: 3.1, median: 7.8, p90: 18.9, max: 67.7 },
-  stitchesPerMm2: { p10: 0.63, median: 1.22, p90: 2.37, max: 4.36 },
-  densityMax: { p10: 11, median: 15, p90: 24, max: 44 },
-  /** Einstiche je 0,2-mm-Zelle: gemessen an vier Archivdateien (§11). */
-  needleMax: { p10: 4, median: 6, p90: 8, max: 8 },
-};
-
-/** Wo ein Wert im Archiv steht — das ist die eigentliche Aussage. */
-function einordnen(wert, { p10, median, p90, max }) {
-  if (wert <= p10) return "unter p10";
-  if (wert <= median) return "bis Median";
-  if (wert <= p90) return "bis p90";
-  if (wert <= max) return "über p90";
-  return "ÜBER ALLEM";
-}
+import { zeile } from "./archiv.mjs";
 
 const args = process.argv.slice(2);
 const presetArg = args.includes("--preset") ? args[args.indexOf("--preset") + 1] : "pique";
@@ -49,11 +35,6 @@ if (files.length === 0 || !(presetArg in PRESETS)) {
 }
 
 await initEngine();
-
-const zeile = (name, wert, einheit, feld) =>
-  `  ${name.padEnd(22)} ${wert.padStart(8)} ${einheit.padEnd(14)} Archiv ${String(
-    ARCHIV[feld].median,
-  ).padStart(5)} (Median) · ${einordnen(Number(wert), ARCHIV[feld])}`;
 
 for (const file of files) {
   const path = resolve(file);

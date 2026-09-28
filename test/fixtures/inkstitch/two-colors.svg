@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture for test/inkstitch.smoke.test.ts: a filled rectangle (colour A,
+     tatami fill) plus a running-stitch line in a second colour (colour B).
+     Own template, not a customer logo, see CLAUDE.md. Nominal size
+     20 x 15 mm (rectangle 0,0 to 20,10; line at y = 15). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="20mm" height="15mm" viewBox="0 0 20 15">
+  <path id="flaeche" d="M 0 0 L 20 0 L 20 10 L 0 10 Z" fill="#101010" />
+  <path id="laufstich" d="M 0 15 L 20 15" stroke="#c8102e" fill="none" stroke-width="0.3" />
+</svg>

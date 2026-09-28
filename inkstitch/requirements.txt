@@ -1,0 +1,45 @@
+# Pinned runtime dependencies for headless Ink/Stitch (commit see setup.sh:
+# INKSTITCH_COMMIT). This is NOT Ink/Stitch's own requirements.txt -- it is
+# the frozen `pip freeze` of a venv that has Ink/Stitch's actual runtime
+# imports satisfied *without* wxPython (no Linux wheel on PyPI; run.py
+# supplies wx_stub.py instead) and without its dev/test/type-checking extras
+# (mypy, flake8, pytest, types-*, pywin32) -- those are irrelevant here, we
+# only ever call `inkstitch.py --extension=... --format=...`, never the
+# GUI or its test suite. `inkex` is the plain PyPI package (version 1.4.1,
+# same version Ink/Stitch's own requirements.txt pins via
+# EXTENSIONS_AT_INKSCAPE_1.4.1), not a git checkout.
+#
+# PyGObject and pycairo need system libraries at build time -- see
+# inkstitch/setup.sh for the apt package list (libgirepository-2.0-dev,
+# gobject-introspection, libcairo2-dev, pkg-config, python3-dev or the
+# matching pythonX.Y-dev).
+blinker==1.9.0
+click==8.5.0
+colormath2==3.0.3
+cssselect==1.5.0
+diskcache==5.6.3
+Flask==3.1.3
+fonttools==4.66.0
+inkex==1.4.1
+itsdangerous==2.2.0
+Jinja2==3.1.6
+lxml==5.4.0
+MarkupSafe==3.0.3
+networkx==3.6.1
+numpy==2.2.6
+packaging==26.3
+pillow==12.3.0
+platformdirs==4.12.1
+pycairo==1.29.1
+PyGObject==3.58.0
+pyparsing==3.3.3
+pyserial==3.5
+pystitch==1.0.1
+scour==0.37
+shapely==2.1.2
+six==1.17.0
+tinycss2==1.5.1
+tomli==2.4.1
+trimesh==5.1.0
+webencodings==0.6.1
+Werkzeug==3.1.9

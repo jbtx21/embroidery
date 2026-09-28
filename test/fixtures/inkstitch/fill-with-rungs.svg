@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture for test/inkstitch.smoke.test.ts: a fill with two rungs, for
+     extension fill_to_satin (turns the fill into a satin column along the
+     rungs' direction). Own template, not a customer logo, see CLAUDE.md. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="30mm" height="4mm" viewBox="0 0 30 4">
+  <path id="flaeche" d="M 0 0 L 30 0 L 30 4 L 0 4 Z" fill="#101010" />
+  <path id="sprosse1" d="M 10 -1 L 10 5" stroke="#101010" fill="none" />
+  <path id="sprosse2" d="M 20 -1 L 20 5" stroke="#101010" fill="none" />
+</svg>

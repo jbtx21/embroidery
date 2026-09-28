@@ -4,3 +4,12 @@ out/
 *.tsbuildinfo
 .DS_Store
 coverage/
+
+# Bytecode cache from running inkstitch/run.py locally (Ink/Stitch itself
+# lives outside the repo, see inkstitch/README.md, but wx_stub.py/run.py are
+# plain .py files here and Python leaves this next to them).
+__pycache__/
+*.pyc
+
+# Worktrees of Claude Code sub-agents — their own checkouts, never ours to commit.
+.claude/worktrees/

@@ -6,7 +6,15 @@ import prettier from "eslint-config-prettier";
 
 export default tseslint.config(
   {
-    ignores: ["**/dist/**", "**/node_modules/**", "out/**", "coverage/**"],
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "out/**",
+      "coverage/**",
+      // Nested git worktree (Claude Code EnterWorktree/ExitWorktree) -- another
+      // agent's own isolated checkout of this repo, not our tree to lint.
+      ".claude/worktrees/**",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
