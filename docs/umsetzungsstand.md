@@ -26,6 +26,7 @@ steht und was fehlt. Offene Entscheidungen und Zulieferungen stehen in `backlog.
 | 14      | Presets Piqué/Softshell/Fleece/Cap/Frottee, Maschinenprofile                                                                   | `engine/src/presets.ts`                                |
 | 15      | Unit-Tests, DST-Roundtrip, pyembroidery-Kreuzprüfung, Rundungsdrift, Benchmarks, Golden-File-Rahmen                            | `**/*.test.ts`, `engine/bench/`, `test/golden.test.ts` |
 | 16      | `pnpm demo <svg> [preset]` → `out/<name>.{dst,png,json}`                                                                       | `tools/demo.mjs`                                       |
+| 1, 16   | Ink/Stitch als Stich-Engine: Starter, Einrichtung, `pnpm inkstitch <svg> [preset]` → `out/<name>.{dst,png}` + Kennzahlen       | `inkstitch/`, `tools/inkstitch.mjs`                    |
 
 ## Fehlt
 
@@ -376,3 +377,35 @@ Zahlen in `docs/backlog.md`.
 **Die Abnahme steht über alledem:** eine gemessene Verbesserung ist kein „geht jetzt". Ohne
 eine gepunchte Profi-Datei desselben Motivs im selben Player fehlt der Maßstab, woran
 „unbrauchbar" hängt.
+
+## Ink/Stitch als Stich-Engine (28.09.2026)
+
+Entscheidung und Folgen: `docs/adr/0001-inkstitch-als-stich-engine.md`. Ink/Stitch erzeugt die
+Stiche, TEXMA Stitch bereitet die Vorlage vor und prüft das Ergebnis; die eigene
+Stichgenerierung ist eingefroren. Phase 1b in Spec §16.
+
+**Schritt 1 — Einbau, fertig.** `inkstitch/setup.sh` holt Ink/Stitch im festen Commit
+`d59c9ab` nach `~/.cache/texma-stitch` und legt eine venv mit festen Versionen an (Erstlauf
+17–27 s, danach No-op in 11–20 ms; ein SessionStart-Hook ruft es auf). `inkstitch/run.py`
+startet jede Erweiterung kopflos und leitet Meldungen, die Ink/Stitch sonst nur im GUI-Dialog
+zeigt, auf stderr. `pnpm inkstitch <svg> [preset]` schreibt DST, PNG und die Kennzahlen gegen
+das Archiv. Jeder Ink/Stitch-Aufruf kostet rund 9 s allein für den Start.
+
+Die sechs Kundenlogos ergeben **Stich für Stich den Probelauf** — Ink/Stitch ist bei gleicher
+Vorlage und gleichem Commit deterministisch:
+
+| Motiv                      |  Stiche | Sprünge | Trims | Farbblöcke | Dichtespitze | Nadelhäufung |
+| -------------------------- | ------: | ------: | ----: | ---------: | -----------: | -----------: |
+| STUTTGART 80 mm            |  17.974 |      52 |     0 |         13 |           39 |            8 |
+| STUTTGART 250 mm           | 111.130 |     138 |     0 |         13 |           26 |           10 |
+| Berufsfeuerwehr Köln 90 mm |  27.139 |     111 |     0 |         23 |           34 |           15 |
+| Eislingen Print 200 mm     |  46.806 |     190 |     0 |         12 |           39 |           12 |
+| Atzensport Hofbräu 80 mm   |  16.642 |     245 |     0 |         11 |           29 |            9 |
+| Atzensport Hofbräu 200 mm  |  58.432 |     565 |     0 |         13 |           26 |            7 |
+
+Laufzeit mit Ink/Stitchs eigenem Stichspeicher 10–25 s je Logo; im ersten Lauf ohne ihn bis
+rund 4,5 min.
+
+Offen: Schrift als Satin (Schritt 2) — heute wird jede Fläche Tatami, auch die Schrift;
+verdeckte Flächen, Farbfolge und Fadenschnitte (Schritt 3). Die Probelauf-Dateien STUTTGART
+80 mm und Köln 90 mm sind zum Probesticken beim Nutzer.

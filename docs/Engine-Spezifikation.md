@@ -11,20 +11,29 @@ Stand: 19.09.2026 · Zielgruppe: Entwicklung (Claude Code) · Status: Entwurf f�
   Bounding-Box-Mitte; Weg vom Nullpunkt zum ersten Stich als Sprungfolge.
 - §11 Warnung `SHAPE_SPLIT` mit Teilanzahl, wenn eine Fläche beim Normieren zerfällt.
 
+**Änderung 28.09.2026** — Ink/Stitch erzeugt die Stiche (`docs/adr/0001-inkstitch-als-stich-engine.md`):
+
+- §1 neu gefasst: TEXMA Stitch bereitet die Vorlage vor und prüft das Ergebnis; die eigene
+  Stichgenerierung ist eingefroren.
+- §2 `inkstitch/` ergänzt.
+- §16 Phase 1b ergänzt, die Abnahme Phase 1 entfällt.
+
 ---
 
-## 1. Zweck und Grundsätze
+## 1. Zweck und Grundsätze *(28.09.2026 neu gefasst — vorher: die Engine erzeugt die Stiche selbst)*
 
-Die Engine wandelt **Stickobjekte** (Pfade + Parameter) deterministisch in **Stiche** um. Stiche werden nie gespeichert, nur Objekte. Jede Änderung im Editor löst eine Neuberechnung der betroffenen Objekte aus.
+**Ink/Stitch erzeugt die Stiche** — als eigener Prozess in fester Version (ADR 0001). TEXMA Stitch **bereitet die Vorlage vor** (Formen nach Breite einteilen, Sprossen für Satin setzen, verdeckte Flächen ausschneiden, Farbfolge und Fadenschnitte festlegen, Preset-Werte als `inkstitch:`-Attribute) und **prüft das Ergebnis** (DST-Leser, Kennzahlen gegen das Archiv, Player, Deckung der Satinsäulen). Stiche werden nie gespeichert, nur Objekte.
+
+Die eigene Stichgenerierung (Kap. 6–8, 10) ist **eingefroren**: Code und Tests bleiben grün, weiterentwickelt wird sie nicht. Was diese Spec dort beschreibt, bleibt Referenz für Vorbereitung und Prüfung, ist aber kein Bauauftrag mehr.
 
 Grundsätze:
 
-- Reines TypeScript, keine DOM-Abhängigkeit. Läuft im Web Worker (Editor) und in Node (Tests, Server-Export).
+- Reines TypeScript, keine DOM-Abhängigkeit. Läuft im Web Worker (Editor) und in Node (Tests, Server-Export). Ink/Stitch läuft daneben als Python-Prozess.
 - Interne Einheit: **Millimeter**, Fließkomma. Erst der Export rundet auf 0,1 mm (DST-Einheit).
 - Koordinatensystem wie SVG: Ursprung oben links, y nach unten.
-- Deterministisch: gleiche Eingabe → byte-identische Ausgabe. Kein Zufall.
-- Algorithmen nach Vorbild Ink/Stitch (GPL, nur interne Nutzung).
-- Qualitätsreferenz: die Phase-0-Dateien aus Ink/Stitch.
+- Deterministisch: gleiche Eingabe → byte-identische Ausgabe. Kein Zufall. Für Ink/Stitch heißt das: gleiche Vorlage und gleicher Commit → gleiche DST.
+- Ink/Stitch (GPL-3.0, interne Nutzung) wird aufgerufen, nicht ins Repo kopiert. Eigener Code, der Ink/Stitch eng nachbildet, trägt „Abgeleitet aus Ink/Stitch (GPL-3.0)".
+- Qualitätsreferenz: die Profi-Dateien aus Stickvoll und die Kennzahlen des TEXMA-Archivs (192 Produktionsdateien); die Phase-0-Dateien, sobald sie vorliegen.
 
 Nicht Teil der Engine: Vektorisierung (Vectorizer.AI), UI, Persistenz, TexOS.
 
@@ -42,6 +51,8 @@ texma-stitch/
     formats/     Writer: DST (TS), neutrales JSON; Reader: DST/PES für Import und Vergleich
     fonts/       Stickschriften als JSON (Glyphen = Satin-Objekte)
     render/      Canvas-2D-Renderer für Stiche (Fadenoptik, Sprünge, Punkte)
+  inkstitch/     Starter, wx-Platzhalter und Einrichtung für Ink/Stitch (28.09.2026);
+                 Ink/Stitch selbst liegt als Klon außerhalb des Repos
   apps/
     editor/      React + Canvas, später
     api/         Python FastAPI: Vectorizer.AI, pyembroidery-Export, Speicherung
@@ -1059,7 +1070,17 @@ statt einer festen Zahl, damit eine Schrift mit gröberen Spalten ihre eigene Gr
 | 3 | Satin mit Paarung, Sprossen, Zugausgleich, Split, Unterlage, Kurzstiche | Schriftzug aus Satin gestickt |
 | 4 | Reihenfolge, Verbindungen, Verriegelung, Post, Stats, Warnungen, Auto-Satin Basis, pyembroidery-Kreuzprüfung | Komplettes Kundenlogo gestickt, Stichzahl vs. Puncher |
 
-Abnahme Phase 1: drei Phase-0-Motive stickbar ohne manuelle Nachbearbeitung der Stiche, Abweichung zur Ink/Stitch-Stichzahl < 10 %.
+Abnahme Phase 1: drei Phase-0-Motive stickbar ohne manuelle Nachbearbeitung der Stiche, Abweichung zur Ink/Stitch-Stichzahl < 10 %. *(Entfällt seit 28.09.2026 — Ink/Stitch ist jetzt der Erzeuger, siehe Phase 1b.)*
+
+### Phase 1b — Ink/Stitch als Stich-Engine *(28.09.2026)*
+
+| Schritt | Inhalt | Nachweis |
+|---|---|---|
+| 1 | Einbau: Starter, Einrichtung, `pnpm inkstitch <svg> [preset]`, Rauchtest | die sechs Kundenlogos reproduzieren den Probelauf vom 28.09.2026 |
+| 2 | Schrift und schmale Formen als Satin: Einteilung nach Breite, Sprossen aus der Mittelachse, Ink/Stitch „Füllung zu Satin" → „Satinsäulen automatisch führen" | jeder Buchstabe von „STUTTGART", „CYS SPORTS", „Berufsfeuerwehr Köln", „NotSan 01/24", „SEGEN SEIN" als Satin, Deckung ≥ 0,85, im Player lesbar |
+| 3 | Verdeckte Flächen ausschneiden, gleiche Farben zusammenziehen, Fadenschnitte, Preset-Werte als Attribute | STUTTGART 80 mm: höchstens 4 Farbblöcke, Dichtespitze ≤ 24, Nadelhäufung ≤ 8, Trims/1000 ≤ 5,6 |
+
+Abnahme Phase 1b: Probestick STUTTGART 80 mm und Köln 90 mm auf Piqué, Bewertung durch den Stickverantwortlichen.
 
 ---
 

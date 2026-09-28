@@ -14,6 +14,7 @@ Kommunikation und Commit-Messages auf Deutsch. Code, Bezeichner, Kommentare im C
 - Tests: Vitest. Lint: ESLint + Prettier (Standardkonfig)
 - Polygon-Ops: `clipper2-wasm`. Keine weiteren Abhängigkeiten in `packages/engine` ohne Rückfrage.
 - Editor später: React + Canvas. Backend später: Python FastAPI + pyembroidery.
+- **Stiche erzeugt Ink/Stitch** (seit 28.09.2026, `docs/adr/0001-inkstitch-als-stich-engine.md`): eigener Python-Prozess in festem Commit, außerhalb des Repos. Dieses Repo bereitet die Vorlage vor und prüft das Ergebnis; die eigene Stichgenerierung ist eingefroren.
 
 ## Struktur
 
@@ -23,6 +24,7 @@ packages/engine     running, satin, fill, text, order, connect, tie, post, analy
 packages/formats    DST-Writer/Reader, neutrales StitchPlan-JSON
 packages/fonts      Stickschriften als JSON, Konverter aus Ink/Stitch-SVG
 packages/render     Canvas-2D-Renderer
+inkstitch/          Starter, wx-Platzhalter, Einrichtung für Ink/Stitch (GPL-3.0, nicht im Repo)
 apps/editor         später
 apps/api            später
 test-data/phase0    Golden Files aus Phase 0 (Ink/Stitch SVG + DST)
@@ -43,7 +45,7 @@ docs/               Spec und Entscheidungen
 
 ## Arbeitsweise
 
-- Ein Modul pro Session, in der Reihenfolge der Meilensteine aus Spec §16.
+- Ein Modul pro Session, in der Reihenfolge der Meilensteine aus Spec §16 (seit 28.09.2026: Phase 1b).
 - Vor dem Coden: betroffenen Spec-Abschnitt lesen und in 3–5 Sätzen zusammenfassen, was gebaut wird. Bei Unklarheit fragen, nicht raten.
 - Nach jedem Schritt: `pnpm test` und `pnpm typecheck` grün, sonst nicht weitermachen.
 - Kleine Commits, Message-Form: `engine: fill sections and travel`, `formats: dst writer header`.
@@ -65,6 +67,8 @@ pnpm test:watch
 pnpm typecheck
 pnpm bench           Benchmarks (packages/engine/bench)
 pnpm demo <svg>      SVG → DST + PNG-Vorschau nach ./out/ (ab Woche 1)
+pnpm inkstitch <svg> [preset]   SVG → Ink/Stitch → DST + PNG + Kennzahlen nach ./out/
+bash inkstitch/setup.sh         Ink/Stitch einrichten (läuft auch als SessionStart-Hook)
 ```
 
 ## Domänenbegriffe
