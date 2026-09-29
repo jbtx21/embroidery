@@ -558,3 +558,51 @@ describe("import decisions (spec §5.1)", () => {
     expect(touchesOrCovers(a, polygonOf(rect(40, 0, 10, 10)))).toBe(false);
   });
 });
+
+describe("medianShapeWidthMm with a sampling distance (spec §5.2, second version)", () => {
+  const strip = (widthMm: number, lenMm = 10): ReturnType<typeof polygonOf> =>
+    polygonOf(rect(0, 0, lenMm, widthMm));
+
+  it("gives the values it always gave when called without the parameter", () => {
+    // As the function measured before it took a second argument (29.09.2026): the outline is
+    // sampled every perimeter / 300 mm, at the least every 0.3 mm — so thin strips read wide.
+    expect(medianShapeWidthMm(strip(0.3))).toBeCloseTo(0.422, 3);
+    expect(medianShapeWidthMm(strip(0.5))).toBeCloseTo(0.549, 3);
+    expect(medianShapeWidthMm(strip(1.0))).toBeCloseTo(1.026, 3);
+    expect(medianShapeWidthMm(strip(3, 40))).toBeLessThan(AUTOSATIN_MAX_WIDTH_MM);
+    for (const w of [0.1, 0.3, 0.5, 1, 3]) {
+      const shape = strip(w);
+      const standard = medianShapeWidthMm(shape);
+      // No options, empty options and an undefined distance are the same call.
+      expect(medianShapeWidthMm(shape, {})).toBe(standard);
+      expect(medianShapeWidthMm(shape, { sampleMm: undefined })).toBe(standard);
+    }
+  });
+
+  it("reads a thin strip much closer to its width with a finer sampling", () => {
+    // The standard sampling reads 0.2 mm as 0.32 and 0.3 mm as 0.42; every 0.1 mm it is 0.22 and 0.32.
+    expect(medianShapeWidthMm(strip(0.2))).toBeCloseTo(0.316, 2);
+    expect(medianShapeWidthMm(strip(0.2), { sampleMm: 0.1 })).toBeCloseTo(0.224, 2);
+    expect(medianShapeWidthMm(strip(0.3), { sampleMm: 0.1 })).toBeCloseTo(0.316, 2);
+    expect(medianShapeWidthMm(strip(0.5), { sampleMm: 0.1 })).toBeCloseTo(0.51, 2);
+    expect(medianShapeWidthMm(strip(1.0), { sampleMm: 0.1 })).toBeCloseTo(1.005, 2);
+  });
+
+  it("finds an axis in a strip of 0.1 mm, which the standard sampling has none for", () => {
+    expect(medianShapeWidthMm(strip(0.1))).toBe(Infinity);
+    const fine = medianShapeWidthMm(strip(0.1), { sampleMm: 0.1 });
+    expect(Number.isFinite(fine)).toBe(true);
+    expect(fine).toBeGreaterThan(0.1);
+    expect(fine).toBeLessThan(0.16);
+  });
+
+  it("still finds no axis in what is far narrower than the sampling", () => {
+    expect(medianShapeWidthMm(strip(0.01), { sampleMm: 0.1 })).toBe(Infinity);
+  });
+
+  it("changes nothing for a wide shape, whichever way it is sampled", () => {
+    const plate = polygonOf(rect(0, 0, 40, 20));
+    expect(medianShapeWidthMm(plate, { sampleMm: 0.5 })).toBeGreaterThan(AUTOSATIN_MAX_WIDTH_MM);
+    expect(medianShapeWidthMm(plate)).toBeGreaterThan(AUTOSATIN_MAX_WIDTH_MM);
+  });
+});

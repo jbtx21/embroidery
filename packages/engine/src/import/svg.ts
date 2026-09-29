@@ -12,7 +12,7 @@
  * Vectorisation is NOT part of the engine (spec §1). This importer takes paths
  * that already exist.
  */
-import type { Point, Polygon, Polyline } from "@texma-stitch/geometry";
+import type { MedialAxisOptions, Point, Polygon, Polyline } from "@texma-stitch/geometry";
 import type { SubPath } from "@texma-stitch/geometry";
 import {
   dist,
@@ -291,9 +291,19 @@ const SPINE_FRACTION = 0.5;
  *
  * A shape without a skeleton — a disc, or anything too small to sample — has no
  * median width and counts as wide, so it stays a fill.
+ *
+ * `sampleMm` (spec §5.2, second version) sets how finely the outline is sampled for the
+ * axis. Left out, it is what it always was: perimeter / 300, between 0.3 and 2 mm — which
+ * reads a strip of 0.2 mm as 0.32 mm and finds no axis at all in one of 0.1 mm. A finer
+ * distance reads thin strips closer to their width (0.22 mm at 0.1 mm). Callers that do not
+ * pass it — the classification of the template, the frozen import — get the same value as
+ * before.
  */
-export function medianShapeWidthMm(shape: Polygon): number {
-  const axis = medialAxis(shape);
+export function medianShapeWidthMm(
+  shape: Polygon,
+  opts: Pick<MedialAxisOptions, "sampleMm"> = {},
+): number {
+  const axis = medialAxis(shape, opts.sampleMm === undefined ? {} : { sampleMm: opts.sampleMm });
   const all: { w: number; len: number }[] = [];
   let widest = 0;
   for (const branch of axis.branches) {
