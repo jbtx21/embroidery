@@ -365,6 +365,81 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
   );
 
   it(
+    "Aussparen (§4.2 Regel 1): die Stiche des Grunds meiden die spätere Satinform und laufen bis an ihre Kante",
+    async () => {
+      // A blue tatami ground with a red satin bar over it (3 x 20 mm, centred). With the knockdown
+      // on, the template cuts the bar's place out of the ground, 0.2 mm short of its edge; Ink/Stitch
+      // has to stitch the ground round the hole. The bar sits in the middle of the ground, so where
+      // the DST puts its origin does not matter: the box of the ground stitches gives the centre.
+      await initEngine();
+      const ground = {
+        kind: "area" as const,
+        id: "ground",
+        polygon: polygonOf(rect(0, 0, 40, 30)),
+        color: "#1f3a93",
+        attrs: {},
+        trimAfter: "auto" as const,
+      };
+      const bar = {
+        kind: "area" as const,
+        id: "bar",
+        polygon: polygonOf(rect(18.5, 5, 3, 20)),
+        color: "#c8102e",
+        attrs: {},
+        trimAfter: "auto" as const,
+      };
+      const flat = { ...PRESETS.pique, pullCompMm: 0, pushCompMm: 0 };
+      const dir = mkdtempSync(join(tmpdir(), "texma-aussparen-"));
+      try {
+        const groundStitches = async (knockdown: boolean) => {
+          const template = buildInkstitchTemplate([ground, bar], flat, {
+            widthMm: 40,
+            heightMm: 30,
+            knockdown,
+          });
+          expect(template.objects.map((o) => [o.shapeId, o.kind])).toEqual([
+            ["ground", "tatami"],
+            ["bar", "satin"],
+          ]);
+          const svg = join(dir, `k${knockdown}.svg`);
+          writeFileSync(svg, template.svg);
+          const r = await runInkstitch({ extension: "output", options: { format: "dst" }, svg });
+          expect(r.stderr.trim()).toBe("");
+          const all = unitsToMm(readDst(new Uint8Array(r.stdout)).stitches);
+          // The ground comes first: everything up to the colour change.
+          const change = all.findIndex((s) => s.cmd === "color");
+          expect(change).toBeGreaterThan(0);
+          const own = all.slice(0, change).filter((s) => s.cmd === "stitch");
+          const xs = own.map((s) => s.x);
+          const ys = own.map((s) => s.y);
+          const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+          const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+          return {
+            satin: all.slice(change).filter((s) => s.cmd === "stitch").length,
+            // Relative to the centre of the ground: the bar covers |x| < 1.5, |y| < 10.
+            rel: own.map((s) => ({ x: s.x - cx, y: s.y - cy })),
+          };
+        };
+        const [plain, spared] = await Promise.all([groundStitches(false), groundStitches(true)]);
+        // The hole is 2.6 x 19.6 mm; 0.4 mm short of its edge, so the DST's rounding cannot matter.
+        const inside = (p: { x: number; y: number }) => Math.abs(p.x) < 0.9 && Math.abs(p.y) < 9.4;
+        // Within reach of the bar's edge (1.0 to 1.6 mm from its axis): the ground runs up to it.
+        const atEdge = (p: { x: number; y: number }) =>
+          Math.abs(p.x) > 1.0 && Math.abs(p.x) < 1.6 && Math.abs(p.y) < 9.4;
+        expect(plain.rel.filter(inside).length).toBeGreaterThan(10);
+        expect(spared.rel.filter(inside)).toHaveLength(0);
+        expect(spared.rel.filter(atEdge).length).toBeGreaterThan(5);
+        // The satin is the same either way.
+        expect(spared.satin).toBe(plain.satin);
+        expect(spared.satin).toBeGreaterThan(0);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 2,
+  );
+
+  it(
     "fill_to_satin: Fläche + zwei Sprossen ergibt eine Satin-Spalte",
     async () => {
       const svg = resolve(fixturesDir, "fill-with-rungs.svg");
