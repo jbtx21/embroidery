@@ -21,8 +21,7 @@ Stand: 19.09.2026 · Zielgruppe: Entwicklung (Claude Code) · Status: Entwurf f�
 **Änderung 29.09.2026** — §7.8 neu: Satin für die Ink/Stitch-Vorlage (Einteilung nach Breite mit
 Satin ab 0,7 mm, Strichplan, Säulen, Glätten rauer Konturen, Prüfgrenzen). §7.4 verweist darauf. §5.2 neu:
 Feinheit und Mindestgröße (Satinstrich mindestens 1,3 mm, Lücke mindestens 0,8 mm als Schätzwert).
-§4.2 neu: Aussparen in der Ink/Stitch-Vorlage (Satin spart die Fläche darunter aus, 0,2 mm;
-angrenzende Flächen 0,3 mm statt 0,8 mm). §7.8.5: schmale Rückfälle werden Laufstich. §8.8 neu:
+§4.2 neu: Aussparen in der Ink/Stitch-Vorlage (am selben Tag gemessen und zurückgenommen, siehe dort). §7.8.5: schmale Rückfälle werden Laufstich. §8.8 neu:
 Tatami in der Ink/Stitch-Vorlage (Preset-Werte, Unterlage nur wo sie hält, Zug und Schub im
 Umriss).
 §5.2 zweite Fassung: Mindestgröße aus den Satinstrichen, Lücken als zweite Zahl, Rauschfilter.
@@ -241,22 +240,24 @@ Nichts wird verworfen: eine untere Fläche, die vollständig verschwindet, wird 
 gestickt und meldet `FILL_COVERED` als `info` — das ist eine Aussage, keine stille
 Reparatur (Regel 8).
 
-### 4.2 Aussparen in der Ink/Stitch-Vorlage *(29.09.2026)*
+### 4.2 Aussparen in der Ink/Stitch-Vorlage — gemessen und verworfen *(29.09.2026)*
 
-Die Vorlage für Ink/Stitch (§7.8, §8.8) spart nach §4.1 aus, mit zwei Abweichungen
-(Entscheidung 29.09.2026). Die eingefrorene Engine (`resolveOverlaps`) bleibt bei §4.1.
+Die Vorlage für Ink/Stitch (§7.8, §8.8) spart **nach §4.1** aus. Zwei Abweichungen waren am
+29.09.2026 beschlossen, wurden an den sechs Kundenlogos gemessen und am selben Tag vom Nutzer
+**zurückgenommen** — beide machten es schlechter:
 
-1. **Satin spart die Fläche darunter aus.** Eine Satinform, die später gestickt wird als eine
-   Tatami-Fläche unter ihr, schneidet ihren Platz aus dieser Fläche; die Fläche bleibt
-   `underlapMm` (Preset, Piqué 0,2 mm) unter der Satinkante. Die 0,8 mm aus Regel 4 sparten bei
-   Schrift mit 1 mm Strich gar nichts aus. Die Schwelle 20 mm² (Regel 3) gilt für den Platz, den
-   **alle** Satinformen zusammen aus einer Fläche schneiden — ein Schriftzug auf einem Banner
-   schneidet, ein einzelner Strich, der eine Fläche streift, nicht. Laufstich schneidet
-   weiterhin nie. Gemessen vorher: unter Satin lagen je Logo 3–10 % aller Stiche, und dort saßen
-   die meisten Zellen über 18 Stichen/mm² (STUTTGART 250 mm: 13 von 17).
-2. **Angrenzende Flächen (Regel 5) greifen 0,3 mm statt 0,8 mm untereinander.** Ohne die Regel
-   halbierten sich im Köln-Logo die Zellen über 18 (30 → 15), die Nadelhäufung sank von 8 auf 6.
-   0,3 mm hält gegen Blitzer an der Naht, bis der Probestick zeigt, ob mehr nötig ist.
+1. **Satin spart die Fläche darunter aus** (0,2 mm Unterlappung). STUTTGART 80 mm: Dichtespitze
+   22 → 27, Zellen über 18 Stichen/mm² 5 → 14, Stiche +13 %; von den dichten Zellen unter Satin
+   verschwand bei STUTTGART 250 mm 1 von 13. Ursache: Ink/Stitch zerlegt die Fläche an jeder
+   Satinkante in Stücke, jedes mit eigener Verriegelung, eigenem Sprung und Fadenschnitt
+   (Tatami-Objekte STUTTGART 80 mm: 8 → 18). Satin schneidet also weiterhin nicht (§4.1 Regel 1).
+2. **Angrenzende Flächen greifen 0,3 mm statt 0,8 mm untereinander.** Köln 90 mm nach Weite
+   (Dichtespitze / Zellen über 18 / Nadelhäufung): 0 mm 26 / 15 / 6 — 0,3 mm 32 / 33 / 10 —
+   0,8 mm 29 / 30 / 8. 0,3 mm war die schlechteste gemessene Weite. Es bleibt bei 0,8 mm, bis
+   ein Probestick zeigt, ob weniger ohne Blitzer an der Naht geht.
+
+Beide Wege sind im Code als abschaltbare Optionen geblieben (`cutOutSatin`, `touchUnderlapMm`),
+im Standard aus bzw. 0,8 mm.
 
 ---
 
