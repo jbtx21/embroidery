@@ -25,6 +25,7 @@ Feinheit und Mindestgröße (Satinstrich mindestens 1,3 mm, Lücke mindestens 0,
 angrenzende Flächen 0,3 mm statt 0,8 mm). §7.8.5: schmale Rückfälle werden Laufstich. §8.8 neu:
 Tatami in der Ink/Stitch-Vorlage (Preset-Werte, Unterlage nur wo sie hält, Zug und Schub im
 Umriss).
+§5.2 zweite Fassung: Mindestgröße aus den Satinstrichen, Lücken als zweite Zahl, Rauschfilter.
 
 ---
 
@@ -364,16 +365,36 @@ vereinfachen oder so lassen.
 
 **Lücken** werden je Farbe gesucht: die Formen einer Farbe werden vereinigt und um die halbe
 Grenze geschlossen (nach außen und zurück, wie §7.8.4); was dabei dazukommt, ist eine Lücke
-schmaler als die Grenze. Ihre Breite ist die mittlere Breite dieses Stücks. Ausgenommen sind
-Lücken, die eine später gestickte Form ganz überdeckt — dort liegt ein anderes Element, keine
-Lücke. Stücke unter 0,02 mm² sind Rechenrauschen und zählen nicht.
+schmaler als die Grenze. Ausgenommen sind Lücken, die eine später gestickte Form ganz
+überdeckt — dort liegt ein anderes Element, keine Lücke.
+
+**Rauschfilter für Lücken** *(29.09.2026, zweite Fassung)*. Vektorisierte Logos haben
+Haarschlitze zwischen gleichfarbigen Formen, Eckrundungen und hauchdünne Späne; sie sind
+keine Lücken auf dem Stoff. Die erste Fassung (Stücke unter 0,02 mm² verwerfen) ließ sie durch:
+jede konkave Ecke gibt beim Schließen (1 − π/4) · 0,4² = 0,034 mm² dazu, und ein Haarschlitz
+von 0,013 mm Breite im Köln-Logo ergab als „Mindestgröße" 5.538 mm. Deshalb:
+
+1. Späne unter 0,01 mm werden vor dem Messen abgetragen (Öffnen um 0,005 mm).
+2. Gemessen wird mit **0,1 mm** Abtastung (`medianShapeWidthMm` mit `sampleMm`; die
+   Standard-Abtastung bis 2 mm las eine 0,2-mm-Lücke als 0,32 mm).
+3. Stücke unter **0,1 mm** Breite zählen nicht — das ist die DST-Auflösung, feiner gibt es auf
+   dem Stoff nichts.
+4. Stücke ohne Mittelachse zählen nicht (Eckrundungen); nur ein vom Schließen ganz gefülltes
+   **Loch** wird mit seinem einbeschriebenen Kreis gemessen und zählt, wenn der mindestens
+   0,1 mm hat.
 
 **Ergebnis** je zu feinem Element: Art (Satinstrich oder Lücke), gemessene Breite, Grenze, und
-die **Logobreite, ab der es hält** (bestellte Breite × Grenze ÷ gemessene Breite). Die
-**Mindestgröße** des Logos ist das größte dieser Maße; das Element, das sie bestimmt, wird
-genannt. Die Ausgabe listet die Elemente nach dieser Größe und markiert sie im Vorschaubild.
-Eine Satinform zwischen 0,7 und 1,3 mm kann auch eine dünne Zierlinie sein, die als Laufstich
-besser aufgehoben wäre; das entscheidet der Nutzer, die Prüfung nennt es als Möglichkeit.
+die **Logobreite, ab der es hält** (bestellte Breite × Grenze ÷ gemessene Breite).
+
+- Die **Mindestgröße** des Logos kommt aus den **Satinstrichen** allein: ab dieser Breite sind
+  alle Satinstriche mindestens 1,3 mm. Das Element, das sie bestimmt, wird genannt.
+  *(29.09.2026, zweite Fassung — vorher das größte Maß aller Befunde, Lücken eingeschlossen.)*
+- Die Lücken ergeben eine **zweite Zahl**: ab welcher Breite alle Lücken offen bleiben. Feine
+  Zierkanäle (STUTTGART: 0,25 mm zwischen Rand und Körper der Buchstaben) treiben sie weit
+  über die Mindestgröße; ob sie zusticken dürfen, entscheidet der Nutzer.
+- Die Ausgabe listet die Elemente nach „hält ab" und markiert sie im Vorschaubild. Eine
+  Satinform zwischen 0,7 und 1,3 mm kann auch eine dünne Zierlinie sein, die als Laufstich
+  besser aufgehoben wäre; die Prüfung nennt es als Möglichkeit.
 
 ---
 
