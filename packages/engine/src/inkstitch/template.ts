@@ -51,7 +51,7 @@ import { warn, WARNING } from "../warnings.js";
 import { classifyShape, SATIN_NARROW_WARN_MM } from "./classify.js";
 import type { SatinColumnPlan } from "./columns.js";
 import { satinColumns, STAYS_TATAMI } from "./columns.js";
-import { cutOutSatin, knockdownAreas } from "./knockdown.js";
+import { cutOutSatin, knockdownAreas, TEMPLATE_TOUCH_UNDERLAP_MM } from "./knockdown.js";
 import { colourBlockCount, sequenceByColour } from "./sequence.js";
 import { compensateArea, fillAngles, gridUnderlay, tatamiAttributes } from "./tatami.js";
 import { strokeGraph } from "./strokes.js";
@@ -474,7 +474,7 @@ function applyKnockdown(
   const items = planned.flatMap((p) =>
     p.kind === "tatami" ? [{ id: p.id, polygon: p.polygon }] : [],
   );
-  const result = knockdownAreas(items);
+  const result = knockdownAreas(items, { touchUnderlapMm: TEMPLATE_TOUCH_UNDERLAP_MM });
   warnings.push(...result.warnings);
   const satinAt = planned.map((p) => (p.kind === "satin" ? p.cover : undefined));
 

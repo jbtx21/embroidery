@@ -426,6 +426,19 @@ describe("satin spares the tatami beneath it (spec §4.2 rule 1)", () => {
   });
 });
 
+describe("touching tatami areas reach 0.3 mm under each other in the template (spec §4.2 rule 2)", () => {
+  it("grows the earlier area by 0.3 mm under a later one it only touches", () => {
+    const flat = { ...pique, pullCompMm: 0, pushCompMm: 0 };
+    const left = area("left", polygonOf(rect(0, 0, 20, 20)));
+    const right = area("right", polygonOf(rect(20, 0, 20, 20)), "#c8102e");
+    const t = buildInkstitchTemplate([left, right], flat, { ...PAGE, knockdown: true });
+    const d = /<path id="left" d="([^"]*)"/.exec(t.svg)![1]!;
+    const xs = [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => Number(m[1]));
+    // 20 mm of the shared edge, out to x = 20.3 — not to 20.8.
+    expect(Math.max(...xs)).toBeCloseTo(20.3, 1);
+  });
+});
+
 describe("order option (spec §10.1)", () => {
   const ground = area("ground", polygonOf(rect(0, 0, 40, 30)), "#1f3a93");
   const letter = area("letter", moved(GLYPHS.T!, 10), "#c8102e");

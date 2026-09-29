@@ -5,9 +5,10 @@
  * The rules — the later one cuts whatever the colour, 20 mm² threshold, the lower
  * area stays 0.8 mm under the upper one, areas that only touch grow under each
  * other — are those of `resolveOverlaps` and are not rebuilt here. This is the
- * adapter from the template's areas onto the fill objects it works on. Only tatami
- * reaches it, in stitch order: a satin shape or a running stitch cuts nothing out
- * of another fill there (§4.1 rule 1).
+ * adapter from the template's areas onto the fill objects it works on, with the
+ * reach for touching areas the template asks for (`TEMPLATE_TOUCH_UNDERLAP_MM`,
+ * §4.2 rule 2). Only tatami reaches it, in stitch order: a satin shape or a
+ * running stitch cuts nothing out of another fill there (§4.1 rule 1).
  *
  * The one thing §4.2 adds — a later satin shape spares its place out of the tatami
  * beneath it (rule 1) — is `cutOutSatin`, on the parts `knockdownAreas` left.
@@ -16,6 +17,18 @@ import type { Polygon } from "@texma-stitch/geometry";
 import { bbox, difference, intersect, offset, polygonArea } from "@texma-stitch/geometry";
 import { KNOCKDOWN_MIN_MM2, resolveOverlaps } from "../resolve-overlaps.js";
 import type { FillObject, Warning } from "../types.js";
+
+/**
+ * How far an area grows under a later one it only touches, in the template
+ * (spec §4.2 rule 2). §4.1 says 0.8 mm; 0.3 mm holds against a gap at the seam
+ * until the trial stitch shows whether more is needed.
+ */
+export const TEMPLATE_TOUCH_UNDERLAP_MM = 0.3;
+
+export type KnockdownOptions = {
+  /** Reach under a later area that is only touched. Default: `resolveOverlaps`' own (0.8 mm). */
+  touchUnderlapMm?: number;
+};
 
 /** One tatami area, as the template has it. */
 export type KnockdownItem = { id: string; polygon: Polygon };
@@ -59,8 +72,14 @@ function asFill(index: number, polygon: Polygon): FillObject {
 }
 
 /** Cuts the areas, later out of earlier (module doc). `items` are in stitch order. */
-export function knockdownAreas(items: KnockdownItem[]): KnockdownResult {
-  const resolved = resolveOverlaps(items.map((it, i) => asFill(i, it.polygon)));
+export function knockdownAreas(
+  items: KnockdownItem[],
+  opts: KnockdownOptions = {},
+): KnockdownResult {
+  const resolved = resolveOverlaps(
+    items.map((it, i) => asFill(i, it.polygon)),
+    opts.touchUnderlapMm === undefined ? {} : { touchUnderlapMm: opts.touchUnderlapMm },
+  );
 
   const parts = new Map<number, Polygon[]>();
   for (const o of resolved.objects) {

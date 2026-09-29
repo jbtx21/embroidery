@@ -51,13 +51,23 @@ type Work = { obj: StitchObject; parts: Polygon[] };
 
 export type ResolveResult = { objects: StitchObject[]; warnings: Warning[] };
 
+export type ResolveOptions = {
+  /**
+   * How far an earlier fill grows under a later one it only touches (spec §4.1 rule 5).
+   * Default `KNOCKDOWN_UNDERLAP_MM`; the Ink/Stitch template asks for less (spec §4.2 rule 2).
+   * The cut of an overlap (rule 4) keeps its 0,8 mm whatever this is.
+   */
+  touchUnderlapMm?: number;
+};
+
 /**
  * Cut the fills, one pair at a time.
  *
  * Worked from the top down: by the time an object is used as a cutter it has
  * itself been cut by everything above it, so what cuts is what actually covers.
  */
-export function resolveOverlaps(objects: StitchObject[]): ResolveResult {
+export function resolveOverlaps(objects: StitchObject[], opts: ResolveOptions = {}): ResolveResult {
+  const touchUnderlap = opts.touchUnderlapMm ?? KNOCKDOWN_UNDERLAP_MM;
   const warnings: Warning[] = [];
   const work: Work[] = objects.map((obj) => ({
     obj,
@@ -86,7 +96,7 @@ export function resolveOverlaps(objects: StitchObject[]): ResolveResult {
         } else {
           // Touching without covering: grow the earlier area under the later one
           // (spec §4.1 rule 5). Only into the upper shape, nowhere else.
-          const reach = l.parts.flatMap((lp) => offset(lp, KNOCKDOWN_UNDERLAP_MM));
+          const reach = l.parts.flatMap((lp) => offset(lp, touchUnderlap));
           const ext = intersect(reach, [up]);
           if (totalArea(ext) > AREA_EPS_MM2) l.parts = union([...l.parts, ...ext]);
         }

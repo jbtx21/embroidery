@@ -136,3 +136,26 @@ describe("edgeGapRisks after resolveOverlaps (spec §8.1.3)", () => {
     expect(edgeGapRisks(resolveOverlaps([below(), far]).objects)).toHaveLength(0);
   });
 });
+
+describe("resolveOverlaps with a shorter reach for touching fills (spec §4.2 rule 2)", () => {
+  const below = fillObject("below", polygonOf(rect(0, 0, 20, 20)));
+  const above = fillObject("above", polygonOf(rect(20, 0, 20, 20)));
+
+  it("extends the earlier fill by the reach it is given", () => {
+    const r = resolveOverlaps([below, above], { touchUnderlapMm: 0.3 });
+    // 20 mm of shared edge times 0,3 mm.
+    expect(areaOf(r.objects[0]) - 400).toBeCloseTo(20 * 0.3, 0);
+  });
+
+  it("keeps the 0,8 mm of §4.1 without the option — the frozen engine does not change", () => {
+    const r = resolveOverlaps([below, above]);
+    expect(areaOf(r.objects[0]) - 400).toBeCloseTo(20 * KNOCKDOWN_UNDERLAP_MM, 0);
+  });
+
+  it("leaves the cut of an overlap at 0,8 mm whatever the reach", () => {
+    const big = fillObject("big", polygonOf(rect(0, 0, 40, 40)));
+    const top = fillObject("top", polygonOf(rect(10, 10, 20, 20)));
+    const r = resolveOverlaps([big, top], { touchUnderlapMm: 0.3 });
+    expect(40 * 40 - areaOf(r.objects[0])).toBeCloseTo((20 - 2 * KNOCKDOWN_UNDERLAP_MM) ** 2, 0);
+  });
+});
