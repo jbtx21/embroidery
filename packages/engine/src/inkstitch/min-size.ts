@@ -62,8 +62,10 @@ export const SATIN_STROKE_MIN_MM = 1.3;
  */
 export const GAP_MIN_MM = 0.8;
 /**
- * A closing piece smaller than this is computing noise and does not count (spec §5.2):
- * what the round joins of the offset leave along an edge that is not straight.
+ * A closing piece smaller than this is computing noise and does not count (spec §5.2): what
+ * the arc approximation of the offset's round joins leaves at a feature just over the limit
+ * (0.008 mm² at a hole of 0.9 mm). Hairline slivers along a long edge are not caught by an
+ * area floor.
  */
 export const GAP_NOISE_MM2 = 0.02;
 
@@ -118,8 +120,8 @@ export type MinimumSizeIgnored = {
   noise: number;
   /**
    * Pieces with no median width that are not a hole: mostly the rounding of a concave
-   * corner (a quarter circle of half the limit leaves 0.04 mm² in a right angle), also a
-   * short gap between small shapes. `medianShapeWidthMm` counts a shape without a medial
+   * corner (a quarter circle of half the limit leaves (1 − π/4)·0.4² = 0.034 mm² in a right
+   * angle, more than the noise floor), also a short gap between small shapes. `medianShapeWidthMm` counts a shape without a medial
    * axis as wide, and so does this check.
    */
   compact: number;

@@ -177,8 +177,8 @@ describe("checkMinimumSize — gaps within a colour", () => {
   });
 
   it("does not take the rounding of a concave corner for a gap, and says it left it out", () => {
-    // The closing rounds the inner corner of an L with a quarter circle of 0.4 mm: 0.04 mm² of
-    // area, more than the noise floor, but a corner — a shape without a medial axis, which
+    // The closing rounds the inner corner of an L with a quarter circle of 0.4 mm: 0.03 to 0.04 mm²
+    // of area, more than the noise floor, but a corner — a shape without a medial axis, which
     // `medianShapeWidthMm` counts as wide.
     const r = checkMinimumSize([areaShape("l", L_SHAPE, GRAY)], { widthMm: B });
     expect(r.findings).toEqual([]);
