@@ -365,12 +365,14 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
   );
 
   it(
-    "Aussparen (§4.2 Regel 1): die Stiche des Grunds meiden die spätere Satinform und laufen bis an ihre Kante",
+    "Aussparen (§4.2 Regel 1, Option satinCutout): die Stiche des Grunds meiden die spätere Satinform und laufen bis an ihre Kante — im Standard aus",
     async () => {
-      // A blue tatami ground with a red satin bar over it (3 x 20 mm, centred). With the knockdown
-      // on, the template cuts the bar's place out of the ground, 0.2 mm short of its edge; Ink/Stitch
-      // has to stitch the ground round the hole. The bar sits in the middle of the ground, so where
-      // the DST puts its origin does not matter: the box of the ground stitches gives the centre.
+      // A blue tatami ground with a red satin bar over it (3 x 20 mm, centred). With the option
+      // `satinCutout` the template cuts the bar's place out of the ground, 0.2 mm short of its edge;
+      // Ink/Stitch has to stitch the ground round the hole. Spec §4.2 withdrew this on 29.09.2026, so
+      // by default — with the knockdown or without it — the ground runs through under the bar. The bar
+      // sits in the middle of the ground, so where the DST puts its origin does not matter: the box
+      // of the ground stitches gives the centre.
       await initEngine();
       const ground = {
         kind: "area" as const,
@@ -391,17 +393,17 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
       const flat = { ...PRESETS.pique, pullCompMm: 0, pushCompMm: 0 };
       const dir = mkdtempSync(join(tmpdir(), "texma-aussparen-"));
       try {
-        const groundStitches = async (knockdown: boolean) => {
+        const groundStitches = async (name: string, options: { [k: string]: boolean }) => {
           const template = buildInkstitchTemplate([ground, bar], flat, {
             widthMm: 40,
             heightMm: 30,
-            knockdown,
+            ...options,
           });
           expect(template.objects.map((o) => [o.shapeId, o.kind])).toEqual([
             ["ground", "tatami"],
             ["bar", "satin"],
           ]);
-          const svg = join(dir, `k${knockdown}.svg`);
+          const svg = join(dir, `${name}.svg`);
           writeFileSync(svg, template.svg);
           const r = await runInkstitch({ extension: "output", options: { format: "dst" }, svg });
           expect(r.stderr.trim()).toBe("");
@@ -420,17 +422,24 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
             rel: own.map((s) => ({ x: s.x - cx, y: s.y - cy })),
           };
         };
-        const [plain, spared] = await Promise.all([groundStitches(false), groundStitches(true)]);
+        const [plain, standard, spared] = await Promise.all([
+          groundStitches("plain", {}),
+          groundStitches("standard", { knockdown: true }),
+          groundStitches("spared", { knockdown: true, satinCutout: true }),
+        ]);
         // The hole is 2.6 x 19.6 mm; 0.4 mm short of its edge, so the DST's rounding cannot matter.
         const inside = (p: { x: number; y: number }) => Math.abs(p.x) < 0.9 && Math.abs(p.y) < 9.4;
         // Within reach of the bar's edge (1.0 to 1.6 mm from its axis): the ground runs up to it.
         const atEdge = (p: { x: number; y: number }) =>
           Math.abs(p.x) > 1.0 && Math.abs(p.x) < 1.6 && Math.abs(p.y) < 9.4;
         expect(plain.rel.filter(inside).length).toBeGreaterThan(10);
+        // The standard knockdown does not spare: the same stitches as without it.
+        expect(standard.rel).toEqual(plain.rel);
         expect(spared.rel.filter(inside)).toHaveLength(0);
         expect(spared.rel.filter(atEdge).length).toBeGreaterThan(5);
         // The satin is the same either way.
         expect(spared.satin).toBe(plain.satin);
+        expect(standard.satin).toBe(plain.satin);
         expect(spared.satin).toBeGreaterThan(0);
       } finally {
         rmSync(dir, { recursive: true, force: true });

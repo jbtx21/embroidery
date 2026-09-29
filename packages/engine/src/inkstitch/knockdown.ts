@@ -1,32 +1,33 @@
 /**
- * Knockdown for the Ink/Stitch template (spec §4.1, §4.2): what a later tatami
- * area covers is cut out of the earlier ones, so the spot is not stitched twice.
+ * Knockdown for the Ink/Stitch template (spec §4.1): what a later tatami area
+ * covers is cut out of the earlier ones, so the spot is not stitched twice.
  *
  * The rules — the later one cuts whatever the colour, 20 mm² threshold, the lower
  * area stays 0.8 mm under the upper one, areas that only touch grow under each
  * other — are those of `resolveOverlaps` and are not rebuilt here. This is the
- * adapter from the template's areas onto the fill objects it works on, with the
- * reach for touching areas the template asks for (`TEMPLATE_TOUCH_UNDERLAP_MM`,
- * §4.2 rule 2). Only tatami reaches it, in stitch order: a satin shape or a
- * running stitch cuts nothing out of another fill there (§4.1 rule 1).
+ * adapter from the template's areas onto the fill objects it works on. Only tatami
+ * reaches it, in stitch order: a satin shape or a running stitch cuts nothing out
+ * of another fill there (§4.1 rule 1).
  *
- * The one thing §4.2 adds — a later satin shape spares its place out of the tatami
- * beneath it (rule 1) — is `cutOutSatin`, on the parts `knockdownAreas` left.
+ * Two ways §4.2 tried to do better were measured on the six customer logos and
+ * withdrawn on 29.09.2026; both are still here, as options and off: the reach for
+ * touching areas (`KnockdownOptions.touchUnderlapMm`, 0.3 mm instead of 0.8 mm
+ * made Köln worse) and a later satin shape sparing its place out of the tatami
+ * beneath it (`cutOutSatin`, on the parts `knockdownAreas` left — it splits the
+ * area at every satin edge and raised the density peak of STUTTGART 80 mm from
+ * 22 to 27).
  */
 import type { Polygon } from "@texma-stitch/geometry";
 import { bbox, difference, intersect, offset, polygonArea } from "@texma-stitch/geometry";
 import { KNOCKDOWN_MIN_MM2, resolveOverlaps } from "../resolve-overlaps.js";
 import type { FillObject, Warning } from "../types.js";
 
-/**
- * How far an area grows under a later one it only touches, in the template
- * (spec §4.2 rule 2). §4.1 says 0.8 mm; 0.3 mm holds against a gap at the seam
- * until the trial stitch shows whether more is needed.
- */
-export const TEMPLATE_TOUCH_UNDERLAP_MM = 0.3;
-
 export type KnockdownOptions = {
-  /** Reach under a later area that is only touched. Default: `resolveOverlaps`' own (0.8 mm). */
+  /**
+   * Reach under a later area that is only touched. Default: `resolveOverlaps`' own (0.8 mm,
+   * spec §4.1 rule 5). §4.2 rule 2 asked for 0.3 mm in the template and was withdrawn: in the
+   * Köln logo it was the worst reach measured.
+   */
   touchUnderlapMm?: number;
 };
 
@@ -124,7 +125,8 @@ const boxesTouch = (a: Polygon, b: Polygon): boolean => {
 
 /**
  * A later satin shape spares its place out of the tatami beneath it (spec §4.2
- * rule 1). `parts` is the area as the tatami knockdown left it, `satins` the
+ * rule 1, withdrawn — an option of the template, off). `parts` is the area as the
+ * tatami knockdown left it, `satins` the
  * shapes of the satin objects stitched after it. What they cover of the area
  * together is measured against the 20 mm² of §4.1 rule 3 — a lettering on a
  * banner cuts, a single stroke grazing an area does not — and if it is enough,

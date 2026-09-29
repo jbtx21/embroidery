@@ -30,10 +30,12 @@
  *
  * `TemplateOptions.order` groups the colours as far as the overlaps allow
  * (spec §10.1, `sequence.ts`), and `TemplateOptions.knockdown` cuts what a later
- * tatami covers out of the tatami below it (spec §4.1) and spares the place of a
- * later satin shape out of it (spec §4.2, `knockdown.ts`) — the stitch order
- * decides which is which, so the order comes first. The stitch angle
- * follows from the cut areas, and the compensation from the angle.
+ * tatami covers out of the tatami below it (spec §4.1, `knockdown.ts`) — the
+ * stitch order decides which is which, so the order comes first. The stitch angle
+ * follows from the cut areas, and the compensation from the angle. Two options
+ * of §4.2 — a later satin shape sparing its place out of the tatami beneath it,
+ * a shorter reach for areas that only touch — were measured and withdrawn; they
+ * stay as options (`satinCutout`, `touchUnderlapMm`), off.
  */
 import type { Point, Polygon, Polyline } from "@texma-stitch/geometry";
 import {
@@ -51,7 +53,7 @@ import { warn, WARNING } from "../warnings.js";
 import { classifyShape, SATIN_NARROW_WARN_MM } from "./classify.js";
 import type { SatinColumnPlan } from "./columns.js";
 import { satinColumns, STAYS_TATAMI } from "./columns.js";
-import { cutOutSatin, knockdownAreas, TEMPLATE_TOUCH_UNDERLAP_MM } from "./knockdown.js";
+import { cutOutSatin, knockdownAreas } from "./knockdown.js";
 import { colourBlockCount, orderSwaps, sequenceByColour } from "./sequence.js";
 import type { SwapBox } from "./sequence.js";
 import { compensateArea, fillAngles, gridUnderlay, tatamiAttributes } from "./tatami.js";
@@ -205,6 +207,18 @@ export type TemplateOptions = {
   minOverlapMm2?: number;
   /** Cut what later tatami areas cover out of the earlier ones (spec §4.1). Default: off. */
   knockdown?: boolean;
+  /**
+   * With `knockdown`: a later satin shape also spares its place out of the tatami beneath it
+   * (spec §4.2 rule 1). Measured on 29.09.2026 and withdrawn — every satin edge splits the area,
+   * each part with its own tie, jump and trim. Default: off, satin cuts nothing (§4.1 rule 1).
+   */
+  satinCutout?: boolean;
+  /**
+   * With `knockdown`: how far a tatami area grows under a later one it only touches, mm.
+   * Default: 0.8 mm (spec §4.1 rule 5). 0.3 mm (§4.2 rule 2) was the worst reach in the Köln
+   * logo and was withdrawn.
+   */
+  touchUnderlapMm?: number;
 };
 
 const num = (n: number): string => (Math.round(n * 1e4) / 1e4).toString();
@@ -516,20 +530,25 @@ function withFillAngles(planned: Planned[], preset: Preset): Planned[] {
 }
 
 /**
- * Cuts the tatami areas, later out of earlier (spec §4.1, `knockdown.ts`), and
- * spares the place of a later satin shape out of the tatami beneath it (spec
- * §4.2 rule 1). An area the cut splits becomes one object per part, each in the
- * place of the whole; one that is covered completely is left out, and says so.
+ * Cuts the tatami areas, later out of earlier (spec §4.1, `knockdown.ts`). With
+ * `satinCutout` it also spares the place of a later satin shape out of the tatami
+ * beneath it (spec §4.2 rule 1, withdrawn). An area the cut splits becomes one
+ * object per part, each in the place of the whole; one that is covered completely
+ * is left out, and says so.
  */
 function applyKnockdown(
   planned: Planned[],
   preset: Preset,
   warnings: Warning[],
+  opts: { satinCutout: boolean; touchUnderlapMm: number | undefined },
 ): { planned: Planned[]; report: KnockdownReport } {
   const items = planned.flatMap((p) =>
     p.kind === "tatami" ? [{ id: p.id, polygon: p.polygon }] : [],
   );
-  const result = knockdownAreas(items, { touchUnderlapMm: TEMPLATE_TOUCH_UNDERLAP_MM });
+  const result = knockdownAreas(
+    items,
+    opts.touchUnderlapMm === undefined ? {} : { touchUnderlapMm: opts.touchUnderlapMm },
+  );
   warnings.push(...result.warnings);
   const satinAt = planned.map((p) => (p.kind === "satin" ? p.cover : undefined));
 
@@ -548,7 +567,9 @@ function applyKnockdown(
       changed++;
       return;
     }
-    const later = satinAt.slice(at + 1).filter((c): c is Polygon => c !== undefined);
+    const later = opts.satinCutout
+      ? satinAt.slice(at + 1).filter((c): c is Polygon => c !== undefined)
+      : [];
     const spared = cutOutSatin(byFill, later, preset.underlapMm);
     const parts = spared.parts;
     if (parts !== byFill) {
@@ -770,7 +791,10 @@ export function buildInkstitchTemplate(
   }
   let knockdown: KnockdownReport | undefined;
   if (opts.knockdown) {
-    const cut = applyKnockdown(planned, preset, warnings);
+    const cut = applyKnockdown(planned, preset, warnings, {
+      satinCutout: opts.satinCutout === true,
+      touchUnderlapMm: opts.touchUnderlapMm,
+    });
     planned = cut.planned;
     knockdown = cut.report;
   }

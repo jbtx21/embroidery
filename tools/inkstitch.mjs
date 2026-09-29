@@ -3,6 +3,7 @@
  * check (docs/adr/0001-inkstitch-als-stich-engine.md, decision 28.09.2026).
  *
  *   pnpm inkstitch <svg> [preset] [--tatami] [--breite <mm>] [--ueberlappung <mm2>]
+ *                        [--aussparen] [--naht <mm>]
  *
  * --breite <mm> scales the motif proportionally to that width before anything is
  * imported (tools/breite.mjs); the output names the factor and the new size, and
@@ -12,6 +13,12 @@
  * standard is spec §10.1: any overlap binds. It is a variant for a look at the
  * result, not a setting: the output lists the overlaps whose order it turns round
  * (ids, colours, area, place), and out/<name>.tausch.json has all of them.
+ *
+ * --aussparen and --naht <mm> switch on the two ways spec §4.2 tried to do the
+ * knockdown better and withdrew on 29.09.2026 after measuring them: --aussparen lets
+ * a later satin shape spare its place out of the tatami beneath it, --naht sets how
+ * far a tatami area grows under a later one it only touches (standard 0.8 mm, §4.1
+ * rule 5; §4.2 asked for 0.3). Without them the knockdown is §4.1.
  *
  * Satin (default) — lettering and narrow shapes set the way a puncher sets
  * them:
@@ -172,9 +179,10 @@ const pruefeFeinheit = (imported) =>
     ? checkMinimumSize(imported.shapes, { widthMm: imported.widthMm })
     : undefined;
 
-const VALUE_FLAGS = ["--breite", "--ueberlappung"];
+const VALUE_FLAGS = ["--breite", "--ueberlappung", "--naht"];
 const args = process.argv.slice(2);
 const tatamiOnly = args.includes("--tatami");
+const satinCutout = args.includes("--aussparen");
 const [svgArg, presetArg = "pique"] = args.filter(
   (a, i) => !a.startsWith("--") && !VALUE_FLAGS.includes(args[i - 1]),
 );
@@ -194,10 +202,12 @@ function numberFlag(flag, { min }) {
 }
 const breiteMm = numberFlag("--breite", { min: Number.MIN_VALUE });
 const minOverlapMm2 = numberFlag("--ueberlappung", { min: 0 });
+const touchUnderlapMm = numberFlag("--naht", { min: 0 });
 
 if (!svgArg) {
   console.error(
-    "Aufruf: pnpm inkstitch <svg> [preset] [--tatami] [--breite <mm>] [--ueberlappung <mm2>]",
+    "Aufruf: pnpm inkstitch <svg> [preset] [--tatami] [--breite <mm>] [--ueberlappung <mm2>] " +
+      "[--aussparen] [--naht <mm>]",
   );
   console.error(`Presets: ${Object.keys(PRESETS).join(", ")}`);
   process.exit(1);
@@ -206,8 +216,10 @@ if (!(presetArg in PRESETS)) {
   console.error(`Unbekanntes Preset "${presetArg}". Bekannt: ${Object.keys(PRESETS).join(", ")}`);
   process.exit(1);
 }
-if (tatamiOnly && minOverlapMm2 !== undefined) {
-  console.error("--ueberlappung gilt für die Farbfolge der Vorlage und nicht mit --tatami");
+if (tatamiOnly && (minOverlapMm2 !== undefined || satinCutout || touchUnderlapMm !== undefined)) {
+  console.error(
+    "--ueberlappung, --aussparen und --naht gelten für die Vorlage und nicht mit --tatami",
+  );
   process.exit(1);
 }
 if (!isInkstitchReady()) {
@@ -269,6 +281,8 @@ if (tatamiOnly) {
     heightMm: imported.heightMm,
     order: "colour",
     knockdown: true,
+    ...(satinCutout ? { satinCutout: true } : {}),
+    ...(touchUnderlapMm === undefined ? {} : { touchUnderlapMm }),
     ...(minOverlapMm2 === undefined ? {} : { minOverlapMm2 }),
   });
   templateMs = performance.now() - started;
@@ -446,7 +460,9 @@ if (fallbacks.length > 0) {
 }
 if (knockdown) {
   console.log(
-    `\nKnockdown (Spec §4.1, §4.2): ${knockdown.changed} Tatami-Flächen verändert, ` +
+    `\nKnockdown (Spec §4.1${satinCutout ? ", --aussparen: §4.2 Regel 1" : ""}` +
+      `${touchUnderlapMm === undefined ? "" : `, --naht ${touchUnderlapMm} mm: §4.2 Regel 2`}): ` +
+      `${knockdown.changed} Tatami-Flächen verändert, ` +
       `${knockdown.covered.length} ganz verdeckt, ${knockdown.split.length} in Teile zerfallen`,
   );
   console.log(

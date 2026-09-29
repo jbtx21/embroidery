@@ -47,6 +47,8 @@ pnpm inkstitch <svg> [preset]        # Vorlage (Satin/Laufstich/Tatami) -> auto_
 pnpm inkstitch <svg> [preset] --tatami   # reiner Tatami-Lauf: die Quelle wie gezeichnet, nur Reihenabstand gesetzt
 pnpm inkstitch <svg> [preset] --breite 120   # das Motiv proportional auf 120 mm Breite skalieren, dann wie sonst (Ausgabe <name>-120mm.*)
 pnpm inkstitch <svg> [preset] --ueberlappung 20   # Variante: Überlappungen unter 20 mm² binden die Farbfolge nicht (Standard: jede, §10.1)
+pnpm inkstitch <svg> [preset] --aussparen   # Variante: Satin spart die Tatami-Fläche darunter aus (Spec §4.2 Regel 1, verworfen)
+pnpm inkstitch <svg> [preset] --naht 0.3   # Variante: angrenzende Flächen greifen 0,3 mm statt 0,8 mm (Spec §4.2 Regel 2, verworfen)
 ```
 
 `--breite` schreibt `width` und `height` der SVG um (die viewBox bleibt) und liest das Motiv erst dann
@@ -56,7 +58,10 @@ Breite der Zeichenfläche, das Motiv darin kann etwas schmaler sein (die DST-Gr�
 viel). `--ueberlappung` ist
 eine Variante für die Sichtprüfung, kein Standard: die Ausgabe listet die Überlappungen, deren
 Reihenfolge sich gegenüber §10.1 umdreht (Kennungen, Farben, Fläche, Lage in mm), und
-`out/<name>.tausch.json` hat alle.
+`out/<name>.tausch.json` hat alle. `--aussparen` und `--naht` schalten die beiden Wege ein, die
+Spec §4.2 am 29.09.2026 für den Knockdown probiert und nach der Messung an den sechs Kundenlogos
+zurückgenommen hat (Zahlen in `docs/backlog.md`); ohne sie gilt §4.1: Satin schneidet nichts aus,
+angrenzende Flächen greifen 0,8 mm.
 
 Für einzelne Ink/Stitch-Erweiterungen direkt (z. B. zum Verketten mehrerer Schritte):
 

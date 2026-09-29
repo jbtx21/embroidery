@@ -314,10 +314,18 @@ describe("knockdown option (spec §4.1)", () => {
     expect(t.knockdown!.split).toEqual([{ id: "bar", parts: 2 }]);
   });
 
-  it("never cuts a satin column out of a tatami over it (§4.1 rule 1); the other way round see §4.2", () => {
+  it("never cuts a satin column and never cuts out of one (rule 1)", () => {
     const letter = area("letter", moved(GLYPHS.T!, 5), "#c8102e");
     const ground = area("ground", polygonOf(rect(0, 0, 40, 30)), "#1f3a93");
-    // A tatami over the letter does not cut it.
+    // A tatami under the letter is not touched by it…
+    const a = buildInkstitchTemplate([ground, letter], pique, { ...PAGE, knockdown: true });
+    expect(a.objects.map((o) => [o.shapeId, o.kind])).toEqual([
+      ["ground", "tatami"],
+      ["letter", "satin"],
+    ]);
+    expect(/<path id="ground" d="([^"]*)"/.exec(a.svg)![1]!.match(/M /g)).toHaveLength(1);
+    expect(a.knockdown).toMatchObject({ changed: 0, satin: [] });
+    // …and a tatami over the letter does not cut it.
     const b = buildInkstitchTemplate([letter, ground], pique, { ...PAGE, knockdown: true });
     expect(b.objects.map((o) => [o.shapeId, o.kind])).toEqual([
       ["letter", "satin"],
@@ -328,11 +336,11 @@ describe("knockdown option (spec §4.1)", () => {
   });
 });
 
-describe("satin spares the tatami beneath it (spec §4.2 rule 1)", () => {
+describe("satinCutout option: satin spares the tatami beneath it (spec §4.2 rule 1, measured and rejected)", () => {
   const ground = area("ground", polygonOf(rect(0, 0, 40, 30)), "#1f3a93");
   const letter = area("letter", moved(GLYPHS.T!, 5), "#c8102e");
   const flat = { ...pique, pullCompMm: 0, pushCompMm: 0 };
-  const knock = { ...PAGE, knockdown: true };
+  const knock = { ...PAGE, knockdown: true, satinCutout: true };
   const drawn = (svg: string, id: string): Polygon => {
     const d = new RegExp(`<path id="${id}" d="([^"]*)"`).exec(svg)![1]!;
     const rings: Polyline[] = d
@@ -350,6 +358,17 @@ describe("satin spares the tatami beneath it (spec §4.2 rule 1)", () => {
       );
     return { outer: rings[0]!, holes: rings.slice(1) };
   };
+
+  it("is off unless asked: the knockdown alone leaves the tatami under a later letter whole (§4.1 rule 1)", () => {
+    const t = buildInkstitchTemplate([ground, letter], flat, { ...PAGE, knockdown: true });
+    expect(drawn(t.svg, "ground").holes).toHaveLength(0);
+    expect(t.knockdown).toMatchObject({ changed: 0, covered: [], split: [], satin: [] });
+    expect(t.knockdown!.areaMm2.after).toBeCloseTo(t.knockdown!.areaMm2.before, 6);
+    // The option without the knockdown does nothing either: it is a part of it.
+    const alone = buildInkstitchTemplate([ground, letter], flat, { ...PAGE, satinCutout: true });
+    expect(drawn(alone.svg, "ground").holes).toHaveLength(0);
+    expect(alone.knockdown).toBeUndefined();
+  });
 
   it("cuts the place of a later letter out of the tatami beneath it, and says what it cut", () => {
     const t = buildInkstitchTemplate([ground, letter], flat, knock);
@@ -426,16 +445,38 @@ describe("satin spares the tatami beneath it (spec §4.2 rule 1)", () => {
   });
 });
 
-describe("touching tatami areas reach 0.3 mm under each other in the template (spec §4.2 rule 2)", () => {
-  it("grows the earlier area by 0.3 mm under a later one it only touches", () => {
-    const flat = { ...pique, pullCompMm: 0, pushCompMm: 0 };
-    const left = area("left", polygonOf(rect(0, 0, 20, 20)));
-    const right = area("right", polygonOf(rect(20, 0, 20, 20)), "#c8102e");
-    const t = buildInkstitchTemplate([left, right], flat, { ...PAGE, knockdown: true });
-    const d = /<path id="left" d="([^"]*)"/.exec(t.svg)![1]!;
+describe("touching tatami areas under each other in the template (spec §4.1 rule 5, §4.2 rule 2 rejected)", () => {
+  const flat = { ...pique, pullCompMm: 0, pushCompMm: 0 };
+  const left = area("left", polygonOf(rect(0, 0, 20, 20)));
+  const right = area("right", polygonOf(rect(20, 0, 20, 20)), "#c8102e");
+  const reach = (svg: string): number => {
+    const d = /<path id="left" d="([^"]*)"/.exec(svg)![1]!;
     const xs = [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => Number(m[1]));
-    // 20 mm of the shared edge, out to x = 20.3 — not to 20.8.
-    expect(Math.max(...xs)).toBeCloseTo(20.3, 1);
+    return Math.max(...xs);
+  };
+
+  it("grows the earlier area by 0.8 mm under a later one it only touches, unless asked", () => {
+    const t = buildInkstitchTemplate([left, right], flat, { ...PAGE, knockdown: true });
+    // 20 mm of the shared edge, out to x = 20.8.
+    expect(reach(t.svg)).toBeCloseTo(20.8, 1);
+  });
+
+  it("grows it by the touchUnderlapMm it is given — 0.3 mm was tried in §4.2 and rejected", () => {
+    const t = buildInkstitchTemplate([left, right], flat, {
+      ...PAGE,
+      knockdown: true,
+      touchUnderlapMm: 0.3,
+    });
+    expect(reach(t.svg)).toBeCloseTo(20.3, 1);
+    // The cut of an overlap keeps its 0.8 mm whatever it is: rule 4 is not this reach.
+    const big = area("big", polygonOf(rect(0, 0, 40, 30)));
+    const top = area("top", polygonOf(rect(10, 5, 20, 20)), "#c8102e");
+    const cut = buildInkstitchTemplate([big, top], flat, {
+      ...PAGE,
+      knockdown: true,
+      touchUnderlapMm: 0.3,
+    });
+    expect(cut.knockdown!.areaMm2.after).toBeCloseTo(40 * 30 + 20 * 20 - 18.4 * 18.4, 0);
   });
 });
 

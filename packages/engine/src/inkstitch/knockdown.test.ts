@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { initGeometry, polygonArea, pointInPolygon } from "@texma-stitch/geometry";
 import { polygonOf, pt, rect } from "../../test/fixtures/shapes.js";
 import { KNOCKDOWN_MIN_MM2, KNOCKDOWN_UNDERLAP_MM } from "../resolve-overlaps.js";
-import { cutOutSatin, knockdownAreas, TEMPLATE_TOUCH_UNDERLAP_MM } from "./knockdown.js";
+import { cutOutSatin, knockdownAreas } from "./knockdown.js";
 import type { KnockdownItem } from "./knockdown.js";
 
 beforeAll(async () => {
@@ -88,10 +88,10 @@ describe("knockdownAreas (spec §4.1 on the tatami areas of the template)", () =
   });
 });
 
-describe("knockdownAreas with a shorter reach for touching areas (spec §4.2 rule 2)", () => {
+describe("knockdownAreas with a shorter reach for touching areas (spec §4.2 rule 2, rejected — an option)", () => {
   it("extends the earlier area by the reach it is given, under a later one it only touches", () => {
     const items = [item("below", 0, 0, 20, 20), item("above", 20, 0, 20, 20)];
-    const short = knockdownAreas(items, { touchUnderlapMm: TEMPLATE_TOUCH_UNDERLAP_MM });
+    const short = knockdownAreas(items, { touchUnderlapMm: 0.3 });
     // 20 mm of shared edge times 0.3 mm of underlap.
     expect(areaOf(short.areas.get("below")) - 400).toBeCloseTo(20 * 0.3, 0);
     expect(areaOf(short.areas.get("above"))).toBeCloseTo(400, 6);
@@ -100,10 +100,9 @@ describe("knockdownAreas with a shorter reach for touching areas (spec §4.2 rul
     expect(areaOf(plain.areas.get("below")) - 400).toBeCloseTo(20 * KNOCKDOWN_UNDERLAP_MM, 0);
   });
 
-  it("is 0.3 mm in the template (spec §4.2) and leaves the cut of an overlap at 0.8 mm", () => {
-    expect(TEMPLATE_TOUCH_UNDERLAP_MM).toBe(0.3);
+  it("leaves the cut of an overlap at 0.8 mm whatever the reach", () => {
     const r = knockdownAreas([item("below", 0, 0, 40, 40), item("above", 10, 10, 20, 20)], {
-      touchUnderlapMm: TEMPLATE_TOUCH_UNDERLAP_MM,
+      touchUnderlapMm: 0.3,
     });
     const cut = 40 * 40 - areaOf(r.areas.get("below"));
     expect(cut).toBeCloseTo((20 - 2 * KNOCKDOWN_UNDERLAP_MM) ** 2, 0);
