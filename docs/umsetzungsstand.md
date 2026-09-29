@@ -601,3 +601,51 @@ byte-gleich mit der vom Zwischenstand. Die DST unterscheidet sich nur um einen S
 Läufen sind byte-gleich. Der Spalt Rot/Gold ist unverändert (Median der Abstände Gold → nächster roter
 Einstich: ganzes Motiv 0,50 mm, „Ho“ 0,50, „Stu“ 0,41; Anteil unter 0,3 mm 21 % / 30 % / 24 %); die
 93 Rails am Stoffspalt teilen sich in 61 an breiten Säulen und 32 an den 28 schmalen.
+
+**Atzensport aus dem Vektor-PDF (29.09.2026).** Der Nutzer hat das Atzensport-Hofbräu-Logo als
+Vektor-PDF nachgereicht (nicht im Repo). Die Vorlage unter den sechs Kundenlogos ist eine
+Nachzeichnung aus einem Bild: fünf statt sieben Farben — der goldene Schatten der Schrift (#D0B259)
+ist mit dem Beige des Pferds verschmolzen (#C2AA7D), das Rot stumpfer (#C72C31 statt #E00310) —, und
+der Papiergrund in und neben den Buchstaben liegt als 18 cremefarbene Formen (#F4F3EF) in der
+Vorlage, die mitgestickt werden. Umgewandelt wie das Hofbräu-PDF (MuPDF, Pfade unverändert, das
+Gezeichnete 80 bzw. 200 mm breit), Stand `ce28e5d`, Preset `pique`, Nachzeichnung → PDF:
+
+| Motiv                     |          Stiche |   Sprünge |  Trims/1000 | Farbblöcke | Dichtespitze | Zellen >18 | Nadelhäufung | Mindestgröße |
+| ------------------------- | --------------: | --------: | ----------: | ---------: | -----------: | ---------: | -----------: | -----------: |
+| Atzensport Hofbräu 80 mm  | 11.959 → 12.450 | 226 → 186 | 9,70 → 9,16 |      7 → 8 |      24 → 22 |      3 → 2 |        7 → 6 | 141 → 147 mm |
+| Atzensport Hofbräu 200 mm | 46.496 → 41.746 | 496 → 312 | 2,47 → 2,71 |      8 → 8 |      23 → 19 |      4 → 1 |        6 → 6 | 351 → 296 mm |
+
+Im Bild (Garnfarben, 28 Pixel je mm) ist die Schrift aus dem PDF durchgehend Satin mit goldenem
+Schatten; aus der Nachzeichnung war das „o" von „Hofbräu" Tatami mit cremefarbenem Innenraum und der
+Schatten ein Laufstich. Die Trims liegen in 80 mm auch aus dem PDF über dem Archiv-p90 — die raue
+Kontur war nicht ihre Ursache (27 der 114 setzt §10.2, Sprung ab 5 mm). Der achte Farbblock kommt
+aus dem PDF selbst: die Umlautstriche des „ä" tragen ein zweites, fast gleiches Rot (#D1070D) und
+werden als eigene Farbe zuletzt gestickt. Offene Punkte in `docs/backlog.md`.
+
+**Probestick-Stand (29.09.2026).** Fünf Dateien mit dem Endstand `ce28e5d`, erzeugt im sauberen
+Arbeitsverzeichnis (DST, Vorschau in Garnfarben und Nadelbelegung je Stopp an den Nutzer; nicht im
+Repo):
+
+| Datei                             | Preset  |            Größe | Stiche | Farbblöcke | Trims/1000 | Dichtespitze | Nadelhäufung | Mindestgröße |
+| --------------------------------- | ------- | ---------------: | -----: | ---------: | ---------: | -----------: | -----------: | -----------: |
+| Stuttgarter Hofbräu               | `cap`   |  110,4 × 51,0 mm |  9.427 |          2 |       9,76 |           20 |            6 |       202 mm |
+| STUTTGART 80 mm                   | `pique` |   79,4 × 74,6 mm | 13.578 |          6 |       3,39 |           22 |            7 |       118 mm |
+| STUTTGART 120 mm (`--breite 120`) | `pique` | 119,0 × 111,6 mm | 25.541 |          6 |       2,00 |           25 |            9 |       223 mm |
+| Berufsfeuerwehr Köln 90 mm        | `pique` |   90,2 × 90,2 mm | 20.711 |         15 |       4,10 |           29 |            8 |       167 mm |
+| Atzensport Hofbräu 80 mm (PDF)    | `pique` |  79,6 × 113,0 mm | 12.450 |          8 |       9,16 |           22 |            6 |       147 mm |
+
+STUTTGART 120 mm: die Nadelhäufung 9 liegt über dem Archiv (Maximum 8, aus vier Dateien) — eine
+Zelle, in der drei Farblagen einstechen (Schwarz, Grau, Schwarz; zwei, vier und drei Einstiche);
+im Zwischenstand `cb1f01c` war es 8 an anderer Stelle. Dass die Mindestgröße dort 223 mm statt
+118 mm heißt, liegt an der Prüfung selbst (Backlog: „Die Mindestgröße springt mit der Prüfgröße").
+
+**Ink/Stitch mit festem Hash-Seed (29.09.2026).** Beim Messen fiel auf, dass zwei Läufe mit
+byte-gleicher Vorlage um einen Stich auseinanderlagen. Nachgemessen am Hofbräu-Motiv mit kaltem
+Cache: drei Läufe ohne festen Seed gaben 9.424, 9.425 und 9.426 Stiche (drei verschiedene DSTs),
+drei mit `PYTHONHASHSEED=0` dreimal dieselbe DST (9.425). Python würfelt den Hash von
+Zeichenketten je Prozess und damit die Reihenfolge von Mengen, die Ink/Stitch durchläuft.
+`tools/inkstitch-lauf.mjs` startet Ink/Stitch jetzt immer mit `PYTHONHASHSEED=0`
+(`inkstitchEnv`, getestet in `test/inkstitch-lauf.test.ts`); der Stichplan-Cache aus der Zeit davor
+ist einmal zu leeren (`inkstitch/README.md`). Nachgeprüft über `pnpm inkstitch`: kalter und warmer
+Cache geben dieselbe DST wie die drei Läufe mit festem Seed. Die fünf Probestick-Dateien oben
+entstanden vor dieser Änderung; ein Lauf heute kann um wenige Stiche von ihnen abweichen.

@@ -3,6 +3,45 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Probestick-Stand und Atzensport aus dem PDF (29.09.2026)
+
+Beim Erzeugen der fünf Probestick-Dateien und beim Umstieg von der Atzensport-Nachzeichnung auf das
+Vektor-PDF des Nutzers (Zahlen in `docs/umsetzungsstand.md`).
+
+- **Die Mindestgröße springt mit der Prüfgröße (Spec-Frage §5.2).** §5.2 misst die Satinstriche in
+  der Größe, in der geprüft wird. Wird ein Motiv größer, wird ein Strich, der vorher Laufstich war, ab
+  0,7 mm Satin (§7.8.1) — und fordert dann 1,3 mm. STUTTGART in 80 mm: Mindestgröße 118 mm (bestimmt
+  von „CYS SPORTS", 0,88 mm); dasselbe Motiv in 120 mm (`--breite 120`): 223 mm, bestimmt von einem
+  grauen Strich, der dort 0,70 mm breit ist (in 80 mm 0,47 mm, Laufstich). Atzensport aus dem PDF: in
+  80 mm 147 mm (goldene Schattenlinie 0,71 mm), in 200 mm 296 mm (ein Haarstrich der Schrift, dort
+  0,88 mm, in 80 mm 0,35 mm). Die Zahl aus der kleinen Größe gilt also nur, solange kein weiterer
+  Strich über 0,7 mm wächst. Denkbar: die Mindestgröße über die Größen suchen (die kleinste, in der
+  kein Satinstrich zwischen 0,7 und 1,3 mm liegt), oder schmale Satinstriche als eigene Klasse
+  zulassen (nächster Punkt).
+- **1,3 mm ist für Schattenlinien zu streng (Spec-Frage §5.2).** Die Profi-Mütze „Stuttgarter
+  Hofbräu" zeigt die goldenen Schattenlinien in 110 mm sauber gestickt; gezeichnet sind sie dort
+  0,75 mm breit. Unsere Prüfung verlangt für dasselbe Motiv 202 mm, für Atzensport aus dem PDF
+  (goldener Schatten 0,71 mm in 80 mm) 147 mm. Die 1,3 mm stammen aus dem p5 der typischen
+  Satinbreite je Archivdatei (Median je Datei), beschreiben also die übliche Säule einer Datei, nicht
+  die schmalste, die hält. Erst den Probestick der Hofbräu-Datei abwarten.
+- **Nahe Farben werden eigene Farbblöcke.** Im Atzensport-PDF tragen die Umlautstriche des „ä" ein
+  Rot #D1070D, die übrige Schrift #E00310 — für die Vorlage zwei Farben, für jeden Sticker ein Faden.
+  Die Vorlage stickt die Umlautstriche als achten Farbblock zuletzt. Denkbar: Farben unter einem
+  kleinen Abstand zusammenlegen und das in der Ausgabe nennen (§10.1 sagt dazu nichts).
+- **Der Importer übergeht den Ursprung der viewBox.** `unitScale` (`import/svg.ts`) nimmt Breite und
+  Höhe der viewBox, nicht ihren Ursprung. Eine SVG aus einem PDF hat meist einen (Hofbräu:
+  `viewBox="29.9 367.2 …"`); ihre Formen liegen in der Vorlage um den Ursprung verschoben, beim
+  Hofbräu-Motiv um 76 mm in y. Die DST ändert das nicht (sie ist auf ihre Mitte bezogen), aber die
+  Lagen in den Berichten sind verschoben: `pnpm mindestgroesse` meldet am 51 mm hohen Hofbräu-Motiv
+  „path33 bei (36.9, 88.3) mm".
+- **Atzensport 80 mm: die Trims bleiben auch aus dem PDF über p90** (9,16 statt 9,70 je 1000). Die
+  raue Nachzeichnung war nicht die Ursache; 27 der 114 Trims setzt §10.2 (Sprung ab 5 mm), die
+  übrigen setzt Ink/Stitch selbst (u. a. `auto_satin --trim`, siehe `inkstitch/README.md`). Dasselbe bei der
+  Hofbräu-Mütze (9,76 je 1000, zwei Farben). Offen, wie weit das der Motivart geschuldet ist (viele
+  einzelne Buchstaben mit Schatten) — der Probestick zeigt, ob es stört.
+- **STUTTGART 120 mm: Nadelhäufung 9.** Eine Zelle, in der drei Farblagen einstechen (Schwarz 2,
+  Grau 4, Schwarz 3 Einstiche); über dem Archiv (Maximum 8, aus nur vier Dateien).
+
 ## Ink/Stitch-Vorlage, Zugausgleich je Rail und Profi-Vergleich Hofbräu (29.09.2026)
 
 Nach der Rücknahme von §4.2 (Spec §4.2 neu gefasst) und dem neuen §7.8.3 „Zugausgleich lässt
