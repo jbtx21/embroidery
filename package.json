@@ -17,6 +17,7 @@
     "bench": "pnpm run build && node packages/engine/bench/run.mjs",
     "demo": "pnpm run build && node tools/demo.mjs",
     "kennzahlen": "node tools/kennzahlen.mjs",
+    "mindestgroesse": "pnpm run build && node tools/mindestgroesse.mjs",
     "inkstitch": "pnpm run build && node tools/inkstitch.mjs"
   },
   "devDependencies": {

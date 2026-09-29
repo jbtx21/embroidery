@@ -40,6 +40,11 @@
  * preset's row spacing on every path (withPresetAttributes), straight to
  * output. It is the baseline the satin run is measured against.
  *
+ * Either way -- before any stitch is made -- the template is checked for fineness
+ * (spec §5.2, packages/engine/src/inkstitch/min-size.ts): the minimum logo width, the
+ * findings per kind and the five largest are printed under "Feinheit". It only reports;
+ * `pnpm mindestgroesse <svg>` lists every finding and draws them.
+ *
  * Either way the DST is read back with @texma-stitch/formats, rendered to
  * out/<name>.png with @texma-stitch/render, and measured: the archive-relative
  * metrics `pnpm kennzahlen` prints (tools/archiv.mjs), our own analyze()
@@ -51,6 +56,7 @@ import { basename, extname, resolve } from "node:path";
 import {
   analyze,
   buildInkstitchTemplate,
+  checkMinimumSize,
   CONNECT_DEFAULTS,
   densityProfile,
   importShapes,
@@ -62,6 +68,7 @@ import {
 import { readDst, unitsToMm } from "@texma-stitch/formats";
 import { renderPlanPng } from "@texma-stitch/render";
 import { zeile } from "./archiv.mjs";
+import { befundZeilen, zusammenfassung } from "./feinheit.mjs";
 import { isInkstitchReady, runInkstitch, SETUP_HINT } from "./inkstitch-lauf.mjs";
 
 const INKSTITCH_NS = "http://inkstitch.org/namespace";
@@ -149,6 +156,12 @@ async function inkstitch(args) {
   }
 }
 
+/** Spec §5.2 on the shapes of the SVG; without a size in the SVG there is no ordered width to hold from. */
+const pruefeFeinheit = (imported) =>
+  imported.widthMm > 0
+    ? checkMinimumSize(imported.shapes, { widthMm: imported.widthMm })
+    : undefined;
+
 const args = process.argv.slice(2);
 const tatamiOnly = args.includes("--tatami");
 const [svgArg, presetArg = "pique"] = args.filter((a) => !a.startsWith("--"));
@@ -185,6 +198,7 @@ let smoothed = [];
 let knockdown;
 let underlay;
 let compensation;
+let feinheit;
 let templateMs = 0;
 let outputInput = templatePath;
 
@@ -194,6 +208,8 @@ if (tatamiOnly) {
   });
   writeFileSync(templatePath, text);
   summary = [`Tatami-Lauf (--tatami): ${pathCount} Pfade wie gezeichnet`];
+  await initEngine();
+  feinheit = pruefeFeinheit(importShapes(sourceSvg));
 } else {
   await initEngine();
   const started = performance.now();
@@ -206,6 +222,7 @@ if (tatamiOnly) {
   });
   templateMs = performance.now() - started;
   writeFileSync(templatePath, template.svg);
+  feinheit = pruefeFeinheit(imported);
 
   const count = (kind) => template.objects.filter((o) => o.kind === kind).length;
   const columns = template.objects.reduce(
@@ -336,6 +353,17 @@ if (!tatamiOnly && outputInput !== templatePath) {
 console.log(`DST         out/${name}.dst`);
 console.log(`Vorschau    out/${name}.png`);
 for (const line of summary) console.log(`            ${line}`);
+
+console.log("\nFeinheit (Spec §5.2)");
+if (!feinheit) {
+  console.log("  Die SVG nennt keine Größe in mm — ohne die bestellte Breite kein „hält ab“.");
+} else {
+  for (const line of zusammenfassung(feinheit)) console.log(`  ${line}`);
+  if (feinheit.findings.length > 0) {
+    console.log("\n  Die fünf größten Befunde (alle: pnpm mindestgroesse <svg>)");
+    for (const line of befundZeilen(feinheit.findings, { max: 5 })) console.log(`  ${line}`);
+  }
+}
 
 if (fallbacks.length > 0) {
   console.log(`\nBleibt Tatami (als Satin oder Laufstich vorgesehen, ${fallbacks.length})`);
