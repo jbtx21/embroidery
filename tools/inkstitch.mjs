@@ -2,7 +2,11 @@
  * Ink/Stitch as the stitch generator, TEXMA Stitch as template prep + result
  * check (docs/adr/0001-inkstitch-als-stich-engine.md, decision 28.09.2026).
  *
- *   pnpm inkstitch <svg> [preset] [--tatami] [--ueberlappung <mm2>]
+ *   pnpm inkstitch <svg> [preset] [--tatami] [--breite <mm>] [--ueberlappung <mm2>]
+ *
+ * --breite <mm> scales the motif proportionally to that width before anything is
+ * imported (tools/breite.mjs); the output names the factor and the new size, and
+ * the files get the width in their name (<name>-120mm.dst).
  *
  * --ueberlappung <mm2> lets overlaps under that area go in the colour order — the
  * standard is spec §10.1: any overlap binds. It is a variant for a look at the
@@ -73,6 +77,7 @@ import {
 import { readDst, unitsToMm } from "@texma-stitch/formats";
 import { renderPlanPng } from "@texma-stitch/render";
 import { zeile } from "./archiv.mjs";
+import { scaleSvgToWidth } from "./breite.mjs";
 import { befundZeilen, zusammenfassung } from "./feinheit.mjs";
 import { isInkstitchReady, runInkstitch, SETUP_HINT } from "./inkstitch-lauf.mjs";
 
@@ -167,7 +172,7 @@ const pruefeFeinheit = (imported) =>
     ? checkMinimumSize(imported.shapes, { widthMm: imported.widthMm })
     : undefined;
 
-const VALUE_FLAGS = ["--ueberlappung"];
+const VALUE_FLAGS = ["--breite", "--ueberlappung"];
 const args = process.argv.slice(2);
 const tatamiOnly = args.includes("--tatami");
 const [svgArg, presetArg = "pique"] = args.filter(
@@ -187,10 +192,13 @@ function numberFlag(flag, { min }) {
   }
   return value;
 }
+const breiteMm = numberFlag("--breite", { min: Number.MIN_VALUE });
 const minOverlapMm2 = numberFlag("--ueberlappung", { min: 0 });
 
 if (!svgArg) {
-  console.error("Aufruf: pnpm inkstitch <svg> [preset] [--tatami] [--ueberlappung <mm2>]");
+  console.error(
+    "Aufruf: pnpm inkstitch <svg> [preset] [--tatami] [--breite <mm>] [--ueberlappung <mm2>]",
+  );
   console.error(`Presets: ${Object.keys(PRESETS).join(", ")}`);
   process.exit(1);
 }
@@ -208,13 +216,27 @@ if (!isInkstitchReady()) {
 }
 
 const svgPath = resolve(svgArg);
-const name = basename(svgPath, extname(svgPath));
+let sourceSvg = readFileSync(svgPath, "utf8");
+/** What --breite did: the factor and the size before and after. */
+let scaled;
+if (breiteMm !== undefined) {
+  await initEngine();
+  const original = importShapes(sourceSvg);
+  try {
+    scaled = scaleSvgToWidth(sourceSvg, breiteMm, original);
+  } catch (err) {
+    console.error(`FEHLER: ${err.message}`);
+    process.exit(1);
+  }
+  sourceSvg = scaled.text;
+}
+const name =
+  basename(svgPath, extname(svgPath)) + (scaled === undefined ? "" : `-${scaled.to.widthMm}mm`);
 const outDir = resolve("out");
 mkdirSync(outDir, { recursive: true });
 
 const preset = PRESETS[presetArg];
 const templatePath = resolve(outDir, `${name}.inkstitch.svg`);
-const sourceSvg = readFileSync(svgPath, "utf8");
 /** Every Ink/Stitch call: what it did and how long it took. */
 const calls = [];
 const stderrLines = [];
@@ -391,6 +413,13 @@ console.log(
   `Preset      ${presetArg} (Reihenabstand ${preset.fillRowSpacingMm} mm, ` +
     `Satin-Abstand ${preset.satinSpacingMm} mm)`,
 );
+if (scaled) {
+  const size = (d) => `${Number(d.widthMm.toFixed(3))} × ${Number(d.heightMm.toFixed(3))} mm`;
+  console.log(
+    `Breite      --breite ${breiteMm}: Faktor ${scaled.factor.toFixed(4)}, ` +
+      `${size(scaled.from)} → ${size(scaled.to)}`,
+  );
+}
 console.log(`Vorlage     out/${name}.inkstitch.svg`);
 if (!tatamiOnly && outputInput !== templatePath) {
   console.log(`Geroutet    out/${name}.routed.svg`);
