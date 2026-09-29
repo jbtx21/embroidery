@@ -3,6 +3,142 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Ink/Stitch-Vorlage, Folge von Schritt 3 (29.09.2026) — §4.2 gemessen, Farbfolge-Variante, Breite
+
+Nach der Entscheidung des Nutzers (Spec §4.2, §7.8.5, §8.8 nachgezogen) umgesetzt und an den
+sechs Kundenlogos gemessen: Preset `pique`, kalter Ink/Stitch-Cache, Vergleich mit dem Stand nach
+Punkt 4 von Schritt 3. Die Zahlen je Punkt stehen auch in den Commit-Nachrichten (`42cdd31`,
+`febaeac`, `fc4e1c8`, `281833d`, `dffac53`). Die Spec ist an keiner Stelle geändert; wo eine
+Regel nicht bringt, was §4.2 von ihr erwartet, steht die Frage mit Zahlen hier.
+
+- **§4.2 Regel 1 (Satin spart die Tatami-Fläche darunter aus) verbessert die Kennzahlen nicht —
+  Spec-Frage.** Umgesetzt wie beschrieben (`cutOutSatin` in `knockdown.ts`); gemessen, Stand nach
+  Punkt 4 → mit Regel 1:
+
+  | Motiv             |          Stiche |  Dichte | Zellen >18 | Nadel | Zellen ≥6 |   Sprünge |     Trims | ausgespart |
+  | ----------------- | --------------: | ------: | ---------: | ----: | --------: | --------: | --------: | ---------: |
+  | STUTTGART 80 mm   | 13.578 → 15.370 | 22 → 27 |     5 → 14 | 7 → 7 |     3 → 8 |  89 → 100 |   46 → 50 |    202 mm² |
+  | STUTTGART 250 mm  | 74.674 → 79.432 | 29 → 29 |    15 → 25 | 9 → 9 |   33 → 31 | 198 → 221 |   57 → 62 |   2927 mm² |
+  | Köln 90 mm        | 20.711 → 20.711 | 29 → 29 |    30 → 30 | 8 → 8 |   11 → 11 | 168 → 168 |   85 → 85 |          0 |
+  | Eislingen 200 mm  | 32.669 → 32.639 | 20 → 20 |      1 → 1 | 6 → 6 |     1 → 1 | 341 → 341 | 146 → 146 |     25 mm² |
+  | Atzensport 80 mm  | 12.005 → 12.544 | 23 → 23 |      3 → 3 | 7 → 7 |     2 → 2 | 226 → 226 | 116 → 116 |    176 mm² |
+  | Atzensport 200 mm | 46.508 → 45.695 | 22 → 24 |      4 → 4 | 6 → 7 |     3 → 3 | 496 → 496 | 115 → 115 |   1846 mm² |
+
+  Die Beobachtung in §4.2 stimmt (unter Satin lagen 3–10 % aller Stiche, dort die meisten
+  Zellen über 18), der Schluss nicht: von den Zellen über 18, die vorher unter Satin lagen
+  (aus den Stichlisten, ohne Verriegelungen), verschwinden STUTTGART 80 mm 1 von 2, 250 mm 1 von
+  13, Köln 0 von 4, Atzensport 200 mm 0 von 1. Satin- und Linienstiche bleiben, wie sie sind,
+  alle Mehrstiche stehen im Tatami (STUTTGART 80 mm 11.698 → 14.658, 250 mm 70.173 → 78.892,
+  Atzensport 80 mm 6.846 → 7.973, 200 mm 40.953 → 42.198). Grund: jede Reihe, die eine
+  Satinform kreuzt, endet an deren Kante und setzt dahinter neu an — zwei Reihenenden statt
+  eines durchlaufenden Stichs, und jedes neue Teil bekommt Verriegelung, Sprung und Trim
+  (STUTTGART 80 mm: Tatami-Objekte 8 → 18). Diese Reihenenden liegen an der Satinkante, wo die
+  Zellen schon vom Satin fast voll sind; ausgespart werden nur 202 mm² Fläche, das sind rund
+  130 Stiche (bei 0,4 mm Reihenabstand und 4 mm Stichlänge).
+
+  Versuche an STUTTGART 80 mm (Scratchpad, nicht übernommen): Satin-Unterlappung 0,5 mm statt
+  0,2 mm — 13.921 Stiche, Dichte 25, Zellen über 18: 12, aber nur noch 45 mm² ausgespart, weil
+  schmale Striche aus dem Schnitt fallen; Teile unter 3 mm² nicht sticken, allein — 15.299
+  Stiche, Dichte 24, 12 Zellen; beides — 13.923 Stiche, 25, 12. Ohne Regel 1: 13.578, 22, 5
+  Zellen. Fragen: Ist das Ziel die Stichzahl, die Dichte oder die doppelte Deckung unter der
+  Schrift (Steife des Stickbilds)? Wenn die Dichte, hilft das Aussparen bei diesem Preset nicht;
+  wenn die Deckung, braucht es den Probestick, nicht die Kennzahl. Eine Regel „nur Flächen
+  aussparen, die der Satin mit mindestens N mm Breite deckt" (breite Buchstaben ja, dünne Striche
+  nein) verhielte sich wie die 0,5 mm Unterlappung.
+
+- **§4.2 Regel 2 (angrenzende Flächen greifen 0,3 mm statt 0,8 mm) macht Köln schlechter —
+  Spec-Frage.** Nur Köln bewegt sich (STUTTGART 250 mm, Eislingen und Atzensport unverändert bis
+  auf ±30 Stiche, STUTTGART 80 mm +52 Stiche): 20.711 → 20.274 Stiche, Dichte 29 → 32, Zellen
+  über 18 30 → 33, Nadelhäufung 8 → 10, Zellen ab 6 Einstichen 11 → 16, Sprünge 168 → 180, Trims
+  85 → 91. Die Kurve über die Weite ist nicht monoton:
+
+  | Weite der Regel 5 |        0 |      0,2 |      0,3 |      0,5 |      0,6 |      0,8 |
+  | ----------------- | -------: | -------: | -------: | -------: | -------: | -------: |
+  | Stiche            |   19.848 |   19.776 |   20.274 |   20.537 |   20.683 |   20.711 |
+  | Dichtespitze      |       26 |       26 |       32 |       29 |       29 |       29 |
+  | Zellen über 18    |       15 |       16 |       33 |       33 |       27 |       30 |
+  | Nadelhäufung      |        6 |        7 |       10 |        9 |        8 |        8 |
+  | Zellen ab 6       |        5 |        6 |       16 |       17 |        8 |       11 |
+  | Sprünge / Trims   | 160 / 81 | 164 / 82 | 180 / 91 | 171 / 88 | 166 / 83 | 168 / 85 |
+
+  0,3 mm ist die schlechteste getestete Weite; ohne Regel 5 (die Beobachtung, auf die §4.2 sich
+  stützt) und mit 0,2 mm halbieren sich die Zellen. Die meisten heißen Zellen in Köln sitzen
+  (Zählung aus den Stichlisten) an den Nähten der Flächen `z03` (schwarz), `z06` und `z17`
+  (blau), wo die Randstreifen von drei Flächen in eine Zelle fallen. Was die Regel gegen den
+  „Blitzer" an der Naht leistet (§8.1.2), zeigt nur der Probestick; für die Kennzahlen sind 0
+  und 0,2 mm die bessere Weite, ob sie an der Naht einen Blitzer lassen, ist offen.
+
+- **Farbfolge-Variante `--ueberlappung <mm²>` (Option `minOverlapMm2` der Vorlage): 20 mm²
+  verdeckt Einzelheiten, eine relative Schwelle nicht — Spec-Frage.** Der Standard bleibt §10.1
+  (jede Überlappung bindet); die Variante steht nur zur Sichtprüfung da. `pnpm inkstitch <svg>
+--ueberlappung 20` nennt die Überlappungen, deren Reihenfolge umdreht (Kennung, Farbe, mm², Lage
+  in mm), `out/<name>.tausch.json` hat alle; Ausschnitte vorher/nachher je Stelle liegen im
+  Scratchpad der Sitzung. Standard → 20 mm²:
+
+  | Motiv             |          Stiche |  Dichte | Zellen >18 |  Nadel | Zellen ≥6 |   Sprünge |     Trims | Blöcke |  umgedreht (andere Farbe) |
+  | ----------------- | --------------: | ------: | ---------: | -----: | --------: | --------: | --------: | -----: | ------------------------: |
+  | STUTTGART 80 mm   | 15.422 → 15.074 | 27 → 30 |    15 → 12 |  7 → 8 |     8 → 9 |  99 → 100 |   50 → 51 |  6 → 3 | 25 (215 mm², größte 15,6) |
+  | STUTTGART 250 mm  | 79.432 → 79.262 | 29 → 29 |    25 → 26 |  9 → 9 |   31 → 30 | 221 → 224 |   62 → 62 |  6 → 6 |    4 (17 mm², größte 4,4) |
+  | Köln 90 mm        | 20.274 → 20.427 | 32 → 30 |    33 → 30 | 10 → 7 |   16 → 13 | 180 → 189 |   91 → 99 | 15 → 6 | 61 (1,5 mm², größte 0,73) |
+  | Eislingen 200 mm  | 32.639 → 32.263 | 20 → 20 |      1 → 1 |  6 → 6 |     1 → 1 | 341 → 350 | 146 → 146 |  6 → 6 |       0 (1 gleiche Farbe) |
+  | Atzensport 80 mm  | 12.544 → 12.486 | 23 → 23 |      3 → 4 |  7 → 7 |     2 → 4 | 226 → 219 | 116 → 117 |  7 → 5 |  22 (95 mm², größte 12,9) |
+  | Atzensport 200 mm | 45.676 → 45.236 | 24 → 24 |      4 → 4 |  7 → 7 |     3 → 4 | 496 → 348 | 115 → 114 |  8 → 6 |  17 (82 mm², größte 14,1) |
+
+  Die Kennzahlen bewegen sich wenig; was sich ändert, ist das Bild: eine kleine Fläche, die im
+  Standard oben liegt, wird vor der großen gestickt und liegt danach darunter. STUTTGART 250 mm
+  verliert die beiden Augen des Pferds, STUTTGART 80 mm die Schrift im Band und den grauen Rand
+  der Bandenden, Atzensport dunkle Einzelheiten im Kopf des Pferds. Was in Köln umdreht, sind
+  Randstreifen von unter 0,75 mm² (61 Stellen, zusammen 1,5 mm²).
+
+  Die umgedrehten Überlappungen trennen sich klar nach dem Anteil an der **kleineren** der beiden
+  Formen: was Einzelheiten verdeckt, deckt 26 bis 100 % von ihr (STUTTGART 250 mm, Atzensport 80
+  mm und zwölf von 17 in Atzensport 200 mm: 100 %; STUTTGART 80 mm 22 von 25 über 25 %), was
+  eine Naht ist, unter 7 % (Köln alle, größter Anteil 6,2 %, meist unter 1 %). Eine **relative**
+  Schwelle („bindet, wenn die Überlappung mindestens 5 % der kleineren Form deckt") behielte
+  alle Einzelheiten und gäbe die Nähte frei. Blöcke Standard → relativ 5 % (Scratchpad-Versuch
+  an `coverPrecedence`, nicht im Repo): STUTTGART 80 mm 6 → 6, 250 mm 6 → 6, Eislingen 6 → 6, Köln
+  15 → 6 (57 Stellen, zusammen 1,5 mm², höchstens 3,7 % der kleineren Form), Atzensport 80 mm
+  7 → 6 (5 Stellen, 0,08 mm²), 200 mm 8 → 7 (20 Stellen, 0,49 mm²). Läufe mit dieser Schwelle:
+
+  | Motiv             |          Stiche |  Dichte | Zellen >18 |   Nadel | Zellen ≥6 |   Sprünge |     Trims | Blöcke |
+  | ----------------- | --------------: | ------: | ---------: | ------: | --------: | --------: | --------: | -----: |
+  | Köln 90 mm        | 20.274 → 20.358 | 32 → 32 |    33 → 40 | 10 → 10 |   16 → 15 | 180 → 185 |   91 → 96 | 15 → 6 |
+  | Atzensport 80 mm  | 12.544 → 12.561 | 23 → 23 |      3 → 3 |   7 → 6 |     2 → 3 | 226 → 217 | 116 → 117 |  7 → 6 |
+  | Atzensport 200 mm | 45.676 → 45.699 | 24 → 22 |      4 → 3 |   7 → 7 |     3 → 3 | 496 → 392 | 115 → 114 |  8 → 7 |
+
+  Die höchstens 4 Blöcke für STUTTGART 80 mm (§16) erreicht keine Schwelle ohne Schaden:
+  relativ 5 % lässt es bei 6 (nichts unter 5 % dreht um), relativ 25 % gibt 5 (Blöcke nur
+  gezählt, nicht angesehen), 20 mm² gibt 3 und verdeckt dafür Schrift und Rand.
+
+- **Ink/Stitch-Altdokument-Modus: die Version 4 in der Vorlage ändert das Ergebnis und macht
+  Nadelhäufung schlechter — nicht übernommen.** Die Vorlage trägt weiter keine
+  `inkstitch_svg_version`. Mit `<metadata><inkstitch:inkstitch_svg_version>4</…>` (Scratchpad-Kopie,
+  gleicher Stand sonst) rechnet Ink/Stitch die Satinsäulen der Vorlage mit den neuen
+  Vorgaben statt mit denen, die das Update alter Dokumente (`lib/update.py`) setzt
+  (`start_at_nearest_point` und `end_at_nearest_point` aus, `reverse_rails` `none`); Standard →
+  Version 4:
+
+  | Motiv             |          Stiche |  Dichte | Zellen >18 |   Nadel | Zellen ≥6 |   Sprünge |     Trims |
+  | ----------------- | --------------: | ------: | ---------: | ------: | --------: | --------: | --------: |
+  | STUTTGART 80 mm   | 15.422 → 14.945 | 27 → 27 |    15 → 17 |   7 → 9 |     8 → 7 |   99 → 98 |   50 → 49 |
+  | STUTTGART 250 mm  | 79.432 → 76.164 | 29 → 31 |    25 → 25 |  9 → 10 |   31 → 36 | 221 → 209 |   62 → 61 |
+  | Köln 90 mm        | 20.274 → 20.033 | 32 → 28 |    33 → 36 | 10 → 10 |   16 → 21 | 180 → 178 |   91 → 91 |
+  | Eislingen 200 mm  | 32.639 → 32.480 | 20 → 27 |      1 → 2 |   6 → 7 |    1 → 10 | 341 → 327 | 146 → 146 |
+  | Atzensport 80 mm  | 12.544 → 12.707 | 23 → 27 |      3 → 4 |   7 → 8 |    2 → 11 | 226 → 216 | 116 → 116 |
+  | Atzensport 200 mm | 45.676 → 44.420 | 24 → 22 |      4 → 7 |   7 → 7 |    3 → 15 | 496 → 468 | 115 → 115 |
+
+  Fünf von sechs Logos bekommen mehr Zellen über 18 und mehr Zellen ab 6 Einstichen (bis
+  3 → 15), vier eine höhere Nadelhäufung — „nichts schlechter" gilt nicht. Ein Weg dahin wäre,
+  die Version zu setzen und die drei Vorgaben ausdrücklich an jede Säule zu schreiben; das
+  sollte am Ergebnis nichts ändern (nicht gemessen) und spart nur das Update im ersten Lauf.
+
+- **`--breite <mm>`:** STUTTGART 80 mm auf 120 mm (Faktor 1,5, Endstand mit §4.2): 27.836
+  Stiche, 133 Sprünge, 54 Trims (1,94 je 1000, Archiv 1,9), 6 Farbblöcke, Dichtespitze 28,
+  Zellen über 18: 16, Nadelhäufung 9 (Archiv 6, über allem), 17 Zellen ab 6 Einstichen (bei
+  80 mm 8), Fäden auf dem Stoff 0; Satin 30 statt 24 Formen, Laufstich 8 statt 16, Tatami 22
+  statt 17. Gemeint ist die Breite der Zeichenfläche; das Motiv darin ist etwas schmaler
+  (119,0 mm im DST).
+
 ## Ink/Stitch-Vorlage, Schritt 3 (29.09.2026) — offen und Spec-Fragen
 
 Was bei den Punkten 0 bis 4 auffiel und nicht mehr in den Schritt gehört. Zahlen: die sechs
@@ -29,12 +165,16 @@ keiner Stelle geändert; wo eine Regel stört, steht die Frage mit Zahlen hier.
   20 mm² ist die Schwelle des Knockdowns (§4.1): darunter wird nichts ausgeschnitten, die
   Reihenfolge entschiede dort nur, welcher Faden obenauf liegt. Dieselbe Schwelle für beide wäre
   der Vorschlag; er würde in der Vorlage nur `minOverlapMm2` an `sequenceByColour` reichen.
+  _(Stand 29.09.: als Variante `--ueberlappung` gebaut, die Sichtprüfung macht der Nutzer; 20 mm²
+  verdecken Einzelheiten, eine relative Schwelle nicht — siehe oben.)_
 
 - **Regel 5 des Knockdowns (berührende Flächen wachsen 0,8 mm unter die spätere) — Spec-Frage.**
   Ohne sie ändert sich nur Köln spürbar (die übrigen fünf um höchstens 1 Dichtespitze und 31
   Stiche): Zellen über 18 Stichen 30 → 15, Nadelhäufung 8 → 6, Zellen ab 6 Einstichen 11 → 5,
   Stiche 20.711 → 19.838. Was die Regel verhindert (ein „Blitzer" an der Naht, §8.1.2), lässt
   sich nur am Probestick sehen.
+  _(Stand 29.09.: entschieden, §4.2 Regel 2 — 0,3 mm; gemessen macht das Köln schlechter, siehe
+  oben.)_
 - **Satin auf Tatami-Grund (§4.1: nur Fill schneidet und nur aus Fill) — Spec-Frage.** Fläche
   der Satinformen, die über früher gestickter Tatami liegt, und Tatami-Stiche darunter:
 
@@ -49,6 +189,8 @@ keiner Stelle geändert; wo eine Regel stört, steht die Frage mit Zahlen hier.
 
   Von den Zellen über 18 Stichen (aus der Stichliste, ohne Verriegelungen) liegen in
   STUTTGART 80 mm 2 von 2, in STUTTGART 250 mm 13 von 17 dort, wo Satin über Tatami liegt.
+  _(Stand 29.09.: entschieden, §4.2 Regel 1; gemessen bringt das Aussparen die Zellen nicht
+  weg und kostet Stiche, siehe oben.)_
 
 - **Gitterunterlage nur auf einem Teil der Tatami-Fläche.** Ink/Stitchs `fill_underlay` zerlegt
   ausgefranste Flächen in Stücke, die es ohne Fadenschnitt abfährt (`tatami.ts`). Die Vorlage
@@ -76,9 +218,11 @@ keiner Stelle geändert; wo eine Regel stört, steht die Frage mit Zahlen hier.
 - **Ink/Stitch-Altdokument-Modus.** Die Vorlage trägt keine `inkstitch_svg_version`; im ersten
   Lauf wendet Ink/Stitch die Updates alter Dokumente an (Satin `start_at_nearest_point` und
   `end_at_nearest_point` aus, `reverse_rails` auf `none`, Füllung `max_stitch_length_mm` 3
-  wo keiner steht). Ob die Version 4 von Anfang an etwas ändert, ist nicht gemessen.
+  wo keiner steht). _(Gemessen 29.09.: die Version 4 ändert das Ergebnis und verschlechtert
+  Nadelhäufung, nicht übernommen — Zahlen oben.)_
 - **Spec §7.8.5** sagt „sonst bleibt sie Tatami"; seit Punkt 0 läuft eine Form unter 1,0 mm,
-  die als Säule nicht hält, als Laufstich entlang der Achse. Spec nachziehen (nicht geändert).
+  die als Säule nicht hält, als Laufstich entlang der Achse. _(Erledigt: Spec nachgezogen,
+  `d8df0c9`.)_
 
 ## Satin für Schrift und schmale Formen — offen (28.09.2026)
 

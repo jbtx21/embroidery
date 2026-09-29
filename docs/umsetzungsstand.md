@@ -485,3 +485,41 @@ Gegen die Ziele aus §16 (STUTTGART 80 mm): Dichtespitze 22 (≤ 24), Nadelhäuf
 Trims/1000 3,4 (≤ 5,6) erreicht; **Farbblöcke 6 statt ≤ 4** — unter §10.1 ist 6 das Minimum
 (Spec-Frage in `docs/backlog.md`). Atzensport 80 mm bleibt bei 9,7 Trims/1000 (Ziel 5,6): 124
 Objekte auf 12.005 Stiche, davon 15 Formen unter 1 mm².
+
+**§4.2, Farbfolge-Variante und Breite (29.09.2026, Folge von Schritt 3).** Nach der Entscheidung
+des Nutzers zu Schritt 3 (Spec §4.2, §7.8.5, §8.8 nachgezogen):
+
+- **Satin spart die Tatami-Fläche darunter aus** (`cutOutSatin` in `knockdown.ts`, §4.2 Regel
+  1): eine später gestickte Satinform schneidet ihren Platz aus der Fläche unter ihr, die
+  Fläche bleibt `underlapMm` (Piqué 0,2 mm) unter der Kante; die 20 mm² gelten für alle
+  Satinformen zusammen, Laufstich schneidet nie. Meldung je Fläche (`KnockdownReport.satin`),
+  ganz überdeckte Flächen als `FILL_COVERED`. Rauchtest gegen die DST.
+- **Angrenzende Flächen greifen 0,3 mm** (`TEMPLATE_TOUCH_UNDERLAP_MM`, §4.2 Regel 2). Die
+  eingefrorene `resolveOverlaps` bekam dafür nur einen optionalen Parameter
+  (`ResolveOptions.touchUnderlapMm`); ohne ihn bleibt es bei 0,8 mm (Test), der Schnitt einer
+  Überlappung behält seine 0,8 mm.
+- **Farbfolge-Variante** `--ueberlappung <mm²>` (Option `minOverlapMm2`, `orderSwaps` in
+  `sequence.ts`): nur zur Sichtprüfung, der Standard bleibt §10.1. Nennt die Überlappungen,
+  deren Reihenfolge umdreht.
+- **`--breite <mm>`** (`tools/breite.mjs`): skaliert das Motiv proportional auf die Zielbreite,
+  bevor eingelesen wird; Ausgabe mit Faktor und Größe davor und danach.
+- **`inkstitch_svg_version`** in der Vorlage gemessen und **nicht übernommen** (mehr Zellen ab 6
+  Einstichen in fünf von sechs Logos).
+
+Endstand (in Klammern der Stand nach Punkt 4), Preset `pique`:
+
+| Motiv                      |          Stiche |   Sprünge |     Trims | Farbblöcke | Dichtespitze | Zellen >18 | Nadelhäufung |
+| -------------------------- | --------------: | --------: | --------: | ---------: | -----------: | ---------: | -----------: |
+| STUTTGART 80 mm            | 15.422 (13.578) |   99 (89) |   50 (46) |      6 (6) |      27 (22) |     15 (5) |        7 (7) |
+| STUTTGART 250 mm           | 79.432 (74.674) | 221 (198) |   62 (57) |      6 (6) |      29 (29) |    25 (15) |        9 (9) |
+| Berufsfeuerwehr Köln 90 mm | 20.274 (20.711) | 180 (168) |   91 (85) |    15 (15) |      32 (29) |    33 (30) |       10 (8) |
+| Eislingen Print 200 mm     | 32.639 (32.669) | 341 (341) | 146 (146) |      6 (6) |      20 (20) |      1 (1) |        6 (6) |
+| Atzensport Hofbräu 80 mm   | 12.544 (12.005) | 226 (226) | 116 (116) |      7 (7) |      23 (23) |      3 (3) |        7 (7) |
+| Atzensport Hofbräu 200 mm  | 45.676 (46.508) | 496 (496) | 115 (115) |      8 (8) |      24 (22) |      4 (4) |        7 (6) |
+
+Gegen die Ziele aus §16 (STUTTGART 80 mm): Nadelhäufung 7 (≤ 8) und Trims/1000 3,24 (≤ 5,6)
+gehalten; **Dichtespitze 27 statt ≤ 24 — mit §4.2 nicht mehr erreicht** (nach Punkt 4: 22),
+Farbblöcke weiter 6 statt ≤ 4. Regel 1 (mehr Stiche und Zellen über 18 an STUTTGART) und Regel 2
+(Köln schlechter) bringen nicht, was §4.2 erwartet; Zahlen, Ursache und Vorschläge (relative
+Schwelle für die Farbfolge, Weite der Regel 2) in `docs/backlog.md`. STUTTGART 80 mm auf
+120 mm (`--breite 120`): 27.836 Stiche, Dichtespitze 28, Nadelhäufung 9.
