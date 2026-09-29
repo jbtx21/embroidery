@@ -12,4 +12,5 @@ export * from "./classify.js";
 export * from "./strokes.js";
 export * from "./columns.js";
 export * from "./smooth.js";
+export * from "./tatami.js";
 export * from "./template.js";

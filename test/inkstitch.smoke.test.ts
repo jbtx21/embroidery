@@ -13,6 +13,7 @@
  * Fixtures are our own tiny templates under test/fixtures/inkstitch/ -- never
  * a customer logo (customer files stay out of the repo).
  */
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -23,6 +24,7 @@ import {
   CONNECT_DEFAULTS,
   initEngine,
   PRESETS,
+  tatamiAttributes,
   untrimmedJumps,
 } from "@texma-stitch/engine";
 import { polygonOf, rect } from "../packages/engine/test/fixtures/shapes.js";
@@ -193,6 +195,168 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
         const trimmed = await dst(cutPath);
         expect(trimmed.filter((st) => st.cmd === "trim")).toHaveLength(1);
         expect(untrimmedJumps(trimmed, CONNECT_DEFAULTS.jumpTrimMm).count).toBe(0);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 2,
+  );
+
+  it(
+    "Tatami: jedes Attribut der Vorlage wirkt — mit anderem Wert ändert sich die DST, ein falscher Name ändert nichts",
+    async () => {
+      // Ink/Stitch ignores an attribute it does not know without a word (a misspelt name reads
+      // like a default), so each name in tatamiAttributes is set to another value and the
+      // DST has to change. A 30 x 20 mm rectangle; the control is a misspelt name.
+      const attrs = tatamiAttributes(PRESETS.pique, 45);
+      const other: Record<string, string> = {
+        row_spacing_mm: "0.6",
+        max_stitch_length_mm: "2",
+        staggers: "1",
+        angle: "-15",
+        fill_underlay: "false",
+        fill_underlay_angle: "0",
+        fill_underlay_row_spacing_mm: "1",
+        fill_underlay_inset_mm: "1.5",
+        fill_underlay_max_stitch_length_mm: "1.5",
+      };
+      // Nothing set that is not tried, nothing tried that is not set.
+      expect(Object.keys(other).sort()).toEqual(Object.keys(attrs).sort());
+
+      const dir = mkdtempSync(join(tmpdir(), "texma-attr-"));
+      try {
+        const dstHash = async (name: string, values: Record<string, string>): Promise<string> => {
+          const svg = join(dir, `${name}.svg`);
+          const set = Object.entries(values)
+            .map(([k, v]) => `inkstitch:${k}="${v}"`)
+            .join(" ");
+          writeFileSync(
+            svg,
+            `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" ` +
+              `width="40mm" height="30mm" viewBox="0 0 40 30"><path id="r" d="M 5,5 L 35,5 L 35,25 L 5,25 Z" ` +
+              `style="fill:#1f3a93;stroke:none" ${set}/></svg>`,
+          );
+          const r = await runInkstitch({ extension: "output", options: { format: "dst" }, svg });
+          expect(r.stderr.trim()).toBe("");
+          return createHash("sha1").update(r.stdout).digest("hex");
+        };
+        const runs: [string, Record<string, string>][] = [
+          ["basis", attrs],
+          ["falscher-name", { ...attrs, max_stitch_lenght_mm: "2" }],
+          ...Object.entries(other).map(([k, v]): [string, Record<string, string>] => [
+            k,
+            { ...attrs, [k]: v },
+          ]),
+        ];
+        const hashes = new Map<string, string>();
+        // Four at a time: each run is mostly Ink/Stitch's own start.
+        for (let i = 0; i < runs.length; i += 4) {
+          await Promise.all(
+            runs.slice(i, i + 4).map(async ([name, values]) => {
+              hashes.set(name, await dstHash(name, values));
+            }),
+          );
+        }
+        expect(hashes.get("falscher-name")).toBe(hashes.get("basis"));
+        for (const name of Object.keys(other)) {
+          expect(hashes.get(name), `${name} ändert die DST nicht`).not.toBe(hashes.get("basis"));
+        }
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 8,
+  );
+
+  it(
+    "Tatami: die Stichrichtung ist die von fill.ts — 45° zeigt im Bild nach rechts unten, −30° nach rechts oben",
+    async () => {
+      // fill.ts turns clockwise on the y-down page, Ink/Stitch counter-clockwise; the template
+      // writes the sign round (tatamiAttributes). The rows of a rectangle are its longest stitches.
+      const dir = mkdtempSync(join(tmpdir(), "texma-angle-"));
+      try {
+        const direction = async (angleDeg: number): Promise<number> => {
+          const svg = join(dir, `a${angleDeg}.svg`);
+          const set = Object.entries(tatamiAttributes(PRESETS.pique, angleDeg))
+            .map(([k, v]) => `inkstitch:${k}="${v}"`)
+            .join(" ");
+          writeFileSync(
+            svg,
+            `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" ` +
+              `width="40mm" height="30mm" viewBox="0 0 40 30"><path id="r" d="M 5,5 L 35,5 L 35,25 L 5,25 Z" ` +
+              `style="fill:#1f3a93;stroke:none" ${set}/></svg>`,
+          );
+          const { stdout } = await runInkstitch({
+            extension: "output",
+            options: { format: "dst" },
+            svg,
+          });
+          const st = unitsToMm(readDst(new Uint8Array(stdout)).stitches).filter(
+            (p) => p.cmd === "stitch",
+          );
+          const bins = new Map<number, number>();
+          for (let i = 1; i < st.length; i++) {
+            const dx = st[i]!.x - st[i - 1]!.x;
+            const dy = st[i]!.y - st[i - 1]!.y;
+            if (Math.hypot(dx, dy) < 2.5) continue;
+            const a = ((((Math.atan2(dy, dx) * 180) / Math.PI) % 180) + 180) % 180;
+            const bin = (Math.round(a / 5) * 5) % 180;
+            bins.set(bin, (bins.get(bin) ?? 0) + 1);
+          }
+          return [...bins.entries()].sort((x, y) => y[1] - x[1])[0]![0];
+        };
+        const [down, up] = await Promise.all([direction(45), direction(-30)]);
+        expect(down).toBe(45);
+        // 150 degrees in the image are 30 degrees up to the right.
+        expect(up).toBe(150);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 2,
+  );
+
+  it(
+    "Tatami: Zug und Schub stehen in der Umrisslinie der Vorlage und kommen in der DST an — länger entlang der Reihen, schmaler quer dazu",
+    async () => {
+      // The compensation of spec §8.1.1 is not an Ink/Stitch attribute (tatami.ts says why), so the
+      // stitches have to show it: a 30 x 20 mm rectangle, rows at 45 degrees. A pull of 1 mm along
+      // the rows widens the box of the stitches by about 0.7 mm either side, a push of 1 mm across
+      // them takes about 0.7 mm off.
+      await initEngine();
+      const shape = {
+        kind: "area" as const,
+        id: "r",
+        polygon: polygonOf(rect(5, 5, 30, 20)),
+        color: "#1f3a93",
+        attrs: {},
+        trimAfter: "auto" as const,
+      };
+      const dir = mkdtempSync(join(tmpdir(), "texma-comp-"));
+      try {
+        const width = async (name: string, pullCompMm: number, pushCompMm: number) => {
+          const template = buildInkstitchTemplate(
+            [shape],
+            { ...PRESETS.pique, pullCompMm, pushCompMm },
+            { widthMm: 40, heightMm: 30 },
+          );
+          expect(template.svg).not.toContain("pull_compensation");
+          const svg = join(dir, `${name}.svg`);
+          writeFileSync(svg, template.svg);
+          const r = await runInkstitch({ extension: "output", options: { format: "dst" }, svg });
+          expect(r.stderr.trim()).toBe("");
+          const xs = unitsToMm(readDst(new Uint8Array(r.stdout)).stitches)
+            .filter((p) => p.cmd === "stitch")
+            .map((p) => p.x);
+          return Math.max(...xs) - Math.min(...xs);
+        };
+        const [flat, pulled, pushed] = await Promise.all([
+          width("flat", 0, 0),
+          width("pulled", 1, 0),
+          width("pushed", 0, 1),
+        ]);
+        expect(pulled - flat).toBeGreaterThan(1);
+        expect(flat - pushed).toBeGreaterThan(1);
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }

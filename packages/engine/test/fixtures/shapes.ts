@@ -336,6 +336,39 @@ export function hourglass(waistMm = 0.6, w = 20, h = 20): Polygon {
 }
 
 /**
+ * Dumbbell: two blocks joined by a straight bar `barMm` thick and `length` long,
+ * the bar along the x axis. A fill runs its rows across the bar (that is where
+ * they break least), so the direction of the rows is the direction of its
+ * thickness — a compensation along the rows that is thicker than the bar cuts
+ * the shape into its two blocks.
+ */
+export function dumbbell(barMm = 0.6, length = 10, blockW = 10, h = 10): Polygon {
+  const half = barMm / 2;
+  const mid = h / 2;
+  const right = blockW + length;
+  return {
+    outer: orient(
+      [
+        pt(0, 0),
+        pt(blockW, 0),
+        pt(blockW, mid - half),
+        pt(right, mid - half),
+        pt(right, 0),
+        pt(right + blockW, 0),
+        pt(right + blockW, h),
+        pt(right, h),
+        pt(right, mid + half),
+        pt(blockW, mid + half),
+        pt(blockW, h),
+        pt(0, h),
+      ],
+      true,
+    ),
+    holes: [],
+  };
+}
+
+/**
  * A "v" stroke with round ends and a round, blunt foot — only the crotch
  * inside is a corner. Its medial axis has no spur into the foot (the outline
  * there is round), just one branch that turns sharply round the crotch: the

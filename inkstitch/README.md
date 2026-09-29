@@ -146,3 +146,46 @@ Wie `trim_after`, Sprünge und die Ausgabe zusammenhängen — vorher in der Que
   letzten `auto_satin` auf. Grenzen: Sprünge **innerhalb** eines Objekts (etwa zwischen den
   Teilpolygonen eines Pfads) sieht sie nicht, und ein Objekt, das schon `trim_after` oder einen
   Trim-Befehl trägt, bleibt unverändert.
+
+## Tatami-Flächen der Vorlage: Attribute, Unterlage, Zugausgleich (gelesen am Commit d59c9ab, 29.09.2026)
+
+Code und Begründung: `packages/engine/src/inkstitch/tatami.ts`, `template.ts`.
+
+- **Gesetzte Attribute** je Tatami-Fläche: `row_spacing_mm`, `max_stitch_length_mm`, `staggers`,
+  `angle`, `fill_underlay` und — wo die Unterlage hält — `fill_underlay_angle`,
+  `fill_underlay_row_spacing_mm`, `fill_underlay_inset_mm`, `fill_underlay_max_stitch_length_mm`
+  (Spec §14, §8.6). Die Namen stammen aus `lib/elements/fill_stitch.py`; Ink/Stitch ignoriert einen
+  unbekannten Namen ohne Meldung, deshalb zeigt der Rauchtest (`RUN_INKSTITCH_TESTS=1`) für jeden
+  Namen, dass ein anderer Wert die DST ändert, und für einen falschen, dass sich nichts ändert.
+- **`angle` zählt gegen den Uhrzeigersinn**, `fill.ts` im Uhrzeigersinn (y nach unten): die Vorlage
+  schreibt das Vorzeichen um (`inkstitchAngleDeg`), und der Rauchtest belegt an einer Fläche, dass
+  45° nach rechts unten zeigt.
+- **Unterlage.** Ink/Stitch schrumpft die Fläche um `fill_underlay_inset_mm`
+  (`shape.buffer(-inset)`) und stickt **jedes Stück**, in das der Einzug zerfällt, als eigene
+  Stichgruppe — in der Reihenfolge, in der die Geometriebibliothek sie liefert, ohne Fadenschnitt
+  dazwischen (`jump_to_trim` sieht Sprünge innerhalb eines Elements nicht) und für ein Stück, das
+  keine Reihe trifft, als Laufstich um seine Kontur (`fallback` in `lib/stitches/tatami_fill.py`).
+  Ist der Einzug leer, nimmt es die ganze Fläche. Auf einer ausgefransten Kontur (Bänder,
+  ausgeschnittene Flächen) sind das Hunderte Stücke. Gemessen mit `pique` an den sechs Kundenlogos,
+  Attribut überall gesetzt: Fäden über 5 mm ohne Fadenschnitt in fünf von sechs Logos (4 bis 55,
+  längster 79 mm; vorher keiner), Nadelhäufung bis 14 statt 10. Deshalb setzt die Vorlage die
+  Gitterunterlage nur, wo `gridUnderlay` sie hält: der Einzug ist ein Stück (auch bei 0,03 mm mehr
+  und weniger Einzug — Ink/Stitchs shapely und unser Clipper runden Bögen verschieden, ein Hals von
+  0,8 mm ist bei uns ein Stück und bei ihm zwei), wenigstens 0,8 mm breit, und jede Lage trifft eine
+  Reihe. Auf allen anderen Flächen trägt der Deckstich allein.
+- **Zugausgleich.** `pull_compensation_mm` gibt es, und es wirkt (die Reihen werden an beiden Enden
+  um den Betrag länger). Ink/Stitch baut dafür aber bei **jedem** Stichplan die Fläche aus ihren
+  Reihen neu (`adjust_shape_for_pull_compensation`: jede Reihe gepuffert, alle vereinigt, die Kontur
+  in Python Punkt für Punkt geglättet), `pnpm inkstitch` rechnet zwei Stichpläne (`jump_to_trim`,
+  `output`), und für den Schub (`pushCompMm`, Spec §8.1.1) gibt es kein Attribut. Gemessen mit
+  `pique`: STUTTGART 80 mm 64 s → 325 s, Köln 90 mm 245 s → 989 s, STUTTGART 250 mm nach 40 Minuten
+  noch im ersten Stichplan (ohne das Attribut 6 Minuten für den ganzen Lauf). Die Vorlage rechnet
+  Zug und Schub deshalb selbst in den Umriss (`offsetDirectional`, derselbe Versatz wie in `fill.ts`)
+  und setzt das Attribut nicht.
+- **Kontur-Unterlage** (Spec §8.6) hat die Füllung von Ink/Stitch nicht; sie bleibt aus.
+- **Altdokument-Modus.** Die Vorlage trägt keine `inkstitch_svg_version`; beim ersten Lauf
+  (`auto_satin`, sonst `jump_to_trim`) wendet Ink/Stitch deshalb die Updates für alte Dokumente an
+  (`lib/update.py`): Satin `start_at_nearest_point` und `end_at_nearest_point` aus, `reverse_rails`
+  auf `none`, Füllung `max_stitch_length_mm` 3, wenn keiner gesetzt ist. Danach steht die Version 4 im
+  Ergebnis, und die folgenden Läufe lassen es. Ob die Version von Anfang an zu setzen etwas ändert,
+  ist nicht gemessen.

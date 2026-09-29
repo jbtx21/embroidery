@@ -1,11 +1,23 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import type { Polygon } from "@texma-stitch/geometry";
-import { initGeometry } from "@texma-stitch/geometry";
+import type { Polygon, Polyline } from "@texma-stitch/geometry";
+import { initGeometry, offsetDirectional, polygonArea } from "@texma-stitch/geometry";
 import { GLYPHS } from "../../test/fixtures/glyphs.js";
-import { HAIRLINE_H, HOLED_BAR, polygonOf, pt, rect } from "../../test/fixtures/shapes.js";
+import {
+  annulus,
+  HAIRLINE_H,
+  HOLED_BAR,
+  hourglass,
+  polygonOf,
+  pt,
+  rect,
+  U_SHAPE,
+} from "../../test/fixtures/shapes.js";
 import type { ImportedShape } from "../import/svg.js";
+import { bestFillAngle } from "../fill.js";
+import { DEFAULT_ANGLE_DEG } from "../import/svg.js";
 import { PRESETS } from "../presets.js";
 import { satinColumns } from "./columns.js";
+import { inkstitchAngleDeg, tatamiAttributes } from "./tatami.js";
 import {
   buildInkstitchTemplate,
   CENTER_WALK_STITCH_MM,
@@ -442,5 +454,202 @@ describe("trim_after of the source (spec §10.2)", () => {
     expect(t.objects.map((o) => o.id)).toEqual(["bar_p0", "bar_p1", "post"]);
     expect(t.svg).not.toMatch(/<path id="bar_p0"[^>]*trim_after/);
     expect(t.svg).toMatch(/<path id="bar_p1"[^>]*inkstitch:trim_after="true"/);
+  });
+});
+
+describe("tatami attributes (spec §14)", () => {
+  const pathOf = (svg: string, id: string): string =>
+    new RegExp(`<path id="${id}"[^>]*>`).exec(svg)![0];
+  const block = area("block", polygonOf(rect(60, 2, 20, 20)));
+
+  it("sets the preset's values on every tatami", () => {
+    const t = buildInkstitchTemplate([block], pique, PAGE);
+    const path = pathOf(t.svg, "block");
+    const expected = tatamiAttributes(pique, DEFAULT_ANGLE_DEG);
+    for (const [name, value] of Object.entries(expected)) {
+      expect(path, name).toContain(` inkstitch:${name}="${value}"`);
+    }
+  });
+
+  it("follows the preset — fleece has a double underlay", () => {
+    const t = buildInkstitchTemplate([block], PRESETS.fleece, PAGE);
+    expect(pathOf(t.svg, "block")).toMatch(/inkstitch:fill_underlay_angle="0 90"/);
+  });
+
+  it("gives every part of a split area attributes of its own, angle included", () => {
+    const bar = area("bar", polygonOf(rect(0, 0, 60, 10)));
+    const post = area("post", polygonOf(rect(20, -5, 10, 20)), "#c8102e");
+    const t = buildInkstitchTemplate([bar, post], pique, { ...PAGE, knockdown: true });
+    for (const id of ["bar_p0", "bar_p1", "post"]) {
+      expect(pathOf(t.svg, id), id).toMatch(/inkstitch:angle="-?\d+"/);
+      expect(pathOf(t.svg, id), id).toContain("inkstitch:max_stitch_length_mm=");
+    }
+  });
+
+  it("turns the angle to where the rows break least (spec §8.2)", () => {
+    const u = area("u", U_SHAPE);
+    const t = buildInkstitchTemplate([u], pique, PAGE);
+    const best = bestFillAngle(U_SHAPE, pique.fillRowSpacingMm, DEFAULT_ANGLE_DEG);
+    expect(best).not.toBe(DEFAULT_ANGLE_DEG);
+    expect(pathOf(t.svg, "u")).toContain(`inkstitch:angle="${inkstitchAngleDeg(best)}"`);
+  });
+
+  it("crosses the rows at a seam: the later of two touching areas takes the other diagonal (spec §5.1)", () => {
+    const left = area("left", polygonOf(rect(0, 0, 10, 10)));
+    const right = area("right", polygonOf(rect(10, 0, 10, 10)), "#c8102e");
+    const t = buildInkstitchTemplate([left, right], pique, PAGE);
+    // fill.ts turns clockwise, Ink/Stitch counter-clockwise: 45 degrees there are -45 here.
+    expect(pathOf(t.svg, "left")).toContain('inkstitch:angle="-45"');
+    expect(pathOf(t.svg, "right")).toContain('inkstitch:angle="45"');
+  });
+
+  it("does not turn areas that lie apart", () => {
+    const a = area("a", polygonOf(rect(0, 0, 10, 10)));
+    const b = area("b", polygonOf(rect(50, 0, 10, 10)), "#c8102e");
+    const t = buildInkstitchTemplate([a, b], pique, PAGE);
+    expect(pathOf(t.svg, "a")).toContain('inkstitch:angle="-45"');
+    expect(pathOf(t.svg, "b")).toContain('inkstitch:angle="-45"');
+  });
+
+  it("counts a satin lying earlier as something to cross", () => {
+    const letter = area("letter", moved(GLYPHS.T!, 0));
+    const under = area("under", polygonOf(rect(9, 2, 12, 8)), "#c8102e");
+    const t = buildInkstitchTemplate([letter, under], pique, PAGE);
+    expect(pathOf(t.svg, "under")).toContain('inkstitch:angle="45"');
+  });
+});
+
+describe("grid underlay only where it holds (spec §8.6)", () => {
+  const pathOf = (svg: string, id: string): string =>
+    new RegExp(`<path id="${id}"[^>]*>`).exec(svg)![0];
+  const block = area("block", polygonOf(rect(60, 2, 20, 20)));
+  // Two blocks on a waist of 0.6 mm: the inset of 0.4 mm cuts it, two pieces. Without
+  // compensation, which would widen the waist along the rows.
+  const waist = area("waist", hourglass(0.6), "#c8102e");
+  const flat = { ...pique, pullCompMm: 0, pushCompMm: 0 };
+
+  it("sets it on a compact area and counts it", () => {
+    const t = buildInkstitchTemplate([block], pique, PAGE);
+    expect(pathOf(t.svg, "block")).toContain('inkstitch:fill_underlay="true"');
+    expect(t.underlay).toEqual({ grid: 1, without: [] });
+  });
+
+  it("leaves it off where the inset falls apart, and says which area and how many pieces", () => {
+    const t = buildInkstitchTemplate([block, waist], flat, PAGE);
+    const path = pathOf(t.svg, "waist");
+    expect(path).toContain('inkstitch:fill_underlay="false"');
+    expect(path).not.toContain("fill_underlay_angle");
+    // The rest of the area's parameters stay.
+    expect(path).toContain('inkstitch:row_spacing_mm="0.4"');
+    expect(t.underlay).toEqual({ grid: 1, without: [{ id: "waist", pieces: 2 }] });
+  });
+
+  it("judges every part of a split area for itself", () => {
+    // A bar cut in three by two posts: the parts are compact, the posts too.
+    const bar = area("bar", polygonOf(rect(0, 0, 60, 10)));
+    const post = area("post", polygonOf(rect(20, -5, 10, 20)), "#c8102e");
+    const t = buildInkstitchTemplate([bar, post], pique, { ...PAGE, knockdown: true });
+    expect(t.underlay.grid).toBe(3);
+    expect(t.underlay.without).toEqual([]);
+  });
+
+  it("reports nothing for a preset without an underlay", () => {
+    const bare = { ...pique, fillUnderlay: { ...pique.fillUnderlay, fill: "none" as const } };
+    const t = buildInkstitchTemplate([block, waist], bare, PAGE);
+    expect(t.underlay).toEqual({ grid: 0, without: [] });
+    expect(pathOf(t.svg, "block")).toContain('inkstitch:fill_underlay="false"');
+  });
+});
+
+describe("pull and push compensation of the tatami areas (spec §8.1.1)", () => {
+  const pathOf = (svg: string, id: string): string =>
+    new RegExp(`<path id="${id}"[^>]*>`).exec(svg)![0];
+  /** The polygon a path of the template draws. */
+  const drawn = (svg: string, id: string): Polygon => {
+    const d = new RegExp(`<path id="${id}" d="([^"]*)"`).exec(svg)![1]!;
+    const rings: Polyline[] = d
+      .split("Z")
+      .map((r) => r.trim())
+      .filter(Boolean)
+      .map((r) =>
+        r
+          .replace(/^M /, "")
+          .split(" L ")
+          .map((q) => {
+            const [x, y] = q.split(",").map(Number);
+            return pt(x!, y!);
+          }),
+      );
+    return { outer: rings[0]!, holes: rings.slice(1) };
+  };
+  const bar = area("bar", polygonOf(rect(60, 2, 20, 10)));
+  const only = (pullCompMm: number, pushCompMm: number) => ({ ...pique, pullCompMm, pushCompMm });
+
+  it("widens an area along its rows by the pull and takes it in across them by the push", () => {
+    const flat = buildInkstitchTemplate([bar], only(0, 0), PAGE);
+    const pulled = buildInkstitchTemplate([bar], only(1, 0), PAGE);
+    const pushed = buildInkstitchTemplate([bar], only(0, 0.5), PAGE);
+    expect(polygonArea(drawn(pulled.svg, "bar"))).toBeGreaterThan(
+      polygonArea(drawn(flat.svg, "bar")),
+    );
+    expect(polygonArea(drawn(pushed.svg, "bar"))).toBeLessThan(polygonArea(drawn(flat.svg, "bar")));
+  });
+
+  it("is the same offset fill.ts applies, along the fill's own angle", () => {
+    const t = buildInkstitchTemplate([bar], pique, PAGE);
+    const angle = -Number(/inkstitch:angle="([^"]*)"/.exec(pathOf(t.svg, "bar"))![1]);
+    const expected = offsetDirectional(bar.polygon, pique.pullCompMm, pique.pushCompMm, angle);
+    expect(expected).toHaveLength(1);
+    expect(polygonArea(drawn(t.svg, "bar"))).toBeCloseTo(polygonArea(expected[0]!), 2);
+  });
+
+  it("leaves the area as drawn where the preset has no compensation", () => {
+    const t = buildInkstitchTemplate([bar], only(0, 0), PAGE);
+    expect(polygonArea(drawn(t.svg, "bar"))).toBeCloseTo(200, 6);
+    expect(pathOf(t.svg, "bar")).toContain('d="M 60,2 L');
+    expect(t.compensation).toEqual({ pulledOnly: [], vanished: [] });
+  });
+
+  it("does not ask Ink/Stitch for a pull of its own — it would compensate twice, and rebuilds the area from its rows on every run", () => {
+    const t = buildInkstitchTemplate([bar], pique, PAGE);
+    expect(pathOf(t.svg, "bar")).not.toContain("pull_compensation");
+  });
+
+  it("stitches an area that vanishes under the compensation as it is, and says so", () => {
+    // A 3 x 3 mm dot with a push of 3 mm either side: nothing is left.
+    const dot = area("dot", polygonOf(rect(5, 5, 3, 3)));
+    const t = buildInkstitchTemplate([dot], only(0, 3), PAGE);
+    expect(polygonArea(drawn(t.svg, "dot"))).toBeCloseTo(9, 6);
+    const w = t.warnings.find((x) => x.objectId === "dot" && x.code === "INVALID_GEOMETRY");
+    expect(w?.severity).toBe("warn");
+    expect(w?.message).toContain("vanish");
+    expect(t.compensation).toEqual({ pulledOnly: [], vanished: ["dot"] });
+  });
+
+  it("compensates by the pull alone where the push would cut the area apart, and says so", () => {
+    // A ring 10 mm wide with rows at 45 degrees. A push of 6 mm (far beyond any preset) takes it in
+    // by 12 mm across the rows, so where its walls run along them nothing is left: two arcs. Every
+    // part would be a trim and a jump of its own.
+    const ring = area("ring", annulus(20, 15, 12, 2));
+    const t = buildInkstitchTemplate([ring], only(0.2, 6), PAGE);
+    expect(t.objects.map((o) => o.id)).toEqual(["ring"]);
+    expect(t.compensation).toEqual({ pulledOnly: [{ id: "ring", parts: 2 }], vanished: [] });
+    // Only the pull: the area grew along its rows and was not taken in across them.
+    expect(polygonArea(drawn(t.svg, "ring"))).toBeGreaterThan(polygonArea(ring.polygon));
+    const w = t.warnings.find((x) => x.objectId === "ring" && x.code === "INVALID_GEOMETRY");
+    expect(w?.severity).toBe("info");
+    expect(w?.message).toContain("2 parts");
+  });
+
+  it("works on what the knockdown left: each part compensated for itself", () => {
+    const post = area("post", polygonOf(rect(20, -5, 10, 20)), "#c8102e");
+    const wide = area("wide", polygonOf(rect(0, 0, 60, 10)));
+    const t = buildInkstitchTemplate([wide, post], only(0.5, 0), { ...PAGE, knockdown: true });
+    const ids = t.objects.map((o) => o.id);
+    expect(ids).toEqual(["wide_p0", "wide_p1", "post"]);
+    for (const id of ids) {
+      const flat = buildInkstitchTemplate([wide, post], only(0, 0), { ...PAGE, knockdown: true });
+      expect(polygonArea(drawn(t.svg, id)), id).toBeGreaterThan(polygonArea(drawn(flat.svg, id)));
+    }
   });
 });

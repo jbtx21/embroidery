@@ -16,6 +16,10 @@
  *    The objects are stitched by colour as far as their overlaps allow
  *    (spec §10.1: two overlapping objects are never turned round), and covered
  *    tatami areas are cut out of the ones below them (knockdown, spec §4.1).
+ *    Every tatami gets the preset's values as attributes and its stitch angle
+ *    (spec §14, §5.1, §8.2), its outline compensated for pull along the rows and
+ *    push across them (§8.1.1), and the grid underlay where it holds (§8.6) —
+ *    packages/engine/src/inkstitch/tatami.ts says why not everywhere.
  * 2. Routes every run of neighbouring same-coloured satin columns with
  *    Ink/Stitch's auto_satin (--preserve_order=true: what ends under a
  *    stroke is stitched first; --trim=true), one call per run, each call on
@@ -122,6 +126,19 @@ function blocksFromForeignStitches(stitches) {
   return blocks.filter((b) => b.stitches.length > 0);
 }
 
+/** How many tatami areas run at which `inkstitch:angle`, e.g. "-45° ×12, 45° ×3, andere ×2". */
+function angleSummary(svg) {
+  const counts = new Map();
+  for (const m of svg.matchAll(/ inkstitch:angle="(-?[\d.]+)"/g)) {
+    counts.set(m[1], (counts.get(m[1]) ?? 0) + 1);
+  }
+  const usual = ["-45", "45"];
+  const other = [...counts].filter(([a]) => !usual.includes(a)).reduce((n, [, c]) => n + c, 0);
+  const parts = usual.filter((a) => counts.has(a)).map((a) => `${a}° ×${counts.get(a)}`);
+  if (other > 0) parts.push(`andere ×${other}`);
+  return parts.length > 0 ? parts.join(", ") : "keine Tatami";
+}
+
 /** One Ink/Stitch call; a failure ends the run with its message (no guessed result). */
 async function inkstitch(args) {
   try {
@@ -166,6 +183,8 @@ let fallbacks = [];
 let narrowLines = [];
 let smoothed = [];
 let knockdown;
+let underlay;
+let compensation;
 let templateMs = 0;
 let outputInput = templatePath;
 
@@ -199,11 +218,22 @@ if (tatamiOnly) {
     `${template.satinRuns.length} Satin-Folgen für auto_satin`,
     `${template.colourBlocks} Farbblöcke in der Vorlage, Untergrenze aus den Überdeckungen ` +
       `${template.colourBlocksLowerBound}`,
+    `Tatami-Winkel (Ink/Stitch, gegen den Uhrzeigersinn): ${angleSummary(template.svg)}`,
+    `Zug ${preset.pullCompMm} mm entlang, Schub ${preset.pushCompMm} mm quer zu den Reihen ` +
+      `in die Tatami-Flächen gerechnet (Spec §8.1.1)`,
   ];
   fallbacks = template.objects.filter((o) => o.kind === "tatami" && o.reason);
   narrowLines = template.objects.filter((o) => o.kind === "running" && o.reason);
   smoothed = template.objects.filter((o) => o.kind === "satin" && o.smoothedMm > 0);
   knockdown = template.knockdown;
+  underlay = template.underlay;
+  compensation = template.compensation;
+  if (underlay.grid + underlay.without.length > 0) {
+    summary.push(
+      `Gitterunterlage bei ${underlay.grid} von ${underlay.grid + underlay.without.length} ` +
+        `Tatami-Flächen`,
+    );
+  }
 
   let current = templatePath;
   for (const [i, ids] of template.satinRuns.entries()) {
@@ -321,6 +351,41 @@ if (knockdown) {
   );
   for (const id of knockdown.covered) console.log(`  FILL_COVERED  ${id} (nicht gestickt)`);
   for (const f of knockdown.split) console.log(`  SHAPE_SPLIT   ${f.id}: ${f.parts} Teile`);
+}
+if (underlay && underlay.without.length > 0) {
+  const shown = underlay.without.slice(0, 12);
+  console.log(
+    `\nOhne Gitterunterlage (Spec §8.6, Einzug hält nicht als ein Stück, ${underlay.without.length})`,
+  );
+  for (const w of shown) {
+    const why =
+      w.pieces === 0
+        ? "zu schmal für einen Einzug"
+        : w.pieces === 1
+          ? "Band oder keine Reihe erreicht sie"
+          : `Einzug zerfällt in ${w.pieces} Stücke`;
+    console.log(`  ${w.id}: ${why}`);
+  }
+  if (underlay.without.length > shown.length) {
+    console.log(`  … und ${underlay.without.length - shown.length} weitere (nicht aufgelistet)`);
+  }
+}
+if (compensation && compensation.pulledOnly.length + compensation.vanished.length > 0) {
+  console.log(
+    `\nZug und Schub (Spec §8.1.1): ${compensation.pulledOnly.length} Flächen nur mit Zug ` +
+      `(der Schub würde sie zerlegen), ${compensation.vanished.length} verschwinden darunter ` +
+      `(ohne Ausgleich gestickt)`,
+  );
+  for (const c of compensation.pulledOnly.slice(0, 12)) {
+    console.log(`  ${c.id}: der Schub würde sie in ${c.parts} Teile zerlegen`);
+  }
+  if (compensation.pulledOnly.length > 12) {
+    console.log(`  … und ${compensation.pulledOnly.length - 12} weitere (nicht aufgelistet)`);
+  }
+  for (const id of compensation.vanished.slice(0, 12)) console.log(`  ${id}: verschwindet`);
+  if (compensation.vanished.length > 12) {
+    console.log(`  … und ${compensation.vanished.length - 12} weitere (nicht aufgelistet)`);
+  }
 }
 if (narrowLines.length > 0) {
   console.log(`\nLaufstich statt Satinsäule (unter 1 mm, ${narrowLines.length})`);

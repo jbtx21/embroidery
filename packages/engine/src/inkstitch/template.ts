@@ -15,8 +15,11 @@
  *   under `SATIN_NARROW_WARN_MM`: a shape that thin is a line, and a fill of it
  *   is rows of one or two stitches (Köln: density peak 30 → 34). It is set as a
  *   running stitch along its axis then, with the reason.
- * - **tatami**: the outline as a fill, `inkstitch:row_spacing_mm` from the
- *   preset.
+ * - **tatami**: the outline as a fill, with the preset's values as `inkstitch:`
+ *   attributes and the stitch angle of the area (`tatami.ts`, spec §14, §5.1, §8.2);
+ *   the grid underlay only where it holds (`gridUnderlay`), and the outline itself
+ *   compensated for pull along the rows and push across them (`compensateArea`,
+ *   spec §8.1.1).
  *
  * Objects keep the document order of their source shapes (the stacking order,
  * spec §5.1); the columns of one shape come in their stitch order (what ends
@@ -28,7 +31,8 @@
  * `TemplateOptions.order` groups the colours as far as the overlaps allow
  * (spec §10.1, `sequence.ts`), and `TemplateOptions.knockdown` cuts what a later
  * tatami covers out of the tatami below it (spec §4.1, `knockdown.ts`) — the
- * stitch order decides which is which, so the order comes first.
+ * stitch order decides which is which, so the order comes first. The stitch angle
+ * follows from the cut areas, and the compensation from the angle.
  */
 import type { Point, Polygon, Polyline } from "@texma-stitch/geometry";
 import {
@@ -39,6 +43,7 @@ import {
   simplify,
 } from "@texma-stitch/geometry";
 import type { ImportedShape } from "../import/svg.js";
+import { DEFAULT_ANGLE_DEG } from "../import/svg.js";
 import type { Preset } from "../presets.js";
 import type { Warning } from "../types.js";
 import { warn, WARNING } from "../warnings.js";
@@ -47,6 +52,7 @@ import type { SatinColumnPlan } from "./columns.js";
 import { satinColumns, STAYS_TATAMI } from "./columns.js";
 import { knockdownAreas } from "./knockdown.js";
 import { colourBlockCount, sequenceByColour } from "./sequence.js";
+import { compensateArea, fillAngles, gridUnderlay, tatamiAttributes } from "./tatami.js";
 import { strokeGraph } from "./strokes.js";
 
 /** Satin wider than this is split into staggered stitches (spec §7.4, `maxWidthMm`). */
@@ -120,6 +126,25 @@ export type KnockdownReport = {
   areaMm2: { before: number; after: number };
 };
 
+/** What the grid underlay of the tatami areas came to (`gridUnderlay`); empty for a preset without one. */
+export type UnderlayReport = {
+  /** Areas with the grid underlay set. */
+  grid: number;
+  /**
+   * Areas without it, with the number of pieces their inset falls into: 0 where the area is too
+   * narrow for an inset, 1 where the piece is a band or no row reaches it, more where it falls apart.
+   */
+  without: { id: string; pieces: number }[];
+};
+
+/** What the pull and push compensation did to the tatami areas (spec §8.1.1). */
+export type CompensationReport = {
+  /** Areas the push would have cut apart, compensated by the pull alone, with the parts it would have made. */
+  pulledOnly: { id: string; parts: number }[];
+  /** Areas the compensation would have made vanish: stitched as they are. */
+  vanished: string[];
+};
+
 export type TemplateResult = {
   svg: string;
   /** One per source shape that became an object (a split tatami: one per part), in stitch order. */
@@ -133,6 +158,8 @@ export type TemplateResult = {
   colourBlocksLowerBound?: number;
   /** Present when `TemplateOptions.knockdown` was on. */
   knockdown?: KnockdownReport;
+  compensation: CompensationReport;
+  underlay: UnderlayReport;
 };
 
 export type TemplateOptions = {
@@ -281,7 +308,13 @@ type PlannedBase = {
    */
   trimAfter: boolean;
 };
-type PlannedTatami = PlannedBase & { kind: "tatami"; polygon: Polygon; reason?: string };
+type PlannedTatami = PlannedBase & {
+  kind: "tatami";
+  polygon: Polygon;
+  /** The fill's own angle (`fill.ts` direction), set once the order and the cut are known. */
+  angleDeg?: number;
+  reason?: string;
+};
 type PlannedRunning = PlannedBase & { kind: "running"; lines: Polyline[]; reason?: string };
 type PlannedSatin = PlannedBase & {
   kind: "satin";
@@ -411,6 +444,19 @@ function orderByColour(planned: Planned[]): { planned: Planned[]; lowerBound: nu
   return { planned: result.order.map((i) => planned[i]!), lowerBound: result.lowerBound };
 }
 
+/** Gives every tatami its stitch angle, in the stitch order (`tatami.ts`). */
+function withFillAngles(planned: Planned[], preset: Preset): Planned[] {
+  const angles = fillAngles(
+    planned.map((p) => ({
+      shapeId: p.shapeId,
+      cover: p.cover,
+      polygon: p.kind === "tatami" ? p.polygon : undefined,
+    })),
+    preset.fillRowSpacingMm,
+  );
+  return planned.map((p, i) => (p.kind === "tatami" ? { ...p, angleDeg: angles[i]! } : p));
+}
+
 /**
  * Cuts the tatami areas, later out of earlier (spec §4.1, `knockdown.ts`). An
  * area the cut splits becomes one object per part, each in the place of the
@@ -469,6 +515,48 @@ function applyKnockdown(
   };
 }
 
+/**
+ * Pull and push compensation of every tatami (`compensateArea`, spec §8.1.1), on the
+ * area the knockdown left and at the angle it got. It is done here, not with
+ * Ink/Stitch's `pull_compensation_mm`: that one rebuilds the area from its rows on
+ * every stitch plan (buffering and uniting every row, smoothing the outline point by
+ * point in Python), which made a run several times as long, and it has no push.
+ */
+function compensate(
+  planned: Planned[],
+  preset: Preset,
+  warnings: Warning[],
+): { planned: Planned[]; report: CompensationReport } {
+  const report: CompensationReport = { pulledOnly: [], vanished: [] };
+  const out = planned.map((p): Planned => {
+    if (p.kind !== "tatami") return p;
+    const c = compensateArea(p.polygon, p.angleDeg ?? DEFAULT_ANGLE_DEG, preset);
+    if (c.how === "pull") {
+      report.pulledOnly.push({ id: p.id, parts: c.parts });
+      warnings.push(
+        warn(
+          WARNING.INVALID_GEOMETRY,
+          `The push compensation of ${preset.pushCompMm} mm would cut "${p.id}" into ${c.parts} parts — compensated along the rows only.`,
+          "info",
+          p.id,
+        ),
+      );
+    } else if (c.how === "none") {
+      report.vanished.push(p.id);
+      warnings.push(
+        warn(
+          WARNING.INVALID_GEOMETRY,
+          `The compensation makes "${p.id}" vanish — stitched without it.`,
+          "warn",
+          p.id,
+        ),
+      );
+    }
+    return c.polygon === p.polygon ? p : { ...p, polygon: c.polygon };
+  });
+  return { planned: out, report };
+}
+
 const trimAttr = (p: { trimAfter: boolean }): Record<string, string> =>
   p.trimAfter ? { trim_after: "true" } : {};
 
@@ -476,8 +564,14 @@ const trimAttr = (p: { trimAfter: boolean }): Record<string, string> =>
 function emitTemplate(
   planned: Planned[],
   preset: Preset,
-): { body: string; objects: TemplateObject[]; satinRuns: string[][] } {
+): {
+  body: string;
+  objects: TemplateObject[];
+  satinRuns: string[][];
+  underlayReport: UnderlayReport;
+} {
   const objects: TemplateObject[] = [];
+  const underlayReport: UnderlayReport = { grid: 0, without: [] };
   const body: string[] = [];
   const satinRuns: string[][] = [];
   let run: { color: string; ids: string[] } | undefined;
@@ -489,9 +583,11 @@ function emitTemplate(
   for (const p of planned) {
     if (p.kind === "tatami") {
       closeRun();
+      const angleDeg = p.angleDeg ?? DEFAULT_ANGLE_DEG;
+      const underlay = gridUnderlay(p.polygon, preset, angleDeg);
       body.push(
         `<path id="${xmlEscape(p.id)}" d="${polygonD(p.polygon)}" style="fill:${xmlEscape(p.color)};stroke:none"` +
-          `${inkAttrs({ row_spacing_mm: num(preset.fillRowSpacingMm), ...trimAttr(p) })}/>`,
+          `${inkAttrs({ ...tatamiAttributes(preset, angleDeg, underlay.grid), ...trimAttr(p) })}/>`,
       );
       objects.push({
         id: p.id,
@@ -500,6 +596,10 @@ function emitTemplate(
         color: p.color,
         ...(p.reason ? { reason: p.reason } : {}),
       });
+      if (preset.fillUnderlay.fill !== "none") {
+        if (underlay.grid) underlayReport.grid++;
+        else underlayReport.without.push({ id: p.id, pieces: underlay.pieces });
+      }
     } else if (p.kind === "running") {
       closeRun();
       // Named explicitly: a plain stroke without a dash pattern is a narrow zigzag
@@ -551,7 +651,7 @@ function emitTemplate(
     }
   }
   closeRun();
-  return { body: body.join(""), objects, satinRuns };
+  return { body: body.join(""), objects, satinRuns, underlayReport };
 }
 
 /**
@@ -577,7 +677,10 @@ export function buildInkstitchTemplate(
     planned = cut.planned;
     knockdown = cut.report;
   }
-  const { body, objects, satinRuns } = emitTemplate(planned, preset);
+  planned = withFillAngles(planned, preset);
+  const compensated = compensate(planned, preset, warnings);
+  planned = compensated.planned;
+  const { body, objects, satinRuns, underlayReport } = emitTemplate(planned, preset);
 
   const svg =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
@@ -594,5 +697,7 @@ export function buildInkstitchTemplate(
     colourBlocks: colourBlockCount(objects.map((o) => o.color)),
     ...(lowerBound === undefined ? {} : { colourBlocksLowerBound: lowerBound }),
     ...(knockdown ? { knockdown } : {}),
+    compensation: compensated.report,
+    underlay: underlayReport,
   };
 }
