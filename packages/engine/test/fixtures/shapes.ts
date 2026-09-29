@@ -6,6 +6,7 @@
  */
 import type { PathSegment, Point, Polygon, Polyline } from "@texma-stitch/geometry";
 import { flattenPath, orient } from "@texma-stitch/geometry";
+import type { ImportedAreaShape, ImportedLineShape } from "../../src/import/svg.js";
 
 export const pt = (x: number, y: number): Point => ({ x, y });
 
@@ -507,3 +508,36 @@ export function hairlineH(size = 10, width = 0.5): Polygon {
 }
 
 export const HAIRLINE_H = hairlineH();
+
+// ---------------------------------------------------------------------------
+// Fineness checks (spec §5.2)
+// ---------------------------------------------------------------------------
+
+/**
+ * A filled area as `importShapes` reads it: what the checks that take imported
+ * shapes (`checkMinimumSize`) are handed. Document order is the order of the list.
+ */
+export function areaShape(id: string, polygon: Polygon, color = "#000000"): ImportedAreaShape {
+  return { kind: "area", id, polygon, color, attrs: {}, trimAfter: "auto" };
+}
+
+/** A stroked line as `importShapes` reads it — no area, the fineness checks skip it. */
+export function lineShape(id: string, polyline: Polyline, color = "#000000"): ImportedLineShape {
+  return { kind: "line", id, polyline, closed: false, color, attrs: {}, trimAfter: "auto" };
+}
+
+/**
+ * Two blocks `gapMm` apart, side by side, the gap running the full height: the space
+ * between two letters. Left block from x = 0, right block from x = w + gap.
+ */
+export function gapBlocks(gapMm: number, w = 10, h = 5): [Polygon, Polygon] {
+  return [polygonOf(rect(0, 0, w, h)), polygonOf(rect(w + gapMm, 0, w, h))];
+}
+
+/**
+ * A disc of 3 mm radius with a round hole of `holeMm` diameter in the middle: the
+ * counter of an "o" or the bowl of a "P", small enough to sew shut.
+ */
+export function punzeDisc(holeMm: number, discRadiusMm = 3): Polygon {
+  return annulus(0, 0, discRadiusMm, holeMm / 2);
+}
