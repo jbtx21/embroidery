@@ -18,6 +18,9 @@ Stand: 19.09.2026 · Zielgruppe: Entwicklung (Claude Code) · Status: Entwurf f�
 - §2 `inkstitch/` ergänzt.
 - §16 Phase 1b ergänzt, die Abnahme Phase 1 entfällt.
 
+**Änderung 29.09.2026** — §7.8 neu: Satin für die Ink/Stitch-Vorlage (Einteilung nach Breite mit
+Satin ab 0,7 mm, Strichplan, Säulen, Glätten rauer Konturen, Prüfgrenzen). §7.4 verweist darauf.
+
 ---
 
 ## 1. Zweck und Grundsätze *(28.09.2026 neu gefasst — vorher: die Engine erzeugt die Stiche selbst)*
@@ -423,6 +426,9 @@ dreifach, und wo ihre Ecken sich treffen, stapelten sich 8 Einstiche. Gerade Str
 sie genau (0,75 mm → 0,78). Ergebnis am selben Logo: 11.192 statt 12.017 Stiche,
 Nadelhäufung 6 statt 8.
 
+Für die Ink/Stitch-Vorlage gilt die Einteilung aus §7.8.1: Satin ab 0,7 mm, darunter ein
+einfacher Laufstich *(29.09.2026)*.
+
 ### 7.5 Kurzstiche *(26.09.2026 neu gefasst — vorher: Innenradius < 1 mm, jeder zweite Stich auf 70 %)*
 
 Das Kriterium liegt am **Abstand zwischen zwei Einstichen auf derselben Rail**, nicht an der
@@ -499,6 +505,113 @@ ist das ein Befund.
 aber gegen gesunde Buchstaben, nicht gegen gewundene Rails; sie steht deshalb auf 4 und ist
 nur noch Rückfall (§5.1, „Wer wovon entscheidet"). Das ist eine bewusste Lockerung mit
 Messwerten, keine stille.
+
+### 7.8 Satin für die Ink/Stitch-Vorlage *(29.09.2026)*
+
+Seit ADR 0001 stickt Ink/Stitch die Satinsäulen; TEXMA Stitch legt fest, wo sie liegen
+(`packages/engine/src/inkstitch/`: `classify.ts`, `strokes.ts`, `columns.ts`, `smooth.ts`,
+`template.ts`). Jede Säule geht als **native Ink/Stitch-Satinsäule** in die Vorlage: ein Pfad
+mit zwei Rails und Sprossen, `inkstitch:satin_column`. Ink/Stitchs eigenes Werkzeug „Füllung
+zu Satin" wird nicht benutzt. Es lässt jedes Stückende in einem Punkt zusammenlaufen und
+fächert an Kreuzungen und Ecken; auf einem Testblatt mit 13 Buchstaben (DejaVu Sans Bold)
+setzte es 10 statt 13 als Satin, bei Dichtespitze 21 statt 12 und Nadelhäufung 7 statt 4.
+
+#### 7.8.1 Einteilung nach Breite
+
+Gemessen mit `medianShapeWidthMm` (§5.1):
+
+- **bis 0,7 mm** (`SINGLE_PASS_MAX_MM`): einfacher Laufstich entlang der Mittelachse — ein
+  Faden deckt die Breite (§7.4). Einen dreifachen Laufstich gibt es in der Vorlage nicht.
+- **über 0,7 mm bis unter 5 mm** (`AUTOSATIN_MAX_WIDTH_MM`): Satin, unter 1,0 mm mit
+  `SATIN_TOO_NARROW` (§7.4).
+- **ab 5 mm**: Tatami.
+
+Die Grenze liegt bei 0,7 und nicht bei den 0,6 mm aus §7.4 (Entscheidung 29.09.2026): Die
+Breitenmessung überschätzt dünne Ringe (§7.4). Die 0,45-mm-Ränder der Bandrahmen im
+STUTTGART-Logo messen 0,61–0,62 mm und bleiben so Laufstich; der „/" in „NotSan 01/24"
+(0,73 mm) und „CYS SPORTS" (0,88–1,24 mm) werden Satin.
+
+#### 7.8.2 Strichplan
+
+Aus der Mittelachse (§5) entsteht der Plan, den ein Puncher vor dem Setzen macht
+(`strokeGraph`):
+
+1. Astenden, die zusammenfallen, bilden einen Knoten. Knoten, die ein Ast kürzer als ihr
+   Freiraum verbindet, sind **eine** Kreuzung — die Taille der „8" ist eine.
+2. Ein Ast, der zu seiner Kreuzung zurückkehrt, ist ein **Ring** (O, die Bäuche der 8).
+3. An jeder Kreuzung **läuft das gegenläufigste Astpaar durch**, wenn es sich mit mindestens
+   140° trifft (`PASS_THROUGH_MIN_DEG`); wiederholt, solange Paare übrig sind (X: zwei Paare).
+   Gemessen: der Balken des T läuft mit rund 161° weiter, die Arme des E treffen den Stamm mit
+   93–100°.
+4. Ketten, die als Säule lang genug sind (1,5 × Freiraum, `STROKE_CHAIN_FACTOR`), sind
+   **Striche**; kürzere hängen als **Anhängsel** am Strich, von dem sie abgehen (Serifen,
+   Ecken eines rechtwinkligen Endes, Beulen).
+5. Jedes Strichende ist **frei**, **stößt an** einen durchlaufenden Strich oder trifft andere
+   an einer **Ecke**. An der Ecke läuft ein Strich bis zur Außenkante weiter, die anderen
+   stoßen an ihn: zuerst ein **tragender** Strich — einer, der durch eine Kreuzung läuft oder
+   unter dem andere enden (Stamm von B, P, R; Stamm und Balken der 4) —, sonst der längere.
+   Ergäbe das eine Stichfolge im Kreis, nimmt die Ecke der nächste Kandidat. Laufen zwei
+   anstoßende Striche vor dem durchlaufenden ineinander (Arm und Bein des K, unter 150°), geht
+   der längere bis zum durchlaufenden, der andere endet unter ihm.
+6. Was anstößt, wird vorher gestickt und liegt unter dem Strich, an den es stößt.
+
+Auf Wunsch (`splitSharpBends`) gilt ein Knick von mindestens 110° innerhalb von 2,5
+Freiräumen als zwei Striche, die sich an einer Ecke treffen — die stumpfen Füße eines „w".
+
+#### 7.8.3 Säulen
+
+- **Rails folgen der Kontur.** Entlang der Strichachse (Schritt 0,2 mm) wird beidseits die
+  Normale geschlagen. Wo sie auf Kontur trifft, die zu diesem Strich gehört, liegt ein
+  Railpunkt; dazwischen läuft die Rail auf der Kontur selbst, Ecken und Serifen eingeschlossen.
+  Zu einem Strich gehört, was der Freiraumkreis seiner Äste berührt.
+- **Öffnungen werden überbrückt.** Wo ein anderer Strich einmündet, läuft die Rail als Gerade
+  vom letzten Punkt vor der Öffnung zum ersten danach.
+- **Enden.** Ein freies Ende läuft bis zu seinen Ecken aus (rechtwinklig) oder bis zur Spitze
+  (rund, spitz). Der Strich, der eine Ecke behält, läuft über sie bis zur Außenkante. Ein
+  anstoßender Strich läuft geradeaus weiter, bis er `underlapMm` (Preset, §14) unter der Kante
+  des anderen liegt.
+- **Sprossen** sind die Normalen selbst: mindestens alle 1,2 mm und beidseits jeder Öffnung,
+  0,05 mm über die Rails hinaus, damit Ink/Stitch sie als kreuzend erkennt.
+- **Parameter aus dem Preset:** Zickzackabstand `satinSpacingMm` (§7.3), Zugausgleich nach der
+  Breite der Säule (§7.2), Split ab 7 mm (§7.4), Unterlage nach Breite (§7.6: unter 3 mm
+  Mittellaufstich, ab 3 mm Kontur und Zickzack). Die Schalter in `satinUnderlay` (§14, immer
+  Kontur und Zickzack) werden dafür nicht gelesen — offener Punkt zwischen §7.6 und §14.
+
+#### 7.8.4 Glätten rauer Konturen
+
+Pinselschrift („SEGEN SEIN") hat alle paar Zehntelmillimeter eine Kerbe oder Beule; ihre
+Mittelachse verzweigt an jeder, und kein Strichplan hält. Scheitert eine Form als Satin, wird
+sie geschlossen und geöffnet (`smoothOutline`: nach außen und zurück, dann nach innen und
+zurück), mit 0,2, dann 0,3, dann 0,4 mm — der kleinste Radius, der trägt, gilt. Gemessen an
+„SEGEN SEIN": 0 von 34 Teilen halten ungeglättet, 18 mit 0,2 mm, 33 mit 0,4 mm.
+
+Geglättet wird nur **Textur**: eine Kontur, die beim Öffnen mindestens 0,5 % ihrer Fläche
+verliert (`TEXTURE_EDGE_MIN`), oder eine, die beim Schließen höchstens 5 % gewinnt
+(`CLEAN_FILL_MAX`). Gezeichnete Löcher bleiben — die Kronen im roten Band des Kölner Wappens
+würden 20 % der Fläche zusticken. Jede Glättung meldet sich als `info`, und die Deckung wird
+gegen die **Originalkontur** gemessen. Preis: Kerben unter dem doppelten Radius werden
+zugestickt (beim „R" von „CYS SPORTS" der Schlitz zwischen den Beinen am Fuß, siehe Backlog).
+
+#### 7.8.5 Prüfgrenzen
+
+Eine Form wird nur Satin, wenn alle vier Grenzen halten; sonst bleibt sie Tatami, und der Grund
+steht in der Ausgabe (Regel 8).
+
+| Grenze | Wert | Warum |
+|---|---|---|
+| Rail außerhalb der Form (`RAIL_OUTSIDE_MAX_MM`) | höchstens 0,15 mm | weniger als der kleinste Zugausgleich (§7.2, 0,2 mm) — darin verbreitert Ink/Stitch die Säule ohnehin |
+| Rails einer Säule | kreuzen sich nicht | eine gekreuzte Säule stickt verdreht |
+| Anteil einer Säule auf anderen (`COLUMN_OVERLAP_MAX`) | höchstens 60 % | mehr heißt: der Plan hat eine Kreuzung als einen Strich gelesen; sich kreuzende Striche teilen bis ein Drittel (4: 31 %, X: 19 %) |
+| Deckung aller Säulen einer Form | mindestens 0,85 (`COLUMN_COVERAGE_MIN`, §5.1) | sonst bleibt Stoff sichtbar |
+
+#### 7.8.6 Reihenfolge und Verbindungen
+
+Die Säulen einer Form kommen in Stichfolge (was unter einem Strich endet, zuerst). Satinformen
+gleicher Farbe, die in der Vorlage aufeinander folgen, bilden eine **Folge**; je Folge ein
+Aufruf von Ink/Stitchs „Satinsäulen automatisch führen" (`auto_satin --preserve_order --trim`).
+Der Weg zwischen den Säulen läuft verdeckt unter späteren Säulen, und nie über eine andere
+Farbe oder ein dazwischen gesticktes Objekt; wo das nicht geht, setzt Ink/Stitch einen
+Fadenschnitt.
 
 ---
 
