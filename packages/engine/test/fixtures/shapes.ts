@@ -541,3 +541,40 @@ export function gapBlocks(gapMm: number, w = 10, h = 5): [Polygon, Polygon] {
 export function punzeDisc(holeMm: number, discRadiusMm = 3): Polygon {
   return annulus(0, 0, discRadiusMm, holeMm / 2);
 }
+
+/**
+ * A rim and a body inside it, `channelMm` apart all the way round — the double contour of
+ * varsity lettering, where the fabric shows through the channel. Rim `rimMm` wide: 2 mm, so
+ * that the rim is no satin stroke under 1.3 mm of its own.
+ */
+export function rimAndBody(channelMm: number, w = 20, h = 12, rimMm = 2): [Polygon, Polygon] {
+  const rim = polygonOf(rect(0, 0, w, h), [
+    orient(rect(rimMm, rimMm, w - 2 * rimMm, h - 2 * rimMm), false),
+  ]);
+  const c = rimMm + channelMm;
+  return [rim, polygonOf(rect(c, c, w - 2 * c, h - 2 * c))];
+}
+
+/**
+ * A block with a slot cut in from the bottom edge, `slotMm` wide and `depthMm` deep: the gap
+ * between the legs of an "R".
+ */
+export function slotBlock(slotMm = 0.44, depthMm = 1.2, w = 10, h = 5): Polygon {
+  const half = slotMm / 2;
+  return {
+    outer: orient(
+      [
+        pt(0, 0),
+        pt(w, 0),
+        pt(w, h),
+        pt(w / 2 + half, h),
+        pt(w / 2 + half, h - depthMm),
+        pt(w / 2 - half, h - depthMm),
+        pt(w / 2 - half, h),
+        pt(0, h),
+      ],
+      true,
+    ),
+    holes: [],
+  };
+}

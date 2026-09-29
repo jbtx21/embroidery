@@ -53,44 +53,50 @@ describe("befundeJeArt", () => {
 });
 
 describe("zusammenfassung", () => {
-  it("nennt die Mindestgröße, das bestimmende Element und die Zahl der Befunde je Art", () => {
+  it("nennt die Mindestgröße aus den Satinstrichen und daneben, ab wann alle Lücken offen sind", () => {
     const { result } = szene();
-    const text = zusammenfassung(result).join("\n");
-    expect(text).toContain(`Mindestgröße  ${Math.ceil(result.minimumWidthMm!)} mm`);
-    expect(text).toContain(`Lücke ${result.decisive!.id}`);
-    expect(text).toContain("1 Satinstrich unter 1.3 mm, 1 Lücke unter 0.8 mm");
+    const lines = zusammenfassung(result);
+    expect(lines[0]).toContain(`Mindestgröße     ${Math.ceil(result.minimumWidthMm!)} mm`);
+    expect(lines[0]).toContain(`bestimmt von Satinstrich ${result.decisive!.id}`);
+    expect(lines[0]).toContain("Grenze 1.3 mm");
+    expect(lines[1]).toContain(`Lücken offen ab  ${Math.ceil(result.gapsOpenFromWidthMm!)} mm`);
+    expect(lines[1]).toContain(`bestimmt von Lücke ${result.decisiveGap!.id}`);
+    expect(lines[1]).toContain("Grenze 0.8 mm");
+    expect(lines.join("\n")).toContain("1 Satinstrich unter 1.3 mm, 1 Lücke unter 0.8 mm");
+    // Die Lücke verlangt mehr als der Strich — und ändert die Mindestgröße trotzdem nicht.
+    expect(result.gapsOpenFromWidthMm!).toBeGreaterThan(result.minimumWidthMm!);
   });
 
-  it("sagt, was jede Art für sich verlangt", () => {
-    const { result } = szene();
-    const satin = result.findings.find((f) => f.kind === "satin-stroke")!;
-    const luecke = result.findings.find((f) => f.kind === "gap")!;
-    const text = zusammenfassung(result).join("\n");
-    expect(text).toContain(
-      `davon         Satinstriche ab ${Math.ceil(satin.holdsFromWidthMm)} mm (zier), ` +
-        `Lücken ab ${Math.ceil(luecke.holdsFromWidthMm)} mm (${luecke.id})`,
-    );
-    // Nur Lücken: der Satinteil sagt „keine“ statt zu schweigen.
-    const [a, b] = gapBlocks(0.5);
-    const nurLuecken = checkMinimumSize([areaShape("a", a, GRAY), areaShape("b", b, GRAY)], {
+  it("sagt, wo alle Striche halten, wie weit das Logo schrumpfen könnte", () => {
+    const shapes = [areaShape("balken", polygonOf(rect(0, 0, 40, 2)))];
+    const result = checkMinimumSize(shapes, { widthMm: 80 });
+    const lines = zusammenfassung(result);
+    expect(lines[0]).toContain(`Mindestgröße     ${Math.ceil(result.minimumWidthMm!)} mm`);
+    expect(lines[0]).toContain("schmalster Satinstrich balken");
+    expect(lines[0]).toContain("die bestellten 80.0 mm halten");
+    expect(result.minimumWidthMm!).toBeLessThan(80);
+    expect(lines[1]).toContain("keine zu feinen Lücken bei 80.0 mm");
+    expect(lines.join("\n")).toContain("0 Satinstriche unter 1.3 mm, 0 Lücken unter 0.8 mm");
+  });
+
+  it("sagt es, wenn das Logo keinen Satinstrich hat", () => {
+    const [a, b] = gapBlocks(0.5, 10, 8);
+    const result = checkMinimumSize([areaShape("a", a, GRAY), areaShape("b", b, GRAY)], {
       widthMm: 80,
     });
-    expect(zusammenfassung(nurLuecken).join("\n")).toContain("Satinstriche: keine");
+    const lines = zusammenfassung(result);
+    expect(lines[0]).toContain("keine Satinstriche im Logo");
+    expect(lines[1]).toContain(`Lücken offen ab  ${Math.ceil(result.gapsOpenFromWidthMm!)} mm`);
   });
 
-  it("sagt, was das Schließen fand und nicht gezählt hat", () => {
+  it("sagt, was der Filter für Lücken herausgenommen hat", () => {
     const { result } = szene();
     const text = zusammenfassung(result).join("\n");
     expect(text).toContain("Nicht gezählt");
+    expect(text).toContain(`${result.ignored.slivers} Stücke ganz von Spänen (unter 0.01 mm)`);
+    expect(text).toContain(`${result.ignored.thin} unter 0.1 mm Breite`);
+    expect(text).toContain(`${result.ignored.compact} ohne Mittelachse`);
     expect(text).toContain(`von ${result.gapPieces} Stücken des Schließens`);
-  });
-
-  it("sagt es, wenn nichts zu fein ist — und dass kleiner nicht geprüft wird", () => {
-    const shapes = [areaShape("balken", polygonOf(rect(0, 0, 40, 2)))];
-    const text = zusammenfassung(checkMinimumSize(shapes, { widthMm: 80 })).join("\n");
-    expect(text).toContain("keine zu feinen Elemente bei 80.0 mm");
-    expect(text).toContain("kleiner wird nicht geprüft");
-    expect(text).toContain("0 Satinstriche unter 1.3 mm, 0 Lücken unter 0.8 mm");
   });
 });
 
@@ -162,12 +168,37 @@ describe("feinheitSvg", () => {
     expect(Number(viewBox[2]) + Number(viewBox[4])).toBeCloseTo(30, 2);
   });
 
-  it("beschriftet höchstens so viele Befunde, wie gesagt, und sagt es im Kopf", () => {
+  it("schreibt beide Zahlen in den Kopf", () => {
     const { shapes, result } = szene();
+    const svg = feinheitSvg(shapes, result, { name: "probe", heightMm: 30 });
+    expect(svg).toContain(
+      `Mindestgröße ${Math.ceil(result.minimumWidthMm!)} mm (Satinstrich ${result.decisive!.id}`,
+    );
+    expect(svg).toContain(
+      `Lücken offen ab ${Math.ceil(result.gapsOpenFromWidthMm!)} mm (${result.decisiveGap!.id}`,
+    );
+  });
+
+  it("beschriftet höchstens so viele Befunde, wie gesagt — die bestimmenden immer", () => {
+    // Drei Befunde: die Lücke von 0,5 mm (Rang 1), der Strich (Rang 2), eine Lücke von 0,7 mm (Rang 3).
+    const [a, b] = gapBlocks(0.5);
+    const shapes = [
+      areaShape("a", a, GRAY),
+      areaShape("b", b, GRAY),
+      areaShape("c", polygonOf(rect(0, 40, 10, 5)), GRAY),
+      areaShape("d", polygonOf(rect(10.7, 40, 10, 5)), GRAY),
+      areaShape("zier", polygonOf(rect(0, 20, 40, 1.0)), "#000000"),
+    ];
+    const result = checkMinimumSize(shapes, { widthMm: 80 });
+    expect(result.findings.map((f) => f.kind)).toEqual(["gap", "satin-stroke", "gap"]);
     const svg = feinheitSvg(shapes, result, { name: "probe", beschriftet: 1 });
     expect(svg).toContain("die 1 mit der größten Mindestbreite");
+    // Rang 1 ist die bestimmende Lücke, Rang 2 der bestimmende Strich: beide stehen im Bild, Rang 3 nicht.
     expect(svg.match(/>L1</g)).toHaveLength(2);
-    expect(svg).not.toContain(">S2<");
+    expect(svg.match(/>S2</g)).toHaveLength(2);
+    expect(svg).not.toContain(">L3<");
+    // Mit mehr Plätzen kommt der dritte dazu.
+    expect(feinheitSvg(shapes, result, { name: "probe", beschriftet: 3 })).toContain(">L3<");
   });
 
   it("zeichnet die Löcher einer Form offen (evenodd)", () => {

@@ -10,12 +10,16 @@ import {
   pt,
   punzeDisc,
   rect,
+  rimAndBody,
+  slotBlock,
 } from "../../test/fixtures/shapes.js";
 import { classifyShape } from "./classify.js";
 import {
   checkMinimumSize,
   GAP_MIN_MM,
-  GAP_NOISE_MM2,
+  GAP_SAMPLE_MM,
+  GAP_SLIVER_MM,
+  GAP_THIN_MM,
   holdsFromWidth,
   SATIN_STROKE_MIN_MM,
 } from "./min-size.js";
@@ -38,10 +42,14 @@ const shift = (poly: Polygon, dx: number, dy: number): Polygon => ({
 const coverOverGap = (h = 7): Polygon => polygonOf(rect(9, -1, 3, h));
 
 describe("constants (spec §5.2)", () => {
-  it("carries the decided limits and the noise floor", () => {
+  it("carries the decided limits and the filter values of the second version", () => {
     expect(SATIN_STROKE_MIN_MM).toBe(1.3);
     expect(GAP_MIN_MM).toBe(0.8);
-    expect(GAP_NOISE_MM2).toBe(0.02);
+    // Slivers under 0.01 mm come off (an opening by half of it), the width is read every 0.1 mm,
+    // and a piece under 0.1 mm — the DST resolution — is not a gap.
+    expect(GAP_SLIVER_MM).toBe(0.01);
+    expect(GAP_SAMPLE_MM).toBe(0.1);
+    expect(GAP_THIN_MM).toBe(0.1);
   });
 });
 
@@ -56,7 +64,7 @@ describe("holdsFromWidth", () => {
   });
 });
 
-describe("checkMinimumSize — satin strokes", () => {
+describe("checkMinimumSize — satin strokes and the minimum size", () => {
   it("flags a satin stroke under 1.3 mm and names the width it holds from", () => {
     const r = checkMinimumSize([areaShape("balken", bar(1.0))], { widthMm: B });
     expect(r.findings).toHaveLength(1);
@@ -75,6 +83,29 @@ describe("checkMinimumSize — satin strokes", () => {
     expect(f.at.y).toBeCloseTo(0.5, 6);
   });
 
+  it("takes the minimum size from the satin strokes: the width from which all are 1.3 mm", () => {
+    const r = checkMinimumSize([areaShape("balken", bar(1.0))], { widthMm: B });
+    const f = r.findings[0]!;
+    expect(r.minimumWidthMm).toBe(f.holdsFromWidthMm);
+    expect(r.minimumWidthMm!).toBeGreaterThan(B);
+    // The stroke that sets it is named.
+    expect(r.decisive).toBe(f);
+  });
+
+  it("lets the narrowest of several strokes decide", () => {
+    const r = checkMinimumSize(
+      [
+        areaShape("breit", shift(bar(1.2), 0, 10)),
+        areaShape("schmal", bar(0.9)),
+        areaShape("gut", shift(bar(2.0), 0, 20)),
+      ],
+      { widthMm: B },
+    );
+    expect(r.findings.map((f) => f.id)).toEqual(["schmal", "breit"]);
+    expect(r.decisive!.id).toBe("schmal");
+    expect(r.minimumWidthMm).toBe(r.findings[0]!.holdsFromWidthMm);
+  });
+
   it("measures it the way the classification does, one width for both", () => {
     const shape = bar(1.1);
     const r = checkMinimumSize([areaShape("balken", shape)], { widthMm: B });
@@ -86,19 +117,41 @@ describe("checkMinimumSize — satin strokes", () => {
     expect(r.findings[0]!.runningAlternative).toBe(true);
   });
 
-  it("leaves a stroke of 1.5 mm alone", () => {
+  it("leaves a stroke of 1.5 mm alone and says how far the logo could shrink", () => {
     const r = checkMinimumSize([areaShape("balken", bar(1.5))], { widthMm: B });
     expect(r.findings).toEqual([]);
+    // Every stroke holds at the ordered width; the minimum is where the narrowest reaches 1.3 mm.
+    expect(r.decisive!.id).toBe("balken");
+    expect(r.minimumWidthMm).toBeCloseTo(holdsFromWidth(B, 1.3, r.decisive!.measuredMm), 9);
+    expect(r.minimumWidthMm!).toBeGreaterThan(65);
+    expect(r.minimumWidthMm!).toBeLessThan(72);
   });
 
   it("does not count a hairline: under 0.7 mm it is a running stitch, not a satin stroke", () => {
     const r = checkMinimumSize([areaShape("haar", bar(0.5))], { widthMm: B });
     expect(r.findings).toEqual([]);
+    expect(r.minimumWidthMm).toBeUndefined();
+    expect(r.decisive).toBeUndefined();
   });
 
   it("does not count a wide area", () => {
     const r = checkMinimumSize([areaShape("platte", bar(8, 8))], { widthMm: B });
     expect(r.findings).toEqual([]);
+    expect(r.minimumWidthMm).toBeUndefined();
+  });
+
+  it("has a minimum size for a logo without any stroke of its own: none", () => {
+    const r = checkMinimumSize([], { widthMm: B });
+    expect(r.minimumWidthMm).toBeUndefined();
+    expect(r.decisive).toBeUndefined();
+    expect(r.widthMm).toBe(B);
+  });
+
+  it("holds from a larger width the larger the logo was ordered — the formula is linear", () => {
+    const shapes = [areaShape("balken", bar(1.0))];
+    const at80 = checkMinimumSize(shapes, { widthMm: 80 });
+    const at160 = checkMinimumSize(shapes, { widthMm: 160 });
+    expect(at160.minimumWidthMm).toBeCloseTo(2 * at80.minimumWidthMm!, 6);
   });
 });
 
@@ -113,9 +166,9 @@ describe("checkMinimumSize — gaps within a colour", () => {
     expect(f.id).toBe("gap-bebebe-001");
     expect(f.limitMm).toBe(0.8);
     expect(f.measure).toBe("median");
-    // The median width of the piece: the medial axis reads a strip of this size a little wide.
-    expect(f.measuredMm).toBeGreaterThan(0.45);
-    expect(f.measuredMm).toBeLessThan(0.65);
+    // The median width of the piece, read every 0.1 mm: a strip of 0.5 mm reads 0.51.
+    expect(f.measuredMm).toBeGreaterThan(0.47);
+    expect(f.measuredMm).toBeLessThan(0.56);
     expect(f.holdsFromWidthMm).toBeCloseTo((B * 0.8) / f.measuredMm, 9);
     expect(f.runningAlternative).toBe(false);
     // The piece is the strip between the blocks: 0.5 mm wide, the height of the blocks.
@@ -123,6 +176,15 @@ describe("checkMinimumSize — gaps within a colour", () => {
     expect(polygonArea(f.polygon)).toBeLessThan(0.5 * 5 + 1e-6);
     expect(f.at.x).toBeCloseTo(10.25, 1);
     expect(f.at.y).toBeCloseTo(2.5, 1);
+  });
+
+  it("reads a gap of 0.2 mm as 0.22, not as the 0.32 the standard sampling reads", () => {
+    const [a, b] = gapBlocks(0.2);
+    const r = checkMinimumSize([areaShape("a", a, GRAY), areaShape("b", b, GRAY)], { widthMm: B });
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]!.measuredMm).toBeGreaterThan(0.19);
+    expect(r.findings[0]!.measuredMm).toBeLessThan(0.26);
+    expect(r.gapsOpenFromWidthMm).toBeGreaterThan(B * 3);
   });
 
   it("leaves a gap of 0.9 mm alone", () => {
@@ -150,6 +212,69 @@ describe("checkMinimumSize — gaps within a colour", () => {
     expect(r.findings).toEqual([]);
   });
 
+  it("finds the channel between a rim and its body — 0.25 mm all the way round", () => {
+    // The double contour of varsity lettering (STUTTGART, 80 mm): the fabric shows through.
+    const [rim, body] = rimAndBody(0.25);
+    const r = checkMinimumSize([areaShape("rand", rim, GRAY), areaShape("koerper", body, GRAY)], {
+      widthMm: B,
+    });
+    expect(r.findings).toHaveLength(1);
+    const f = r.findings[0]!;
+    expect(f.kind).toBe("gap");
+    expect(f.polygon.holes).toHaveLength(1); // a ring: the body stands in it
+    expect(f.measuredMm).toBeGreaterThan(0.22);
+    expect(f.measuredMm).toBeLessThan(0.3);
+    // 80 mm × 0.8 ÷ 0.25: the logo would have to be about 256 mm wide.
+    expect(f.holdsFromWidthMm).toBeGreaterThan(200);
+    expect(f.holdsFromWidthMm).toBeLessThan(290);
+  });
+
+  it("puts the mark of a ring on the ring, not in its empty middle", () => {
+    // The centre of the box of a channel that runs round a body is inside the body; `at` is
+    // where to look, so it is a point of the piece — the same for a satin ring.
+    const [rim, body] = rimAndBody(0.25);
+    const r = checkMinimumSize([areaShape("rand", rim, GRAY), areaShape("koerper", body, GRAY)], {
+      widthMm: B,
+    });
+    const gap = r.findings[0]!;
+    const onOutline = (f: (typeof r.findings)[number]): boolean =>
+      [f.polygon.outer, ...f.polygon.holes].some((ring) =>
+        ring.some((p) => p.x === f.at.x && p.y === f.at.y),
+      );
+    expect(gap.polygon.holes).toHaveLength(1);
+    expect(onOutline(gap)).toBe(true);
+
+    const thin = polygonOf(rect(0, 0, 20, 12), [rect(1, 1, 18, 10).reverse()]); // a wall of 1 mm
+    const stroke = checkMinimumSize([areaShape("wand", thin)], { widthMm: B }).findings[0]!;
+    expect(stroke.kind).toBe("satin-stroke");
+    expect(onOutline(stroke)).toBe(true);
+  });
+
+  it("keeps the centre of the box where it lies on the piece", () => {
+    const [a, b] = gapBlocks(0.5);
+    const r = checkMinimumSize([areaShape("a", a, GRAY), areaShape("b", b, GRAY)], { widthMm: B });
+    expect(r.findings[0]!.at.x).toBeCloseTo(10.25, 6);
+    expect(r.findings[0]!.at.y).toBeCloseTo(2.5, 1);
+  });
+
+  it("leaves a channel of 0.9 mm open", () => {
+    const [rim, body] = rimAndBody(0.9);
+    const r = checkMinimumSize([areaShape("rand", rim, GRAY), areaShape("koerper", body, GRAY)], {
+      widthMm: B,
+    });
+    expect(r.findings).toEqual([]);
+  });
+
+  it("finds the slit between the legs of an R — 0.44 mm wide, a little over a millimetre deep", () => {
+    const r = checkMinimumSize([areaShape("r", slotBlock(0.44, 1.2), GRAY)], { widthMm: B });
+    expect(r.findings).toHaveLength(1);
+    const f = r.findings[0]!;
+    expect(f.measure).toBe("median");
+    expect(f.measuredMm).toBeGreaterThan(0.4);
+    expect(f.measuredMm).toBeLessThan(0.52);
+    expect(f.at.x).toBeCloseTo(5, 1);
+  });
+
   it("finds a counter of 0.5 mm in a ring — a hole has no median width, its width is the inscribed one", () => {
     const r = checkMinimumSize([areaShape("ring", punzeDisc(0.5), GRAY)], { widthMm: B });
     expect(r.findings).toHaveLength(1);
@@ -169,25 +294,70 @@ describe("checkMinimumSize — gaps within a colour", () => {
     expect(r.findings).toEqual([]);
   });
 
-  it("does not count a piece under 0.02 mm² — computing noise", () => {
-    // A hole of 0.15 mm is 0.0177 mm², one of 0.2 mm is 0.0314 mm²: the floor tells them apart.
-    const tiny = checkMinimumSize([areaShape("ring", punzeDisc(0.15), GRAY)], { widthMm: B });
-    expect(tiny.findings).toEqual([]);
-    expect(tiny.ignored.noise).toBeGreaterThanOrEqual(1);
+  it("counts a counter of 0.15 mm — its circle reaches the 0.1 mm the fabric can show", () => {
+    const r = checkMinimumSize([areaShape("ring", punzeDisc(0.15), GRAY)], { widthMm: B });
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]!.measure).toBe("inscribed-circle");
+    expect(r.findings[0]!.measuredMm).toBeCloseTo(0.15, 1);
+  });
 
-    const small = checkMinimumSize([areaShape("ring", punzeDisc(0.2), GRAY)], { widthMm: B });
-    expect(small.findings).toHaveLength(1);
-    expect(small.findings[0]!.measuredMm).toBeCloseTo(0.2, 1);
+  it("does not count a counter of 0.08 mm — under 0.1 mm there is nothing on the fabric", () => {
+    const r = checkMinimumSize([areaShape("ring", punzeDisc(0.08), GRAY)], { widthMm: B });
+    expect(r.findings).toEqual([]);
+    expect(r.ignored.thin).toBe(1);
+  });
+
+  it("takes a sliver off before measuring: a gap of 0.008 mm is a seam, not a gap", () => {
+    // Two blocks that meet with a hairline between them, as vectorised logos have. Closed, the
+    // seam is a strip of 0.04 mm² — more than the old area floor let through. The opening by
+    // 0.005 mm leaves nothing of it.
+    const [a, b] = gapBlocks(0.008);
+    const r = checkMinimumSize([areaShape("a", a, GRAY), areaShape("b", b, GRAY)], { widthMm: B });
+    expect(r.findings).toEqual([]);
+    expect(r.gapPieces).toBe(1);
+    expect(r.ignored.slivers).toBe(1);
+    expect(r.gapParts).toBe(0);
+  });
+
+  it("does not count a hairline of 0.02 mm either: it has no medial axis", () => {
+    // Wider than a sliver, so it survives the opening — but at the standard sampling there is
+    // no axis in a strip this thin, and a piece without one does not count (spec §5.2, rule 4).
+    const [a, b] = gapBlocks(0.02);
+    const r = checkMinimumSize([areaShape("a", a, GRAY), areaShape("b", b, GRAY)], { widthMm: B });
+    expect(r.findings).toEqual([]);
+    expect(r.ignored.slivers).toBe(0);
+    expect(r.ignored.compact).toBe(1);
   });
 
   it("does not take the rounding of a concave corner for a gap, and says it left it out", () => {
     // The closing rounds the inner corner of an L with a quarter circle of 0.4 mm: 0.03 to 0.04 mm²
-    // of area, more than the noise floor, but a corner — a shape without a medial axis, which
-    // `medianShapeWidthMm` counts as wide.
+    // of area — but a corner, a piece without a medial axis.
     const r = checkMinimumSize([areaShape("l", L_SHAPE, GRAY)], { widthMm: B });
     expect(r.findings).toEqual([]);
     expect(r.gapPieces).toBe(1);
-    expect(r.ignored).toEqual({ noise: 0, compact: 1, wide: 0, covered: 0 });
+    expect(r.ignored).toEqual({ slivers: 0, thin: 0, compact: 1, wide: 0, covered: 0 });
+  });
+
+  it("does not count a short gap between two small shapes: no medial axis (a blind spot)", () => {
+    // 0.5 mm apart, but each shape only 1 mm across: the piece is 0.5 × 1 mm and has no axis.
+    const r = checkMinimumSize(
+      [
+        areaShape("a", polygonOf(rect(0, 0, 1, 1)), GRAY),
+        areaShape("b", polygonOf(rect(1.5, 0, 1, 1)), GRAY),
+      ],
+      { widthMm: B },
+    );
+    expect(r.findings).toEqual([]);
+    expect(r.ignored.compact).toBe(1);
+  });
+
+  it("does not count a strip of 0.12 mm: the standard sampling finds no axis in it (a blind band)", () => {
+    // Between 0.1 and 0.15 mm a real gap is left out, because the axis is looked for at the
+    // standard sampling and only the width is read at 0.1 mm.
+    const [a, b] = gapBlocks(0.12);
+    const r = checkMinimumSize([areaShape("a", a, GRAY), areaShape("b", b, GRAY)], { widthMm: B });
+    expect(r.findings).toEqual([]);
+    expect(r.ignored.compact).toBe(1);
   });
 
   it("does not count a gap that a later form covers completely", () => {
@@ -257,7 +427,7 @@ describe("checkMinimumSize — gaps within a colour", () => {
   });
 });
 
-describe("checkMinimumSize — minimum size", () => {
+describe("checkMinimumSize — the second number: all gaps open from", () => {
   const scene = (gapMm: number, barMm: number) => {
     const [a, b] = gapBlocks(gapMm);
     return [
@@ -267,40 +437,62 @@ describe("checkMinimumSize — minimum size", () => {
     ];
   };
 
-  it("is the largest width any element holds from, with that element named", () => {
+  it("comes from the gaps alone and does not move the minimum size, which the strokes set", () => {
     const r = checkMinimumSize(scene(0.5, 1.0), { widthMm: B });
     expect(r.findings).toHaveLength(2);
-    expect(r.minimumWidthMm).toBe(Math.max(...r.findings.map((f) => f.holdsFromWidthMm)));
-    // 0.5 mm of gap (0.55 measured, limit 0.8) against 1.0 mm of stroke (limit 1.3): the gap asks for more.
-    expect(r.decisive!.kind).toBe("gap");
-    expect(r.decisive).toBe(r.findings[0]);
+    const stroke = r.findings.find((f) => f.kind === "satin-stroke")!;
+    const gap = r.findings.find((f) => f.kind === "gap")!;
+    // The minimum size is the stroke's — although the gap asks for more.
+    expect(r.decisive).toBe(stroke);
+    expect(r.minimumWidthMm).toBe(stroke.holdsFromWidthMm);
+    expect(r.gapsOpenFromWidthMm).toBe(gap.holdsFromWidthMm);
+    expect(r.decisiveGap).toBe(gap);
+    expect(r.gapsOpenFromWidthMm!).toBeGreaterThan(r.minimumWidthMm!);
   });
 
-  it("can be the stroke instead", () => {
-    const r = checkMinimumSize(scene(0.7, 0.9), { widthMm: B });
+  it("names the narrowest gap of several", () => {
+    const [a, b] = gapBlocks(0.5);
+    const [c, d] = gapBlocks(0.7);
+    const r = checkMinimumSize(
+      [
+        areaShape("a", a, GRAY),
+        areaShape("b", b, GRAY),
+        areaShape("c", shift(c, 0, 20), GRAY),
+        areaShape("d", shift(d, 0, 20), GRAY),
+      ],
+      { widthMm: B },
+    );
     expect(r.findings).toHaveLength(2);
-    expect(r.decisive!.kind).toBe("satin-stroke");
-    expect(r.decisive!.id).toBe("zier");
-    expect(r.minimumWidthMm).toBe(r.decisive!.holdsFromWidthMm);
+    expect(r.decisiveGap!.at.y).toBeCloseTo(2.5, 1);
+    expect(r.gapsOpenFromWidthMm).toBe(Math.max(...r.findings.map((f) => f.holdsFromWidthMm)));
   });
 
-  it("lists the findings by the width they hold from, the largest first", () => {
+  it("is absent where no gap is too fine, and the minimum size stays where it was", () => {
+    const r = checkMinimumSize([areaShape("balken", bar(1.0))], { widthMm: B });
+    expect(r.gapsOpenFromWidthMm).toBeUndefined();
+    expect(r.decisiveGap).toBeUndefined();
+    expect(r.minimumWidthMm).toBeDefined();
+  });
+
+  it("is there where the logo has no satin stroke at all", () => {
+    // Blocks 8 mm high are areas, not strokes (a shape under 5 mm is satin).
+    const [a, b] = gapBlocks(0.5, 10, 8);
+    const r = checkMinimumSize([areaShape("a", a, GRAY), areaShape("b", b, GRAY)], { widthMm: B });
+    expect(r.minimumWidthMm).toBeUndefined();
+    expect(r.gapsOpenFromWidthMm).toBeDefined();
+  });
+
+  it("lists the findings of both kinds by the width they hold from, the largest first", () => {
     const r = checkMinimumSize(scene(0.5, 1.0), { widthMm: B });
     const widths = r.findings.map((f) => f.holdsFromWidthMm);
     expect(widths).toEqual([...widths].sort((x, y) => y - x));
+    expect(r.findings[0]!.kind).toBe("gap");
   });
 
-  it("has no minimum and no decisive element without a finding", () => {
-    const r = checkMinimumSize([areaShape("balken", bar(2.0))], { widthMm: B });
-    expect(r.findings).toEqual([]);
-    expect(r.minimumWidthMm).toBeUndefined();
-    expect(r.decisive).toBeUndefined();
-    expect(r.widthMm).toBe(B);
-  });
-
-  it("holds from a smaller width the larger the logo was ordered — the formula is linear", () => {
+  it("scales with the ordered width like the minimum size does", () => {
     const at80 = checkMinimumSize(scene(0.5, 1.0), { widthMm: 80 });
     const at160 = checkMinimumSize(scene(0.5, 1.0), { widthMm: 160 });
+    expect(at160.gapsOpenFromWidthMm).toBeCloseTo(2 * at80.gapsOpenFromWidthMm!, 6);
     expect(at160.minimumWidthMm).toBeCloseTo(2 * at80.minimumWidthMm!, 6);
   });
 });
@@ -320,7 +512,10 @@ describe("checkMinimumSize — options, input, accounting", () => {
     expect(wide.findings).toHaveLength(1);
     expect(wide.findings[0]!.limitMm).toBe(1.0);
 
-    const stroke = checkMinimumSize([areaShape("balken", bar(1.5))], { widthMm: B, satinMinMm: 2 });
+    const stroke = checkMinimumSize([areaShape("balken", bar(1.5))], {
+      widthMm: B,
+      satinMinMm: 2,
+    });
     expect(stroke.findings).toHaveLength(1);
     expect(stroke.findings[0]!.limitMm).toBe(2);
     expect(stroke.findings[0]!.holdsFromWidthMm).toBeCloseTo(
@@ -349,31 +544,38 @@ describe("checkMinimumSize — options, input, accounting", () => {
     const r = checkMinimumSize([], { widthMm: B });
     expect(r.findings).toEqual([]);
     expect(r.gapPieces).toBe(0);
-    expect(r.ignored).toEqual({ noise: 0, compact: 0, wide: 0, covered: 0 });
+    expect(r.gapParts).toBe(0);
+    expect(r.ignored).toEqual({ slivers: 0, thin: 0, compact: 0, wide: 0, covered: 0 });
   });
 
-  it("accounts for every piece the closing added: found or said to be left out", () => {
+  it("accounts for every piece the closing added: found, or said to be left out", () => {
     const [a, b] = gapBlocks(0.5);
     const [c, d] = gapBlocks(0.5);
+    const [e, f] = gapBlocks(0.008);
     const r = checkMinimumSize(
       [
         areaShape("a", a, GRAY),
         areaShape("b", b, GRAY),
-        areaShape("l", shift(L_SHAPE, 60, 30), GRAY),
-        areaShape("ring", shift(punzeDisc(0.15), 40, 0), GRAY),
+        areaShape("l", shift(L_SHAPE, 60, 30), GRAY), // a corner: compact
+        areaShape("ring", shift(punzeDisc(0.08), 40, 0), GRAY), // a counter under 0.1 mm: thin
         areaShape("c", shift(c, 0, 60), GRAY),
         areaShape("d", shift(d, 0, 60), GRAY),
-        areaShape("kontur", shift(coverOverGap(), 0, 60), BLACK),
+        areaShape("kontur", shift(coverOverGap(), 0, 60), BLACK), // covers c and d: covered
+        areaShape("e", shift(e, 0, 90), GRAY), // a seam: a sliver
+        areaShape("f", shift(f, 0, 90), GRAY),
       ],
       { widthMm: B },
     );
-    const gaps = r.findings.filter((f) => f.kind === "gap").length;
+    const gaps = r.findings.filter((x) => x.kind === "gap").length;
     expect(gaps).toBe(1);
-    expect(r.ignored.covered).toBe(1);
-    expect(r.ignored.compact).toBe(1);
-    expect(r.ignored.noise).toBeGreaterThanOrEqual(1);
-    const { noise, compact, wide, covered } = r.ignored;
-    expect(r.gapPieces).toBe(gaps + noise + compact + wide + covered);
+    // The seam is a sliver; the arcs of the round joins leave a few more along the edge of the disc.
+    expect(r.ignored.slivers).toBeGreaterThanOrEqual(1);
+    expect(r.ignored).toMatchObject({ thin: 1, compact: 1, wide: 0, covered: 1 });
+    // Every part that was measured is a finding or one of the four left-out kinds; a piece the
+    // opening took whole has no part at all.
+    const { thin, compact, wide, covered, slivers } = r.ignored;
+    expect(r.gapParts).toBe(gaps + thin + compact + wide + covered);
+    expect(r.gapPieces).toBe(r.gapParts + slivers);
   });
 
   it("gives the same result for the same input", () => {

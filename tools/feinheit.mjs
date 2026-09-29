@@ -4,14 +4,18 @@
  * tools/inkstitch.mjs (der Abschnitt „Feinheit“). Gerechnet wird in
  * packages/engine/src/inkstitch/min-size.ts — hier steht nur, wie es aussieht.
  *
+ * Zwei Zahlen (Spec §5.2, zweite Fassung): die **Mindestgröße** aus den Satinstrichen allein
+ * und „**Lücken offen ab**“ aus den Lücken; beide mit dem Element, das sie bestimmt.
+ *
  * Das Vorschaubild: alle Formen hellgrau, jeder Befund rot (ein Satinstrich als Form, eine
- * Lücke als das Stück, das das Schließen ergänzt hat), die größten mit ihrer Nummer aus der
- * Liste beschriftet. Nichts davon geht in die Vorlage — die Prüfung meldet nur.
+ * Lücke als das Stück, das das Schließen ergänzt hat), die größten und die beiden bestimmenden
+ * Elemente mit ihrer Nummer aus der Liste beschriftet. Nichts davon geht in die Vorlage — die
+ * Prüfung meldet nur.
  */
 import { Buffer } from "node:buffer";
 import { createRequire } from "node:module";
 import { URL } from "node:url";
-import { GAP_NOISE_MM2 } from "@texma-stitch/engine";
+import { GAP_SLIVER_MM, GAP_THIN_MM } from "@texma-stitch/engine";
 
 /** Millimeter mit Punkt, wie die übrigen Werkzeuge ihre Zahlen drucken. */
 export const mm = (value, digits = 2) => value.toFixed(digits);
@@ -32,41 +36,55 @@ export function befundeJeArt(result) {
   return { satin, luecke: result.findings.length - satin };
 }
 
+/** Die Beschriftungen der Zusammenfassung sind gleich breit: die Zahlen stehen untereinander. */
+const spalte = (name) => name.padEnd(17);
+
 /**
- * Was die Prüfung ergab, als Zeilen: Mindestgröße mit dem Element, das sie bestimmt, die Zahl
- * der Befunde je Art, und was das Schließen fand, aber nicht gezählt hat (Regel 8: nichts
- * verschwindet still).
+ * Was die Prüfung ergab, als Zeilen: die Mindestgröße aus den Satinstrichen mit dem Strich,
+ * der sie bestimmt; „Lücken offen ab“ mit der Lücke, die es bestimmt; die Zahl der Befunde je
+ * Art; und was der Filter für Lücken herausgenommen hat (Regel 8: nichts verschwindet still).
  */
 export function zusammenfassung(result) {
   const { satin, luecke } = befundeJeArt(result);
   const lines = [];
+
   const d = result.decisive;
-  if (d) {
+  if (!d) {
+    lines.push(`${spalte("Mindestgröße")}keine Satinstriche im Logo`);
+  } else if (d.measuredMm < d.limitMm) {
     lines.push(
-      `Mindestgröße  ${Math.ceil(result.minimumWidthMm)} mm — bestimmt von ${ART[d.kind]} ${d.id} ` +
-        `bei ${lage(d)} mm: gemessen ${mm(d.measuredMm)} mm, Grenze ${d.limitMm} mm`,
+      `${spalte("Mindestgröße")}${Math.ceil(result.minimumWidthMm)} mm — bestimmt von ` +
+        `Satinstrich ${d.id} bei ${lage(d)} mm: gemessen ${mm(d.measuredMm)} mm, Grenze ${d.limitMm} mm`,
+    );
+  } else {
+    // Jeder Strich hält: die Zahl sagt, wie weit das Logo schrumpfen könnte.
+    lines.push(
+      `${spalte("Mindestgröße")}${Math.ceil(result.minimumWidthMm)} mm — schmalster Satinstrich ` +
+        `${d.id} bei ${lage(d)} mm: ${mm(d.measuredMm)} mm, Grenze ${d.limitMm} mm; ` +
+        `die bestellten ${mm(result.widthMm, 1)} mm halten`,
+    );
+  }
+
+  const g = result.decisiveGap;
+  if (g) {
+    lines.push(
+      `${spalte("Lücken offen ab")}${Math.ceil(result.gapsOpenFromWidthMm)} mm — bestimmt von ` +
+        `Lücke ${g.id} bei ${lage(g)} mm: gemessen ${mm(g.measuredMm)} mm, Grenze ${g.limitMm} mm`,
     );
   } else {
     lines.push(
-      `Mindestgröße  keine zu feinen Elemente bei ${mm(result.widthMm, 1)} mm ` +
-        `(kleiner wird nicht geprüft)`,
+      `${spalte("Lücken offen ab")}keine zu feinen Lücken bei ${mm(result.widthMm, 1)} mm`,
     );
   }
-  if (d) {
-    // Die Mindestgröße ist das Größte von allem; welche Art wie viel verlangt, steht hier.
-    const teil = (kind, name) => {
-      const f = result.findings.find((x) => x.kind === kind);
-      return f ? `${name} ab ${Math.ceil(f.holdsFromWidthMm)} mm (${f.id})` : `${name}: keine`;
-    };
-    lines.push(`davon         ${teil("satin-stroke", "Satinstriche")}, ${teil("gap", "Lücken")}`);
-  }
+
   lines.push(
-    `Befunde       ${zahl(satin, "Satinstrich", "Satinstriche")} unter ${result.limits.satinMinMm} mm, ` +
+    `${spalte("Befunde")}${zahl(satin, "Satinstrich", "Satinstriche")} unter ${result.limits.satinMinMm} mm, ` +
       `${zahl(luecke, "Lücke", "Lücken")} unter ${result.limits.gapMinMm} mm`,
   );
   const i = result.ignored;
   lines.push(
-    `Nicht gezählt ${i.noise} Stücke unter ${GAP_NOISE_MM2} mm² (Rauschen) · ${i.compact} ohne Mittelachse ` +
+    `${spalte("Nicht gezählt")}${i.slivers} Stücke ganz von Spänen (unter ${GAP_SLIVER_MM} mm) · ` +
+      `${i.thin} unter ${GAP_THIN_MM} mm Breite · ${i.compact} ohne Mittelachse ` +
       `(Ecken-Rundungen, kurze Lücken) · ${i.wide} mit gemessener Breite ab der Grenze · ` +
       `${i.covered} von einer späteren Form überdeckt (von ${result.gapPieces} Stücken des Schließens)`,
   );
@@ -151,11 +169,15 @@ export function feinheitSvg(
   const h = box.maxY - box.minY;
   // Schrift in Millimetern, so bemessen, dass sie in jedem Logo gleich groß auf dem Bild steht.
   const font = w / 62;
-  const kopf = font * 4.6;
+  const kopf = font * 5.8;
   const px = pxBreite / w;
   const { satin, luecke } = befundeJeArt(result);
   const rang = new Map(result.findings.map((f, i) => [f, i + 1]));
-  const marken = result.findings.slice(0, beschriftet);
+  // Die größten, und immer die beiden Elemente, die die Zahlen bestimmen.
+  const oben = Math.min(beschriftet, result.findings.length);
+  const marken = result.findings.filter(
+    (f, i) => i < beschriftet || f === result.decisive || f === result.decisiveGap,
+  );
 
   const out = [];
   out.push(`<?xml version="1.0" encoding="UTF-8"?>`);
@@ -168,21 +190,30 @@ export function feinheitSvg(
     `<rect x="${num(box.minX)}" y="${num(box.minY - kopf)}" width="${num(w)}" height="${num(h + kopf)}" fill="#fff"/>`,
   );
 
-  // Kopf: was geprüft wurde, das Ergebnis, was die Farben bedeuten.
+  // Kopf: was geprüft wurde, die beiden Zahlen, was die Farben bedeuten.
   const d = result.decisive;
+  const g = result.decisiveGap;
   const kopfZeilen = [
     [`Feinheit (Spec §5.2) — ${name}`, true],
     [
       `${mm(result.widthMm, 1)} mm breit · ` +
         (d
-          ? `Mindestgröße ${Math.ceil(result.minimumWidthMm)} mm (${ART[d.kind]} ${d.id}, ${mm(d.measuredMm)} mm)`
-          : `keine zu feinen Elemente`),
+          ? `Mindestgröße ${Math.ceil(result.minimumWidthMm)} mm ` +
+            `(${d.measuredMm < d.limitMm ? "" : "schmalster "}Satinstrich ${d.id}, ${mm(d.measuredMm)} mm)`
+          : `keine Satinstriche`),
       false,
     ],
-    [`${zahl(satin, "Satinstrich", "Satinstriche")} · ${zahl(luecke, "Lücke", "Lücken")}`, false],
     [
-      `grau: alle Formen · rot: zu fein · beschriftet: die ${marken.length} mit der größten ` +
-        `Mindestbreite (L Lücke, S Satinstrich; Nummer wie in der Liste)`,
+      (g
+        ? `Lücken offen ab ${Math.ceil(result.gapsOpenFromWidthMm)} mm (${g.id}, ${mm(g.measuredMm)} mm)`
+        : `keine zu feinen Lücken`) +
+        ` · ${zahl(satin, "Satinstrich", "Satinstriche")} · ${zahl(luecke, "Lücke", "Lücken")}`,
+      false,
+    ],
+    [`grau: alle Formen · rot: zu fein (ein Satinstrich als Form, eine Lücke als Stück)`, false],
+    [
+      `beschriftet: die ${oben} mit der größten Mindestbreite und die bestimmenden · ` +
+        `L Lücke, S Satinstrich · Nummer wie in der Liste`,
       false,
     ],
   ];

@@ -3,14 +3,16 @@
  *
  *   pnpm mindestgroesse <svg> [--alle]
  *
- * Liest die SVG in der bestellten Größe (Breite der SVG in mm), meldet, welche Elemente des
+ * Liest die SVG in der bestellten Größe (Breite der SVG in mm) und meldet, welche Elemente des
  * Logos zu fein sind — Satinstriche unter 1,3 mm, Lücken innerhalb einer Farbe unter 0,8 mm —
- * und ab welcher Logobreite sie halten. Druckt die Mindestgröße mit dem Element, das sie
- * bestimmt, und die Befunde nach der Breite, ab der sie halten, größte zuerst. Ändert nichts
- * an der Vorlage: was geschieht, entscheidet der Nutzer.
+ * und ab welcher Logobreite sie halten. Druckt zwei Zahlen, jede mit dem Element, das sie
+ * bestimmt: die **Mindestgröße** aus den Satinstrichen allein (ab dieser Breite sind alle
+ * mindestens 1,3 mm) und „**Lücken offen ab**“ aus den Lücken (feine Zierkanäle treiben sie weit
+ * darüber; ob sie zusticken dürfen, entscheidet der Nutzer). Danach die Befunde nach der Breite,
+ * ab der sie halten, größte zuerst. Ändert nichts an der Vorlage.
  *
- * Schreibt out/<name>.feinheit.svg — alle Formen hellgrau, die Befunde rot, die größten
- * beschriftet — und daneben out/<name>.feinheit.png (tools/feinheit.mjs).
+ * Schreibt out/<name>.feinheit.svg — alle Formen hellgrau, die Befunde rot, die größten und die
+ * bestimmenden beschriftet — und daneben out/<name>.feinheit.png (tools/feinheit.mjs).
  *
  * Die Liste ist auf 40 Befunde gekürzt und sagt es; --alle druckt jeden. Das Bild zeigt sie alle.
  */
