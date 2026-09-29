@@ -55,6 +55,23 @@ describe("zusammenfassung", () => {
     expect(text).toContain("1 Satinstrich unter 1.3 mm, 1 Lücke unter 0.8 mm");
   });
 
+  it("sagt, was jede Art für sich verlangt", () => {
+    const { result } = szene();
+    const satin = result.findings.find((f) => f.kind === "satin-stroke")!;
+    const luecke = result.findings.find((f) => f.kind === "gap")!;
+    const text = zusammenfassung(result).join("\n");
+    expect(text).toContain(
+      `davon         Satinstriche ab ${Math.ceil(satin.holdsFromWidthMm)} mm (zier), ` +
+        `Lücken ab ${Math.ceil(luecke.holdsFromWidthMm)} mm (${luecke.id})`,
+    );
+    // Nur Lücken: der Satinteil sagt „keine“ statt zu schweigen.
+    const [a, b] = gapBlocks(0.5);
+    const nurLuecken = checkMinimumSize([areaShape("a", a, GRAY), areaShape("b", b, GRAY)], {
+      widthMm: 80,
+    });
+    expect(zusammenfassung(nurLuecken).join("\n")).toContain("Satinstriche: keine");
+  });
+
   it("sagt, was das Schließen fand und nicht gezählt hat", () => {
     const { result } = szene();
     const text = zusammenfassung(result).join("\n");

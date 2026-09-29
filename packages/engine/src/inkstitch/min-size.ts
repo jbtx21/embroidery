@@ -20,12 +20,19 @@
  * measured width — a logo made larger makes every width larger in proportion. The
  * minimum size is the largest of these, and the element that sets it is named.
  *
- * Known limits, measured on the customer logos (29.09.2026) and reported rather
- * than bent (see `docs/backlog.md`): the piece width comes from a medial axis that
- * samples the outline no finer than every 0.3 mm, which reads a 0.3 mm strip as
- * 0.42 mm and a 0.1 mm strip as having no axis at all — so thin gaps are measured
- * a little wide (the width they hold from a little small), and hairline seams
- * between abutting shapes are seen or not seen by the size of that sampling.
+ * Known limits, measured on six customer logos (29.09.2026). The check reports what §5.2
+ * defines; these are the places where that definition meets real artwork:
+ *
+ * - The piece width comes from a medial axis that samples the outline no finer than every
+ *   0.3 mm. It reads a 0.2 mm strip as 0.32 mm and a 0.3 mm strip as 0.42 mm, and a 0.1 mm
+ *   strip has no axis at all. Thin gaps are measured wide, so the width they hold from is
+ *   under-stated.
+ * - A piece with no axis counts as wide, as `medianShapeWidthMm` has it — except a filled hole.
+ *   Nearly all of them are the rounding of a concave corner; a short gap between small shapes
+ *   is lost with them (0 to 11 pieces per logo).
+ * - The minimum size is the largest width over ALL elements, so the finest one sets it: a notch
+ *   tip of 0.3 mm, a hairline slit of 0.01 mm in a vector cut-out. On the six logos that made
+ *   it about 3 to 60 times the ordered width.
  */
 import type { Point, Polygon, Rect } from "@texma-stitch/geometry";
 import {

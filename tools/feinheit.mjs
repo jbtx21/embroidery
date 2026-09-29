@@ -52,6 +52,14 @@ export function zusammenfassung(result) {
         `(kleiner wird nicht geprüft)`,
     );
   }
+  if (d) {
+    // Die Mindestgröße ist das Größte von allem; welche Art wie viel verlangt, steht hier.
+    const teil = (kind, name) => {
+      const f = result.findings.find((x) => x.kind === kind);
+      return f ? `${name} ab ${Math.ceil(f.holdsFromWidthMm)} mm (${f.id})` : `${name}: keine`;
+    };
+    lines.push(`davon         ${teil("satin-stroke", "Satinstriche")}, ${teil("gap", "Lücken")}`);
+  }
   lines.push(
     `Befunde       ${zahl(satin, "Satinstrich", "Satinstriche")} unter ${result.limits.satinMinMm} mm, ` +
       `${zahl(luecke, "Lücke", "Lücken")} unter ${result.limits.gapMinMm} mm`,
