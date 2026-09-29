@@ -3,6 +3,83 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Ink/Stitch-Vorlage, Schritt 3 (29.09.2026) — offen und Spec-Fragen
+
+Was bei den Punkten 0 bis 4 auffiel und nicht mehr in den Schritt gehört. Zahlen: die sechs
+Kundenlogos, Preset `pique`, Stand nach Punkt 4 (`docs/umsetzungsstand.md`). Die Spec ist an
+keiner Stelle geändert; wo eine Regel stört, steht die Frage mit Zahlen hier.
+
+- **Farbblöcke „höchstens 4" (STUTTGART 80 mm) gehen unter §10.1 nicht — Spec-Frage.** §10.1
+  verbietet, zwei sich überlappende Objekte zu vertauschen, „ein Haar Überlappung ist auch eine
+  Überlappung". STUTTGART 80 mm hat zwei Farben, aber eine Kette von sechs Flächen, die
+  abwechselnd schwarz und grau übereinanderliegen (`z04-000000-003` → `z05-bebebe-001` →
+  `z08-000000-001` → `z09-bebebe-001` → `z12-000000-001` → `z13-bebebe-011`): sechs Blöcke sind
+  das Minimum, und die Suche findet es (mit zehnfach größerem Strahl dasselbe). Ab welcher
+  Überlappung die Reihenfolge zählt, bestimmt die Zahl der Blöcke:
+
+  | Überlappung zählt ab | jede (§10.1) | 1 mm² | 4 mm² | 20 mm² | 100 mm² |
+  | -------------------- | -----------: | ----: | ----: | -----: | ------: |
+  | STUTTGART 80 mm      |            6 |     6 |     6 |      3 |       3 |
+  | STUTTGART 250 mm     |            6 |     6 |     6 |      6 |       3 |
+  | Köln 90 mm           |           15 |     6 |     6 |      6 |       6 |
+  | Eislingen 200 mm     |            6 |     6 |     6 |      6 |       6 |
+  | Atzensport 80 mm     |            7 |     6 |     6 |      5 |       5 |
+  | Atzensport 200 mm    |            8 |     7 |     6 |      6 |       5 |
+
+  20 mm² ist die Schwelle des Knockdowns (§4.1): darunter wird nichts ausgeschnitten, die
+  Reihenfolge entschiede dort nur, welcher Faden obenauf liegt. Dieselbe Schwelle für beide wäre
+  der Vorschlag; er würde in der Vorlage nur `minOverlapMm2` an `sequenceByColour` reichen.
+
+- **Regel 5 des Knockdowns (berührende Flächen wachsen 0,8 mm unter die spätere) — Spec-Frage.**
+  Ohne sie ändert sich nur Köln spürbar (die übrigen fünf um höchstens 1 Dichtespitze und 31
+  Stiche): Zellen über 18 Stichen 30 → 15, Nadelhäufung 8 → 6, Zellen ab 6 Einstichen 11 → 5,
+  Stiche 20.711 → 19.838. Was die Regel verhindert (ein „Blitzer" an der Naht, §8.1.2), lässt
+  sich nur am Probestick sehen.
+- **Satin auf Tatami-Grund (§4.1: nur Fill schneidet und nur aus Fill) — Spec-Frage.** Fläche
+  der Satinformen, die über früher gestickter Tatami liegt, und Tatami-Stiche darunter:
+
+  | Motiv             | Satin über Tatami | Tatami-Stiche darunter | Anteil aller Stiche |
+  | ----------------- | ----------------: | ---------------------: | ------------------: |
+  | STUTTGART 80 mm   |   410 von 916 mm² |                    684 |               5,2 % |
+  | STUTTGART 250 mm  | 3694 von 5704 mm² |                  5.290 |               7,1 % |
+  | Köln 90 mm        |    98 von 892 mm² |                  1.936 |               9,8 % |
+  | Eislingen 200 mm  |  127 von 3823 mm² |                    997 |               3,2 % |
+  | Atzensport 80 mm  |  351 von 1262 mm² |                    501 |               4,6 % |
+  | Atzensport 200 mm | 2339 von 3957 mm² |                  2.882 |               6,3 % |
+
+  Von den Zellen über 18 Stichen (aus der Stichliste, ohne Verriegelungen) liegen in
+  STUTTGART 80 mm 2 von 2, in STUTTGART 250 mm 13 von 17 dort, wo Satin über Tatami liegt.
+
+- **Gitterunterlage nur auf einem Teil der Tatami-Fläche.** Ink/Stitchs `fill_underlay` zerlegt
+  ausgefranste Flächen in Stücke, die es ohne Fadenschnitt abfährt (`tatami.ts`). Die Vorlage
+  setzt sie nur, wo der Einzug ein breites Stück ist (`gridUnderlay`); Anteil der Tatami-Fläche
+  mit Unterlage: STUTTGART 80 mm 81 %, 250 mm 88 %, Köln 4 %, Eislingen 96 %, Atzensport 80 mm
+  17 %, 200 mm 99 %. Der Rest trägt der Deckstich allein. Vollständig ginge es mit der Unterlage
+  als eigene Fill-Objekte je Stück (geöffnet nach §8.6 `keepWide`, nächstes zuerst nach §8.5),
+  zwischen denen `jump_to_trim` schneiden kann; dort gehörte auch die Konturunterlage hin, die
+  eine Füllung von Ink/Stitch nicht hat.
+- **`jump_to_trim` sieht Sprünge innerhalb eines Elements nicht.** Die Vorlage hält deshalb
+  jedes Tatami einteilig (Teile werden Objekte, ein kompensiertes Polygon wird vor dem Schreiben auf
+  das 1-µm-Raster gelegt, damit shapely es nicht in mehrere zerlegt). Was Ink/Stitch selbst
+  zerlegt, bleibt ohne Fadenschnitt; `pnpm inkstitch` zählt es als „Fäden auf dem Stoff"
+  (alle sechs Läufe: 0).
+- **Schub zerlegt Haarflächen (§8.1.1) — Spec-Frage.** Eislingen 200 mm hat zwei Flächen von
+  42 und 18 mm², die unter dem Schub von 0,1 mm in 55 und 110 Teile zerfallen (108 unter
+  1 mm²). Als Objekte kostet jedes Teil Trim und Sprung: Trims/1000 4,1 → 6,6, Sprünge/1000
+  9,6 → 16,1. Die Vorlage gibt solchen Flächen nur den Zug. Die Spec sagt nur, was bei
+  völligem Verschwinden geschieht.
+- **Farbblöcke Köln 15, Atzensport 7 und 8** liegen über der Untergrenze aus den Ketten
+  (11, 5, 5), weil sie nicht erreichbar ist (die Suche liefert mit zehnfach größerem Strahl
+  dasselbe).
+- **Atzensport 80 mm: Trims/1000 9,7 (Ziel 5,6).** 124 Objekte auf 12.005 Stiche, davon 15
+  Formen unter 1 mm²; §5.2 (Mindestgröße) meldet sie künftig, die Vorlage lässt sie stehen.
+- **Ink/Stitch-Altdokument-Modus.** Die Vorlage trägt keine `inkstitch_svg_version`; im ersten
+  Lauf wendet Ink/Stitch die Updates alter Dokumente an (Satin `start_at_nearest_point` und
+  `end_at_nearest_point` aus, `reverse_rails` auf `none`, Füllung `max_stitch_length_mm` 3
+  wo keiner steht). Ob die Version 4 von Anfang an etwas ändert, ist nicht gemessen.
+- **Spec §7.8.5** sagt „sonst bleibt sie Tatami"; seit Punkt 0 läuft eine Form unter 1,0 mm,
+  die als Säule nicht hält, als Laufstich entlang der Achse. Spec nachziehen (nicht geändert).
+
 ## Satin für Schrift und schmale Formen — offen (28.09.2026)
 
 Eigene Satinsäulen (`packages/engine/src/inkstitch/`: `strokes.ts` Strichplan,

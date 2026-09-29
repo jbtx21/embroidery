@@ -447,3 +447,41 @@ Breite nicht mehr deckt (`SINGLE_PASS_MAX_MM`, §7.4); den dreifachen Laufstich 
 Im Köln-Logo werden damit sechs Formen mehr als Satin angesetzt; zwei davon (0,7–0,8 mm) halten
 als Säule nicht und fallen auf Tatami zurück, die Dichtespitze steigt dort von 30 auf 34.
 Folgepunkt für Schritt 3: schmale Rückfälle als Laufstich statt Tatami.
+
+**Schritt 3 — verdeckte Flächen, Farbfolge, Fadenschnitte, Preset-Werte (29.09.2026).**
+`pnpm inkstitch` setzt dafür `order: "colour"` und `knockdown: true`; Kommentare und Gründe
+stehen in `packages/engine/src/inkstitch/`, Messungen am Commit je Punkt.
+
+- **Schmale Rückfälle** (unter 1,0 mm, als Säule nicht gehalten): Laufstich entlang der Achse
+  statt Tatami, mit Grund in der Ausgabe (`columns.ts`, `template.ts`).
+- **Verdeckte Flächen** (`knockdown.ts` über `resolveOverlaps`, §4.1): nur Fill schneidet und nur
+  aus Fill, später schneidet aus früher, Schwelle 20 mm², untere bleibt 0,8 mm unter der oberen;
+  Teile werden eigene Objekte. STUTTGART 80 mm: Tatami-Fläche 6343 → 3781 mm².
+- **Farbfolge** (`sequence.ts`, §10.1): gleiche Farben zusammengezogen, ohne zwei sich
+  überlappende Objekte zu vertauschen; die Suche liefert das Minimum. Blöcke 13 → 6
+  (STUTTGART 80 und 250 mm), 23 → 15 (Köln), 12 → 6 (Eislingen), 11 → 7 und 13 → 8 (Atzensport).
+- **Fadenschnitte** (Ink/Stitchs `jump_to_trim`, Schwelle 5 mm aus §10.2): nach der Quelle
+  gelesen (`inkstitch/README.md`); `readDst` zählt die drei Sprung-Datensätze eines Trims als
+  einen. `pnpm inkstitch` meldet „Fäden auf dem Stoff" (Sprünge über 5 mm ohne Trim): 0 bei allen.
+- **Tatami-Werte** (`tatami.ts`): Reihenabstand, Stichlänge, Versatz, Winkel (§8.2, §5.1) und
+  Gitterunterlage (§8.6) als Attribute, Zug und Schub (§8.1.1) im Umriss. Zwei Abweichungen vom
+  Auftrag „als Attribute", gemessen: das Attribut `pull_compensation_mm` macht Ink/Stitch bei
+  großen Logos um ein Vielfaches langsamer und kennt keinen Schub; `fill_underlay` zerlegt
+  ausgefranste Flächen in Stücke ohne Fadenschnitt dazwischen (55 Fäden über 5 mm, längster
+  79 mm). Die Gitterunterlage steht deshalb nur, wo der Einzug ein Stück ist.
+
+Stand nach Punkt 4 (in Klammern die Ausgangslage vor Schritt 3), Preset `pique`:
+
+| Motiv                      |           Stiche |   Sprünge |     Trims | Farbblöcke | Dichtespitze | Nadelhäufung |
+| -------------------------- | ---------------: | --------: | --------: | ---------: | -----------: | -----------: |
+| STUTTGART 80 mm            |  13.578 (15.449) |   89 (90) |   46 (31) |     6 (13) |      22 (25) |        7 (8) |
+| STUTTGART 250 mm           | 74.674 (110.875) | 198 (194) |   57 (42) |     6 (13) |      29 (28) |       9 (10) |
+| Berufsfeuerwehr Köln 90 mm |  20.711 (26.374) | 168 (176) |   85 (62) |    15 (23) |      29 (34) |        8 (8) |
+| Eislingen Print 200 mm     |  32.669 (35.161) | 341 (312) |  146 (99) |     6 (12) |      20 (21) |        6 (8) |
+| Atzensport Hofbräu 80 mm   |  12.005 (14.347) | 226 (318) |  116 (76) |     7 (11) |      23 (26) |        7 (7) |
+| Atzensport Hofbräu 200 mm  |  46.508 (55.616) | 496 (635) | 115 (105) |     8 (13) |      22 (24) |        6 (7) |
+
+Gegen die Ziele aus §16 (STUTTGART 80 mm): Dichtespitze 22 (≤ 24), Nadelhäufung 7 (≤ 8),
+Trims/1000 3,4 (≤ 5,6) erreicht; **Farbblöcke 6 statt ≤ 4** — unter §10.1 ist 6 das Minimum
+(Spec-Frage in `docs/backlog.md`). Atzensport 80 mm bleibt bei 9,7 Trims/1000 (Ziel 5,6): 124
+Objekte auf 12.005 Stiche, davon 15 Formen unter 1 mm².
