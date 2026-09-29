@@ -26,7 +26,9 @@ Tatami in der Ink/Stitch-Vorlage (Preset-Werte, Unterlage nur wo sie hält, Zug 
 Umriss).
 §5.2 zweite Fassung: Mindestgröße aus den Satinstrichen, Lücken als zweite Zahl, Rauschfilter.
 §5.2 und §7.8.3 *(29.09.2026, Profi-Vergleich Hofbräu)*: Stofflücken zwischen Farben werden
-geprüft; der Zugausgleich lässt Stoffspalte unter 1,0 mm offen, Säulen unter 1,0 mm ohne Ausgleich.
+geprüft; der Zugausgleich lässt Stoffspalte unter 1,0 mm offen, Säulen unter 1,0 mm an einem
+solchen Spalt ohne Ausgleich (am selben Tag eingeschränkt: zuerst galt das für alle Säulen unter
+1,0 mm).
 
 ---
 
@@ -673,8 +675,14 @@ Profi-Mütze bleibt dort sichtbar Stoff. Deshalb, mit Ink/Stitchs Zugausgleich j
    heißt: bis zur nächsten anderen Form (gleich welcher Farbe, nicht dieselbe Form) liegt nur Stoff.
    Die Grenze liegt 0,2 mm über der Lückengrenze aus §5.2, damit zwei Säulen mit Ausgleich einen
    Spalt ab 1,0 mm nicht unter 0,5 mm drücken.
-2. **Säulen unter 1,0 mm** (`SATIN_NARROW_WARN_MM`, dünne Zier- und Schattenlinien) bekommen
-   **keinen** Zugausgleich. Sie werden so schmal gestickt, wie sie gezeichnet sind.
+2. **Säulen unter 1,0 mm an einem Stoffspalt** (`SATIN_NARROW_WARN_MM`, dünne Schattenlinien
+   neben einer anderen Form) bekommen **keinen** Zugausgleich, auch nicht zur freien Seite. Sie
+   werden so schmal gestickt, wie sie gezeichnet sind. An einem Stoffspalt heißt: mindestens eine
+   Rail liegt nach Regel 1 an einem Spalt unter 1,0 mm. Übrige schmale Säulen behalten den
+   Ausgleich nach §7.2 *(29.09.2026, gemessen: ohne Ausgleich für alle schmalen Säulen stieg an
+   STUTTGART 80 mm die Nadelhäufung von 7 auf 10 — die Zelle an einer Zickzackspitze am Ende einer
+   schmalen Säule —, an Köln 90 mm die Zahl der Zellen über 18 von 30 auf 40; der Spalt Rot/Gold im
+   Hofbräu-Motiv öffnet sich mit Regel 1 allein genauso)*.
 
 #### 7.8.4 Glätten rauer Konturen
 
