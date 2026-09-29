@@ -26,6 +26,8 @@ angrenzende Flächen 0,3 mm statt 0,8 mm). §7.8.5: schmale Rückfälle werden L
 Tatami in der Ink/Stitch-Vorlage (Preset-Werte, Unterlage nur wo sie hält, Zug und Schub im
 Umriss).
 §5.2 zweite Fassung: Mindestgröße aus den Satinstrichen, Lücken als zweite Zahl, Rauschfilter.
+§5.2 und §7.8.3 *(29.09.2026, Profi-Vergleich Hofbräu)*: Stofflücken zwischen Farben werden
+geprüft; der Zugausgleich lässt Stoffspalte unter 1,0 mm offen, Säulen unter 1,0 mm ohne Ausgleich.
 
 ---
 
@@ -368,6 +370,13 @@ Grenze geschlossen (nach außen und zurück, wie §7.8.4); was dabei dazukommt, 
 schmaler als die Grenze. Ausgenommen sind Lücken, die eine später gestickte Form ganz
 überdeckt — dort liegt ein anderes Element, keine Lücke.
 
+**Stofflücken zwischen Farben** *(29.09.2026)* werden genauso gesucht, aber über **alle** Formen
+zusammen: was beim Schließen der Vereinigung aller Formen dazukommt, ist Stoff, der zwischen
+zwei Elementen sichtbar bleiben soll — etwa der Spalt zwischen Buchstabe und Schatten (Hofbräu,
+110 mm: 0,53 mm). Sie erscheinen als eigene Art „Stofflücke" in Liste und Bild und zählen zur
+zweiten Zahl; dieselben Rauschfilter gelten. Eine Stelle, die schon als Lücke einer Farbe
+gemeldet ist, wird nicht doppelt gemeldet.
+
 **Rauschfilter für Lücken** *(29.09.2026, zweite Fassung)*. Vektorisierte Logos haben
 Haarschlitze zwischen gleichfarbigen Formen, Eckrundungen und hauchdünne Späne; sie sind
 keine Lücken auf dem Stoff. Die erste Fassung (Stücke unter 0,02 mm² verwerfen) ließ sie durch:
@@ -650,6 +659,21 @@ Freiräumen als zwei Striche, die sich an einer Ecke treffen — die stumpfen F�
   Breite der Säule (§7.2), Split ab 7 mm (§7.4), Unterlage nach Breite (§7.6: unter 3 mm
   Mittellaufstich, ab 3 mm Kontur und Zickzack). Die Schalter in `satinUnderlay` (§14, immer
   Kontur und Zickzack) werden dafür nicht gelesen — offener Punkt zwischen §7.6 und §14.
+
+**Zugausgleich lässt Stofflücken offen** *(29.09.2026, Entscheidung nach dem Vergleich mit
+einer Profi-Mütze „Stuttgarter Hofbräu")*. Der Zugausgleich (§7.2) verbreitert jede Säule nach
+beiden Seiten; zwischen zwei Formen frisst er den Stoffspalt, der sichtbar bleiben soll. Gemessen
+am Hofbräu-Motiv in 110 mm: rote Buchstaben 2,4 mm (0,29 mm Ausgleich je Seite), goldene
+Schattenlinien 0,75 mm (0,2 mm), der Spalt dazwischen 0,53 mm — übrig blieben 0,04 mm, auf der
+Profi-Mütze bleibt dort sichtbar Stoff. Deshalb, mit Ink/Stitchs Zugausgleich je Rail
+(`pull_compensation_mm` mit zwei Werten):
+
+1. **Zur Seite eines Stoffspalts unter 1,0 mm** bekommt eine Säule keinen Zugausgleich. Stoffspalt
+   heißt: bis zur nächsten anderen Form (gleich welcher Farbe, nicht dieselbe Form) liegt nur Stoff.
+   Die Grenze liegt 0,2 mm über der Lückengrenze aus §5.2, damit zwei Säulen mit Ausgleich einen
+   Spalt ab 1,0 mm nicht unter 0,5 mm drücken.
+2. **Säulen unter 1,0 mm** (`SATIN_NARROW_WARN_MM`, dünne Zier- und Schattenlinien) bekommen
+   **keinen** Zugausgleich. Sie werden so schmal gestickt, wie sie gezeichnet sind.
 
 #### 7.8.4 Glätten rauer Konturen
 
