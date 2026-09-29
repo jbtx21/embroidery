@@ -103,6 +103,76 @@ describe("gapAlong (the fabric between a rail and the next other form)", () => {
   });
 });
 
+describe("railPull for a column under 1.0 mm (spec §7.8.3 rule 2)", () => {
+  const thin = bar(0, 0, 30, 0.9);
+  const own = { shapeId: "thin", polygon: thin };
+  let c: SatinColumnPlan;
+  beforeAll(() => {
+    c = columnOf(thin); // needs the geometry, which the first hook of the file has started
+  });
+  const full = satinPullCompMm(0.9, cap); // 12 % of 0.9 mm is under the floor: 0.2 mm
+  const below = (gap: number, x = 0, w = 30): Polygon => bar(x, 0.9 + gap, w, 2);
+
+  it("keeps the compensation of §7.2 on both rails where it lies at no fabric gap", () => {
+    expect(full).toBe(cap.pullCompMinMm);
+    const r = railPull(c, own, formIndex([]), cap);
+    expect(r.narrowAtGap).toBe(false);
+    expect(r.pull).toEqual([full, full]);
+    // A form 1.5 mm away is no gap under 1.0 mm.
+    const far = railPull(c, own, formIndex([{ shapeId: "plate", polygon: below(1.5) }]), cap);
+    expect(far.pull).toEqual([full, full]);
+  });
+
+  it("gives it no compensation on either rail when a form lies 0.5 mm from one side — the free one too", () => {
+    const forms = formIndex([{ shapeId: "plate", polygon: below(0.5) }]);
+    const r = railPull(c, own, forms, cap);
+    const low = lowerRail(c);
+    expect(r.narrowAtGap).toBe(true);
+    expect(r.pull).toEqual([0, 0]);
+    expect(r.gapMm[low]).toBeCloseTo(0.5, 2);
+    expect(r.gapMm[low === 0 ? 1 : 0]).toBe(Infinity);
+  });
+
+  it("does the same with a gap on each side", () => {
+    const forms = formIndex([
+      { shapeId: "above", polygon: bar(0, -2.5, 30, 2) },
+      { shapeId: "below", polygon: below(0.5) },
+    ]);
+    const r = railPull(c, own, forms, cap);
+    expect(r.narrowAtGap).toBe(true);
+    expect(r.pull).toEqual([0, 0]);
+  });
+
+  it("keeps the compensation where the form only touches or overlaps, or lies under 0.1 mm away", () => {
+    for (const gap of [0, 0.05]) {
+      const r = railPull(c, own, formIndex([{ shapeId: "plate", polygon: below(gap) }]), cap);
+      expect(r.narrowAtGap, `gap ${gap}`).toBe(false);
+      expect(r.pull, `gap ${gap}`).toEqual([full, full]);
+    }
+    const over = formIndex([{ shapeId: "plate", polygon: bar(0, 0.5, 30, 2) }]);
+    expect(railPull(c, own, over, cap).pull).toEqual([full, full]);
+  });
+
+  it("goes by the median over the column here too: a form along a third of it is no gap", () => {
+    const third = formIndex([{ shapeId: "plate", polygon: below(0.5, 20, 10) }]);
+    expect(railPull(c, own, third, cap).pull).toEqual([full, full]);
+    const most = formIndex([{ shapeId: "plate", polygon: below(0.5, 0, 22) }]);
+    expect(railPull(c, own, most, cap).pull).toEqual([0, 0]);
+  });
+
+  it("is the gold shadow line of the Hofbräu motif: 0.75 mm, the red stroke 0.53 mm away", () => {
+    const line = gold(0.53);
+    const lc = columnOf(line);
+    const forms = formIndex([{ shapeId: "red", polygon: red }]);
+    const r = railPull(lc, { shapeId: "gold", polygon: line }, forms, cap);
+    expect(r.narrowAtGap).toBe(true);
+    expect(r.pull).toEqual([0, 0]);
+    // Away from the red stroke it is compensated like any narrow column.
+    const alone = railPull(lc, { shapeId: "gold", polygon: line }, formIndex([]), cap);
+    expect(alone.pull).toEqual([satinPullCompMm(0.75, cap), satinPullCompMm(0.75, cap)]);
+  });
+});
+
 describe("railPull (spec §7.8.3: pull compensation per rail)", () => {
   const full = satinPullCompMm(2.4, cap); // 12 % of 2.4 mm: 0.288, the "0.29 mm" of the spec
 
@@ -111,7 +181,8 @@ describe("railPull (spec §7.8.3: pull compensation per rail)", () => {
     const forms = formIndex([{ shapeId: "gold", polygon: gold(0.53) }]);
     const r = railPull(c, { shapeId: "red", polygon: red }, forms, cap);
     const low = lowerRail(c);
-    expect(r.narrow).toBe(false);
+    // A wide column: only the rail at the gap goes without, the other keeps its full amount.
+    expect(r.narrowAtGap).toBe(false);
     expect(r.pull[low]).toBe(0);
     expect(r.pull[low === 0 ? 1 : 0]).toBeCloseTo(full, 6);
     expect(r.gapMm[low]).toBeCloseTo(0.53, 2);
@@ -130,21 +201,6 @@ describe("railPull (spec §7.8.3: pull compensation per rail)", () => {
       expect(r.pull[0]).toBeCloseTo(full, 6);
       expect(r.pull[1]).toBeCloseTo(full, 6);
     }
-  });
-
-  it("gives a column under 1.0 mm no compensation at all, gap or not", () => {
-    const thin = bar(0, 0, 30, 0.9);
-    const c = columnOf(thin);
-    const r = railPull(c, { shapeId: "thin", polygon: thin }, formIndex([]), cap);
-    expect(r.narrow).toBe(true);
-    expect(r.pull).toEqual([0, 0]);
-    // The gold shadow line itself: 0.75 mm.
-    const line = gold(0.53);
-    const lc = columnOf(line);
-    expect(railPull(lc, { shapeId: "gold", polygon: line }, formIndex([]), cap)).toMatchObject({
-      narrow: true,
-      pull: [0, 0],
-    });
   });
 
   it("goes by the median over the column: a neighbour along a third of it is no gap, along most of it is", () => {

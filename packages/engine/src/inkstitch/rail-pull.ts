@@ -14,8 +14,12 @@
  *    shape — when only fabric does. Measured along the rungs, outwards, the median
  *    over the column. The limit is 0.2 mm over the gap limit of §5.2, so that two
  *    columns with compensation cannot press a gap of 1.0 mm below 0.5 mm.
- * 2. A **column under 1.0 mm** (`SATIN_NARROW_WARN_MM`) gets none at all: a thin
- *    ornamental or shadow line is stitched as narrow as it is drawn.
+ * 2. A **column under 1.0 mm** (`SATIN_NARROW_WARN_MM`) with a rail at such a gap gets
+ *    none at all, on the free side too: a thin shadow line next to another form is
+ *    stitched as narrow as it is drawn. The other narrow columns keep the
+ *    compensation of §7.2, on both rails — without it the zigzag tips at the end of a
+ *    narrow column crowd (measured on 29.09.2026: the needle cluster of STUTTGART 80 mm
+ *    went from 7 to 10, the cells over 18 stitches/mm² of Köln from 30 to 40).
  *
  * What is no gap: a form that touches or overlaps (there is no fabric to keep open),
  * and a gap under `FABRIC_GAP_MIN_MM` — hairline seams between traced shapes are
@@ -160,8 +164,8 @@ export type RailPull = {
   pull: [number, number];
   /** The median gap per rail, mm (`0` touching, `Infinity` none within the limit). */
   gapMm: [number, number];
-  /** The column is under `SATIN_NARROW_WARN_MM`: none at all (rule 2). */
-  narrow: boolean;
+  /** A column under `SATIN_NARROW_WARN_MM` with a rail at a fabric gap: none on either rail (rule 2). */
+  narrowAtGap: boolean;
 };
 
 /** The middle of the sorted values, the lower one of two. */
@@ -182,9 +186,6 @@ export function railPull(
   preset: Preset,
 ): RailPull {
   const full = satinPullCompMm(column.widthMm, preset);
-  if (column.widthMm < SATIN_NARROW_WARN_MM) {
-    return { pull: [0, 0], gapMm: [Infinity, Infinity], narrow: true };
-  }
   const gapsA: number[] = [];
   const gapsB: number[] = [];
   for (const [ra, rb] of column.rungs) {
@@ -198,9 +199,10 @@ export function railPull(
     gapsB.push(gapAlong(b, d, forms, own));
   }
   const gapMm: [number, number] = [median(gapsA), median(gapsB)];
-  return {
-    pull: [isFabricGap(gapMm[0]) ? 0 : full, isFabricGap(gapMm[1]) ? 0 : full],
-    gapMm,
-    narrow: false,
-  };
+  const atGap: [boolean, boolean] = [isFabricGap(gapMm[0]), isFabricGap(gapMm[1])];
+  // Rule 2: a narrow column at a gap goes without on both rails; otherwise rule 1 alone decides.
+  if (column.widthMm < SATIN_NARROW_WARN_MM && (atGap[0] || atGap[1])) {
+    return { pull: [0, 0], gapMm, narrowAtGap: true };
+  }
+  return { pull: [atGap[0] ? 0 : full, atGap[1] ? 0 : full], gapMm, narrowAtGap: false };
 }

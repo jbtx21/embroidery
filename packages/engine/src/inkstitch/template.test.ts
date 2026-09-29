@@ -504,17 +504,20 @@ describe("pull compensation per rail (spec §7.8.3)", () => {
     new RegExp(`<path id="${id}"[^>]*inkstitch:pull_compensation_mm="([^"]*)"`).exec(svg)![1]!;
   const full = satinPullCompMm(2.4, cap);
 
-  it("gives the rail at a fabric gap under 1.0 mm none, the column under 1.0 mm none at all", () => {
+  it("gives the rail at a fabric gap under 1.0 mm none, a column under 1.0 mm at a gap none at all", () => {
     const t = buildInkstitchTemplate([gold(0.53), red], cap, PAGE);
     expect(t.objects.map((o) => o.kind)).toEqual(["satin", "satin"]);
     const [a, b] = pullOf(t.svg, "red-0").split(" ").map(Number);
     // Exactly one rail is left without: the one facing the gold line.
     expect([a, b].sort()).toEqual([0, full].sort());
     expect(pullOf(t.svg, "gold-0")).toBe("0");
-    expect(t.railPull!.narrow).toEqual(["gold-0"]);
-    expect(t.railPull!.gaps).toHaveLength(1);
-    expect(t.railPull!.gaps[0]).toMatchObject({ id: "red-0", side: a === 0 ? "A" : "B" });
-    expect(t.railPull!.gaps[0]!.gapMm).toBeCloseTo(0.53, 2);
+    expect(t.railPull!.narrowAtGap).toEqual(["gold-0"]);
+    // The gap is listed from both sides: the red rail and the rail of the gold line facing it.
+    expect(t.railPull!.gaps).toHaveLength(2);
+    const redGap = t.railPull!.gaps.find((g) => g.id === "red-0")!;
+    expect(redGap.side).toBe(a === 0 ? "A" : "B");
+    expect(redGap.gapMm).toBeCloseTo(0.53, 2);
+    expect(t.railPull!.gaps.find((g) => g.id === "gold-0")!.gapMm).toBeCloseTo(0.53, 2);
   });
 
   it("keeps the compensation of both rails where the neighbour is no fabric gap under 1.0 mm", () => {
@@ -525,7 +528,25 @@ describe("pull compensation per rail (spec §7.8.3)", () => {
     }
     const alone = buildInkstitchTemplate([red], cap, PAGE);
     expect(pullOf(alone.svg, "red-0")).toBe(String(full));
-    expect(alone.railPull).toEqual({ narrow: [], gaps: [] });
+    expect(alone.railPull).toEqual({ narrowAtGap: [], gaps: [] });
+  });
+
+  it("leaves a column under 1.0 mm its compensation of §7.2 where it lies at no fabric gap", () => {
+    // The gold line alone, with the red stroke 1.5 mm away, and touching it.
+    const thin = String(satinPullCompMm(0.75, cap));
+    for (const shapes of [[gold(0.53)], [gold(1.5), red], [gold(0), red]]) {
+      const t = buildInkstitchTemplate(shapes, cap, PAGE);
+      expect(pullOf(t.svg, "gold-0")).toBe(thin);
+      expect(t.railPull!.narrowAtGap).toEqual([]);
+      expect(t.railPull!.gaps).toEqual([]);
+    }
+  });
+
+  it("gives the same column none on either rail as soon as a form lies at a gap on one side", () => {
+    const t = buildInkstitchTemplate([gold(0.53), red], cap, PAGE);
+    expect(pullOf(t.svg, "gold-0")).toBe("0");
+    // Its rail towards the red stroke is among the gaps, the free side is not measured against anything.
+    expect(t.railPull!.gaps.map((g) => g.id).sort()).toEqual(["gold-0", "red-0"]);
   });
 
   it("measures the gap to a form of any kind: a tatami area counts as well as a satin line", () => {

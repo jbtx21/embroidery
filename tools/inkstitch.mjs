@@ -22,7 +22,8 @@
  *
  * --zug-symmetrisch gives both rails of every satin column the pull compensation
  * of spec §7.2 again. The standard is §7.8.3: none on the rail towards a fabric gap
- * under 1.0 mm, none for a column under 1.0 mm (the output lists them).
+ * under 1.0 mm, and none on either rail for a column under 1.0 mm at such a gap (the
+ * output lists them).
  *
  * Satin (default) — lettering and narrow shapes set the way a puncher sets
  * them:
@@ -494,15 +495,21 @@ if (knockdown) {
     }
   }
 }
-if (railPull && railPull.narrow.length + railPull.gaps.length > 0) {
+if (railPull && railPull.narrowAtGap.length + railPull.gaps.length > 0) {
   const smallest = [...railPull.gaps].sort((a, b) => a.gapMm - b.gapMm);
+  const narrow = new Set(railPull.narrowAtGap);
   console.log(
-    `\nZugausgleich je Rail (Spec §7.8.3): ${railPull.narrow.length} Säulen unter 1,0 mm ohne ` +
-      `Ausgleich, ${railPull.gaps.length} Rails zu einem Stoffspalt unter 1,0 mm ohne Ausgleich` +
-      (smallest.length > 0 ? ` (kleinster Spalt ${smallest[0].gapMm.toFixed(2)} mm)` : ""),
+    `\nZugausgleich je Rail (Spec §7.8.3): ${railPull.gaps.length} Rails zu einem Stoffspalt ` +
+      `unter 1,0 mm ohne Ausgleich` +
+      (smallest.length > 0 ? ` (kleinster Spalt ${smallest[0].gapMm.toFixed(2)} mm)` : "") +
+      `, davon ${railPull.narrowAtGap.length} Säulen unter 1,0 mm, die dann auf beiden Rails ` +
+      `ohne Ausgleich sind`,
   );
   for (const g of smallest.slice(0, 10)) {
-    console.log(`  ${g.id}: Rail ${g.side} mit ${g.gapMm.toFixed(2)} mm Stoffspalt`);
+    console.log(
+      `  ${g.id}: Rail ${g.side} mit ${g.gapMm.toFixed(2)} mm Stoffspalt` +
+        (narrow.has(g.id) ? " (Säule unter 1,0 mm: die andere Rail auch ohne)" : ""),
+    );
   }
   if (smallest.length > 10) {
     console.log(`  … und ${smallest.length - 10} weitere Rails (nicht aufgelistet)`);

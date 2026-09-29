@@ -67,8 +67,9 @@ angrenzende Flächen greifen 0,8 mm.
 Der Zugausgleich der Satinsäulen ist je Rail gesetzt (Spec §7.8.3, `packages/engine/src/inkstitch/rail-pull.ts`):
 `pull_compensation_mm="a b"` gibt Ink/Stitch zwei Werte, `a` für die erste Rail des Pfads, `b` für die
 zweite. Eine Rail zu einem Stoffspalt unter 1,0 mm (bis zur nächsten anderen Form liegt nur Stoff, gemessen
-entlang der Sprossen nach außen, Median über die Säule) bekommt 0, eine Säule unter 1,0 mm bekommt auf
-beiden Rails 0; die Ausgabe listet beides. `--zug-symmetrisch` gibt beiden Rails wieder den Wert aus §7.2.
+entlang der Sprossen nach außen, Median über die Säule) bekommt 0; eine Säule unter 1,0 mm mit einer
+solchen Rail bekommt auf beiden Rails 0, die übrigen schmalen Säulen behalten den Ausgleich aus §7.2.
+Die Ausgabe listet beides. `--zug-symmetrisch` gibt beiden Rails wieder den Wert aus §7.2.
 
 Für einzelne Ink/Stitch-Erweiterungen direkt (z. B. zum Verketten mehrerer Schritte):
 

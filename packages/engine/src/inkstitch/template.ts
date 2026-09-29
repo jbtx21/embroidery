@@ -9,9 +9,9 @@
  * - **satin**: `satinColumns`, one native Ink/Stitch satin column per stroke —
  *   rails and rungs in one path, `inkstitch:satin_column` — with the preset's
  *   parameters (spec §7.2 pull compensation from the column's own width — per
- *   rail, none towards a fabric gap under 1.0 mm and none for a column under
- *   1.0 mm, §7.8.3, `rail-pull.ts` —, §7.3 zigzag spacing, §7.4 split above
- *   7 mm, §7.6 underlay by width). Where the
+ *   rail, none towards a fabric gap under 1.0 mm and none on either rail for a
+ *   column under 1.0 mm at such a gap, §7.8.3, `rail-pull.ts` —, §7.3 zigzag
+ *   spacing, §7.4 split above 7 mm, §7.6 underlay by width). Where the
  *   columns do not hold (`SatinColumnsResult.reason`), the shape stays tatami
  *   and the reason goes into the warnings and the object list — unless it is
  *   under `SATIN_NARROW_WARN_MM`: a shape that thin is a line, and a fill of it
@@ -168,8 +168,8 @@ export type TemplateOrderSwap = {
 
 /** What the pull compensation per rail left out (spec §7.8.3). */
 export type RailPullReport = {
-  /** Columns under `SATIN_NARROW_WARN_MM`: no pull compensation at all (rule 2). */
-  narrow: string[];
+  /** Columns under `SATIN_NARROW_WARN_MM` at a fabric gap: no pull compensation on either rail (rule 2). */
+  narrowAtGap: string[];
   /** Rails at a fabric gap under 1.0 mm: none on that side (rule 1), with the median gap, mm. */
   gaps: { id: string; side: "A" | "B"; gapMm: number }[];
 };
@@ -235,8 +235,8 @@ export type TemplateOptions = {
   touchUnderlapMm?: number;
   /**
    * The pull compensation of a satin column per rail (spec §7.8.3): none towards a fabric gap under
-   * 1.0 mm, none at all for a column under 1.0 mm. Default: on. Off: both rails of every column get
-   * the compensation of §7.2, as before.
+   * 1.0 mm, none on either rail for a column under 1.0 mm at such a gap. Default: on. Off: both rails
+   * of every column get the compensation of §7.2, as before.
    */
   railPullBySide?: boolean;
 };
@@ -721,14 +721,14 @@ function railPulls(
   }
   const forms = formIndex([...shapes.values()]);
   const byColumn = new Map<string, RailPull>();
-  const report: RailPullReport = { narrow: [], gaps: [] };
+  const report: RailPullReport = { narrowAtGap: [], gaps: [] };
   for (const p of planned) {
     if (p.kind !== "satin") continue;
     const own = shapes.get(p.shapeId);
     for (const c of p.columns) {
       const r = railPull(c, own, forms, preset);
       byColumn.set(c.id, r);
-      if (r.narrow) report.narrow.push(c.id);
+      if (r.narrowAtGap) report.narrowAtGap.push(c.id);
       (["A", "B"] as const).forEach((side, i) => {
         if (isFabricGap(r.gapMm[i]!)) report.gaps.push({ id: c.id, side, gapMm: r.gapMm[i]! });
       });
