@@ -19,7 +19,8 @@ Stand: 19.09.2026 · Zielgruppe: Entwicklung (Claude Code) · Status: Entwurf f�
 - §16 Phase 1b ergänzt, die Abnahme Phase 1 entfällt.
 
 **Änderung 29.09.2026** — §7.8 neu: Satin für die Ink/Stitch-Vorlage (Einteilung nach Breite mit
-Satin ab 0,7 mm, Strichplan, Säulen, Glätten rauer Konturen, Prüfgrenzen). §7.4 verweist darauf.
+Satin ab 0,7 mm, Strichplan, Säulen, Glätten rauer Konturen, Prüfgrenzen). §7.4 verweist darauf. §5.2 neu:
+Feinheit und Mindestgröße (Satinstrich mindestens 1,3 mm, Lücke mindestens 0,8 mm als Schätzwert).
 
 ---
 
@@ -324,6 +325,34 @@ liegt.
 zudem der Winkel, der am wenigsten mit den Maschen des Gewirkes fluchtet. Eine Fläche, die
 eine frühere überdeckt oder an sie grenzt, bekommt **−45°** — so kreuzen sich die
 Richtungen an jeder Naht, statt parallel zu laufen.
+
+### 5.2 Feinheit und Mindestgröße *(29.09.2026)*
+
+Ein Logo, das als Druck funktioniert, ist gestickt nicht in jeder Größe sauber: zu schmale
+Satinstriche sinken in den Stoff, zu schmale Lücken sticken zu. Diese Prüfung läuft **vor**
+dem Sticken auf der Vorlage in der bestellten Größe (Größe der SVG in mm) und **meldet** — sie
+ändert nichts an der Vorlage (Regel 8). Was geschieht, entscheidet der Nutzer: größer sticken,
+vereinfachen oder so lassen.
+
+**Grenzen** (Entscheidung 29.09.2026):
+
+| Prüfung | Grenze | Herkunft |
+|---|---|---|
+| Satinstrich (Formen, die §7.8.1 als Satin einteilt), mittlere Breite | mindestens **1,3 mm** | TEXMA-Archiv: mittlere Satinbreite je Datei in 192 Produktionsdateien, p5 1,29 mm (Minimum 1,05, Median 1,98) |
+| Lücke innerhalb einer Farbe — Punze, Kerbe, Abstand zwischen Buchstaben | mindestens **0,8 mm** | **Schätzwert**: 2 × Zugausgleich (§7.2, 0,2 mm je Seite) plus eine Fadenstärke. Wird an Profi-Dateien und am Probestick nachgemessen |
+
+**Lücken** werden je Farbe gesucht: die Formen einer Farbe werden vereinigt und um die halbe
+Grenze geschlossen (nach außen und zurück, wie §7.8.4); was dabei dazukommt, ist eine Lücke
+schmaler als die Grenze. Ihre Breite ist die mittlere Breite dieses Stücks. Ausgenommen sind
+Lücken, die eine später gestickte Form ganz überdeckt — dort liegt ein anderes Element, keine
+Lücke. Stücke unter 0,02 mm² sind Rechenrauschen und zählen nicht.
+
+**Ergebnis** je zu feinem Element: Art (Satinstrich oder Lücke), gemessene Breite, Grenze, und
+die **Logobreite, ab der es hält** (bestellte Breite × Grenze ÷ gemessene Breite). Die
+**Mindestgröße** des Logos ist das größte dieser Maße; das Element, das sie bestimmt, wird
+genannt. Die Ausgabe listet die Elemente nach dieser Größe und markiert sie im Vorschaubild.
+Eine Satinform zwischen 0,7 und 1,3 mm kann auch eine dünne Zierlinie sein, die als Laufstich
+besser aufgehoben wäre; das entscheidet der Nutzer, die Prüfung nennt es als Möglichkeit.
 
 ---
 
