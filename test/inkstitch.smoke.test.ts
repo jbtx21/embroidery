@@ -18,7 +18,14 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { buildInkstitchTemplate, initEngine, PRESETS } from "@texma-stitch/engine";
+import {
+  buildInkstitchTemplate,
+  CONNECT_DEFAULTS,
+  initEngine,
+  PRESETS,
+  untrimmedJumps,
+} from "@texma-stitch/engine";
+import { polygonOf, rect } from "../packages/engine/test/fixtures/shapes.js";
 import { readDst, unitsToMm } from "@texma-stitch/formats";
 import { GLYPHS } from "../packages/engine/test/fixtures/glyphs.js";
 import { isInkstitchReady, runInkstitch } from "../tools/inkstitch-lauf.mjs";
@@ -132,6 +139,65 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
       }
     },
     SUBPROCESS_TIMEOUT_MS,
+  );
+
+  it(
+    "jump_to_trim: ein Sprung ab 5 mm bekommt einen Fadenschnitt, ein kurzer nicht — readDst zählt ihn",
+    async () => {
+      // Three squares of one colour: b lies 2 mm from a, c 20 mm from b. Without
+      // `inkstitch:trim_after` Ink/Stitch ties off, jumps and ties on again — the thread
+      // lies on the fabric; with it the DST carries a trim (spec §10.2).
+      await initEngine();
+      const square = (id: string, x: number) => ({
+        kind: "area" as const,
+        id,
+        polygon: polygonOf(rect(x, 1, 10, 10)),
+        color: "#1f3a93",
+        attrs: {},
+        trimAfter: "auto" as const,
+      });
+      const template = buildInkstitchTemplate(
+        [square("a", 0), square("b", 12), square("c", 42)],
+        PRESETS.pique,
+        { widthMm: 60, heightMm: 12 },
+      );
+      const dir = mkdtempSync(join(tmpdir(), "texma-trim-"));
+      try {
+        const templatePath = join(dir, "t.svg");
+        writeFileSync(templatePath, template.svg);
+        const dst = async (svg: string) =>
+          unitsToMm(
+            readDst(
+              new Uint8Array(
+                (await runInkstitch({ extension: "output", options: { format: "dst" }, svg }))
+                  .stdout,
+              ),
+            ).stitches,
+          );
+
+        // As it comes: no cut, one jump of over 5 mm lies on the fabric.
+        const plain = await dst(templatePath);
+        expect(plain.filter((st) => st.cmd === "trim")).toHaveLength(0);
+        expect(untrimmedJumps(plain, CONNECT_DEFAULTS.jumpTrimMm).count).toBe(1);
+
+        // With the extension: exactly the long jump is cut, and readDst counts it.
+        const cut = await runInkstitch({
+          extension: "jump_to_trim",
+          options: { "minimum-jump-length": CONNECT_DEFAULTS.jumpTrimMm },
+          svg: templatePath,
+        });
+        expect(cut.stderr.trim()).toBe("");
+        expect(cut.stdout.toString("utf8").match(/inkstitch:trim_after="True"/g)).toHaveLength(1);
+        const cutPath = join(dir, "t.trimmed.svg");
+        writeFileSync(cutPath, cut.stdout);
+        const trimmed = await dst(cutPath);
+        expect(trimmed.filter((st) => st.cmd === "trim")).toHaveLength(1);
+        expect(untrimmedJumps(trimmed, CONNECT_DEFAULTS.jumpTrimMm).count).toBe(0);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 2,
   );
 
   it(

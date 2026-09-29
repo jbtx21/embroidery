@@ -114,3 +114,35 @@ denselben Vorgaben.
   und nimmt dabei jede Option kommentarlos an — ein Tippfehler im Optionsnamen wird nicht
   gemeldet. Effekt-Erweiterungen wie `fill_to_satin`/`auto_satin` nutzen dagegen den normalen
   `argparse`-Weg und melden eine unbekannte Option als Fehler.
+
+## Fadenschnitte, Sprünge und die DST (gelesen am Commit d59c9ab, 29.09.2026)
+
+Wie `trim_after`, Sprünge und die Ausgabe zusammenhängen — vorher in der Quelle nachgesehen
+(`lib/stitch_plan/stitch_plan.py`, `lib/output.py`, `lib/extensions/jump_to_trim.py`,
+`pystitch/DstWriter.py`):
+
+- **Ohne `inkstitch:trim_after` gibt es keinen Fadenschnitt.** Zwischen zwei Objekten
+  _derselben Farbe_ prüft `stitch_groups_to_stitch_plan` nur den Abstand vom letzten zum ersten
+  Stich: bis `collapse_len_mm` (Metadaten, Vorgabe **3 mm**) läuft der Faden als gewöhnlicher
+  Stich weiter, darüber setzt Ink/Stitch Verriegelung, einen **Sprung** und Verriegelung — der
+  Faden liegt danach quer oben auf dem Stoff. Ein Farbwechsel ist ein eigener Datensatz und
+  schreibt **keinen** Trim (die Maschine schneidet dort selbst).
+- **Mit `trim_after`** setzt Ink/Stitch nach dem letzten Stichblock des Objekts Verriegelung und
+  `TRIM`; das nächste Objekt beginnt wieder mit Verriegelung und Sprung.
+- **In der DST** ist ein `TRIM` genau die Folge dreier Sprung-Datensätze `+2/+2`, `−4/−4`,
+  `+2/+2` (`trim_at = 3` in pystitch; `full_jump = true`, `trims = true` setzt `lib/output.py`).
+  `readDst` erkennt diese Folge auch ohne `interpretJumpsAsTrim` als **einen** Trim; die
+  Sprünge davor und danach zählen als Sprünge. Belegt: die 31 Trims von `auto_satin --trim`
+  im STUTTGART-Lauf vom 28.09. kommen als Trims zurück, und der Rauchtest
+  (`RUN_INKSTITCH_TESTS=1`) setzt einen Trim und liest ihn wieder.
+- **`auto_satin --trim`** setzt Trims nur innerhalb seiner Folge und **am Ende jeder Folge**,
+  unabhängig davon, wie weit das nächste Objekt entfernt ist.
+- **`jump_to_trim`** (Erweiterung, `--minimum-jump-length=<mm>`) läuft die Stichgruppen aller
+  Objekte in Dokumentreihenfolge ab und setzt `trim_after="True"` an das Objekt _vor_ jedem
+  Sprung von mindestens dieser Länge zwischen gleichfarbigen Objekten. Gemessen wird zwischen
+  dem tatsächlich letzten und dem tatsächlich ersten Stich — die Vorlage kennt beides nicht,
+  weil eine Füllung nur ungefähr in Richtung des nächsten Objekts endet. `pnpm inkstitch`
+  ruft sie mit der Schwelle aus Spec §10.2 (`CONNECT_DEFAULTS.jumpTrimMm`, 5 mm) nach dem
+  letzten `auto_satin` auf. Grenzen: Sprünge **innerhalb** eines Objekts (etwa zwischen den
+  Teilpolygonen eines Pfads) sieht sie nicht, und ein Objekt, das schon `trim_after` oder einen
+  Trim-Befehl trägt, bleibt unverändert.

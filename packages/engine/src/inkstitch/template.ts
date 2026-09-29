@@ -274,6 +274,12 @@ type PlannedBase = {
   color: string;
   /** What the object lies on, for the order: the outline of its shape. */
   cover: Polygon | undefined;
+  /**
+   * The source asked for a trim after this object (`inkstitch:trim_after`). Carried over
+   * for tatami and running stitch; a satin column is routed by `auto_satin`, which trims
+   * where its own routing needs it and would repeat the attribute on every piece it cuts.
+   */
+  trimAfter: boolean;
 };
 type PlannedTatami = PlannedBase & { kind: "tatami"; polygon: Polygon; reason?: string };
 type PlannedRunning = PlannedBase & { kind: "running"; lines: Polyline[]; reason?: string };
@@ -288,30 +294,32 @@ type Planned = PlannedTatami | PlannedRunning | PlannedSatin;
 /** Decides what every shape becomes (module doc), in document order. */
 function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]): Planned[] {
   const planned: Planned[] = [];
-  const tatami = (shapeId: string, polygon: Polygon, color: string, reason?: string): void => {
+  const tatami = (shape: ImportedShape, color: string, polygon: Polygon, reason?: string): void => {
     planned.push({
       kind: "tatami",
-      id: xmlId(shapeId),
-      shapeId,
+      id: xmlId(shape.id),
+      shapeId: shape.id,
       color,
       cover: polygon,
+      trimAfter: shape.trimAfter === "always",
       polygon,
       ...(reason ? { reason } : {}),
     });
   };
   const running = (
-    shapeId: string,
-    lines: Polyline[],
+    shape: ImportedShape,
     color: string,
+    lines: Polyline[],
     cover: Polygon | undefined,
     reason?: string,
   ): void => {
     planned.push({
       kind: "running",
-      id: xmlId(shapeId),
-      shapeId,
+      id: xmlId(shape.id),
+      shapeId: shape.id,
       color,
       cover,
+      trimAfter: shape.trimAfter === "always",
       lines,
       ...(reason ? { reason } : {}),
     });
@@ -321,7 +329,7 @@ function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]
     if (shape.kind === "line") {
       if (!shape.color || shape.polyline.length < 2) continue;
       const line = shape.closed ? [...shape.polyline, shape.polyline[0]!] : shape.polyline;
-      running(shape.id, [line], shape.color, lineCover(line));
+      running(shape, shape.color, [line], lineCover(line));
       continue;
     }
     const cls = classifyShape(shape.polygon, shape.id);
@@ -329,7 +337,7 @@ function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]
     // "tight column" note would describe a column that is never set.
     if (cls.shapeClass !== "satin") warnings.push(...cls.warnings);
     if (cls.shapeClass === "tatami") {
-      tatami(shape.id, shape.polygon, shape.color);
+      tatami(shape, shape.color, shape.polygon);
       continue;
     }
     if (cls.shapeClass === "running") {
@@ -343,10 +351,10 @@ function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]
             shape.id,
           ),
         );
-        tatami(shape.id, shape.polygon, shape.color, "no axis for a running stitch");
+        tatami(shape, shape.color, shape.polygon, "no axis for a running stitch");
         continue;
       }
-      running(shape.id, lines, shape.color, shape.polygon);
+      running(shape, shape.color, lines, shape.polygon);
       continue;
     }
     const id = xmlId(shape.id);
@@ -365,13 +373,13 @@ function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]
             id,
           ),
         );
-        running(shape.id, lines, shape.color, shape.polygon, plan.reason);
+        running(shape, shape.color, lines, shape.polygon, plan.reason);
         continue;
       }
     }
     warnings.push(...cls.warnings, ...plan.warnings);
     if (!plan.ok) {
-      tatami(shape.id, shape.polygon, shape.color, plan.reason);
+      tatami(shape, shape.color, shape.polygon, plan.reason);
       continue;
     }
     planned.push({
@@ -380,6 +388,7 @@ function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]
       shapeId: shape.id,
       color: shape.color,
       cover: shape.polygon,
+      trimAfter: false,
       columns: plan.columns,
       coverage: plan.coverage,
       smoothedMm: plan.smoothedMm,
@@ -438,7 +447,15 @@ function applyKnockdown(
     } else {
       changed++;
       split.push({ id: p.id, parts: parts.length });
-      parts.forEach((polygon, i) => out.push({ ...p, id: `${p.id}_p${i}`, polygon }));
+      // The object ends with its last part — that is where a trim after it belongs.
+      parts.forEach((polygon, i) =>
+        out.push({
+          ...p,
+          id: `${p.id}_p${i}`,
+          polygon,
+          trimAfter: p.trimAfter && i === parts.length - 1,
+        }),
+      );
     }
   }
   return {
@@ -451,6 +468,9 @@ function applyKnockdown(
     },
   };
 }
+
+const trimAttr = (p: { trimAfter: boolean }): Record<string, string> =>
+  p.trimAfter ? { trim_after: "true" } : {};
 
 /** Writes the planned objects, in their order, as the SVG body (module doc). */
 function emitTemplate(
@@ -471,7 +491,7 @@ function emitTemplate(
       closeRun();
       body.push(
         `<path id="${xmlEscape(p.id)}" d="${polygonD(p.polygon)}" style="fill:${xmlEscape(p.color)};stroke:none"` +
-          `${inkAttrs({ row_spacing_mm: num(preset.fillRowSpacingMm) })}/>`,
+          `${inkAttrs({ row_spacing_mm: num(preset.fillRowSpacingMm), ...trimAttr(p) })}/>`,
       );
       objects.push({
         id: p.id,
@@ -488,10 +508,17 @@ function emitTemplate(
         stroke_method: "running_stitch",
         running_stitch_length_mm: num(RUNNING_STITCH_MM),
       };
-      body.push(
-        `<path id="${xmlEscape(p.id)}" d="${p.lines.map(lineD).join(" ")}" ` +
-          `style="fill:none;stroke:${xmlEscape(p.color)};stroke-width:0.1"${inkAttrs(attrs)}/>`,
-      );
+      // One element per line: Ink/Stitch cuts after an element and never between the lines
+      // of one, so the jumps between the lines of a hairline with a junction would stay open
+      // (a trim after the shape, if the source asks for it, goes on the last).
+      p.lines.forEach((line, k) => {
+        const last = k === p.lines.length - 1;
+        body.push(
+          `<path id="${xmlEscape(k === 0 ? p.id : `${p.id}_l${k}`)}" d="${lineD(line)}" ` +
+            `style="fill:none;stroke:${xmlEscape(p.color)};stroke-width:0.1"` +
+            `${inkAttrs({ ...attrs, ...(last ? trimAttr(p) : {}) })}/>`,
+        );
+      });
       objects.push({
         id: p.id,
         kind: "running",

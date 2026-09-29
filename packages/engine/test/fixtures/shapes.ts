@@ -443,3 +443,34 @@ export function slabT(bar = 8, barH = 2.8, stem = 2.8, serifH = 4.8, h = 12): Po
 }
 
 export const SLAB_T = slabT();
+
+/**
+ * An "H" of 0.5 mm strokes: a hairline with a junction, which the template sets as a
+ * running stitch of several lines (Ink/Stitch template, `runningLines`).
+ */
+export function hairlineH(size = 10, width = 0.5): Polygon {
+  const w = width;
+  const mid = size / 2;
+  return {
+    outer: orient(
+      [
+        pt(0, 0),
+        pt(w, 0),
+        pt(w, mid - w / 2),
+        pt(size - w, mid - w / 2),
+        pt(size - w, 0),
+        pt(size, 0),
+        pt(size, size),
+        pt(size - w, size),
+        pt(size - w, mid + w / 2),
+        pt(w, mid + w / 2),
+        pt(w, size),
+        pt(0, size),
+      ],
+      true,
+    ),
+    holes: [],
+  };
+}
+
+export const HAIRLINE_H = hairlineH();

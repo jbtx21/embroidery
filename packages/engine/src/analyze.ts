@@ -86,6 +86,51 @@ export function needleClusters(stitches: Stitch[]): {
   return worst === undefined ? { max, cells } : { max, cells, worst };
 }
 
+/**
+ * Jumps that leave thread lying on the fabric (spec §10.2): a move made of jump
+ * records alone, longer than `thresholdMm`, with the thread still fast to the
+ * last stitch — no trim and no colour change before it. Measured along the
+ * records, because a long jump is split into several and the thread follows all
+ * of them. What the machine drives, not what the design says: run on the stitches
+ * read back from the file (ADR 0001, "prüft das Ergebnis").
+ */
+export function untrimmedJumps(
+  stitches: Stitch[],
+  thresholdMm: number,
+): { count: number; longestMm: number } {
+  let count = 0;
+  let longestMm = 0;
+  let at: Stitch | undefined;
+  // Thread is fast to the last stitch until a trim or a colour change cuts it.
+  let fast = false;
+  let run = 0;
+  let runFast = false;
+  const flush = (): void => {
+    if (run > thresholdMm && runFast) {
+      count++;
+      longestMm = Math.max(longestMm, run);
+    }
+    run = 0;
+  };
+  for (const s of stitches) {
+    if (s.cmd === "jump") {
+      if (run === 0) runFast = fast;
+      if (at !== undefined) run += Math.hypot(s.x - at.x, s.y - at.y);
+      at = s;
+      continue;
+    }
+    flush();
+    if (s.cmd === "stitch") {
+      fast = true;
+      at = s;
+    } else if (s.cmd === "trim" || s.cmd === "color") {
+      fast = false;
+    }
+  }
+  flush();
+  return { count, longestMm };
+}
+
 /** Stitches per cell on a 1 mm grid; the maximum is returned. */
 export function maxDensity(stitches: Stitch[]): number {
   return densityProfile(stitches).max;

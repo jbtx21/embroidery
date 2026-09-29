@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { Polygon } from "@texma-stitch/geometry";
 import { initGeometry } from "@texma-stitch/geometry";
 import { GLYPHS } from "../../test/fixtures/glyphs.js";
-import { HOLED_BAR, polygonOf, pt, rect } from "../../test/fixtures/shapes.js";
+import { HAIRLINE_H, HOLED_BAR, polygonOf, pt, rect } from "../../test/fixtures/shapes.js";
 import type { ImportedShape } from "../import/svg.js";
 import { PRESETS } from "../presets.js";
 import { satinColumns } from "./columns.js";
@@ -400,5 +400,47 @@ describe("order option (spec §10.1)", () => {
     // The big one is cut by the small one lying on it, as in the design.
     expect(r.knockdown!.changed).toBe(1);
     expect(/<path id="big" d="([^"]*)"/.exec(r.svg)![1]!.match(/M /g)).toHaveLength(2);
+  });
+});
+
+describe("trim_after of the source (spec §10.2)", () => {
+  const trimmed = (shape: ImportedShape): ImportedShape => ({ ...shape, trimAfter: "always" });
+  const block = area("block", polygonOf(rect(0, 0, 20, 20)));
+  const hairline = area("hairline", polygonOf(rect(30, 2, 20, 0.5)));
+
+  it("carries an explicit trim after a tatami or a running stitch over to its path", () => {
+    const t = buildInkstitchTemplate([trimmed(block), trimmed(hairline)], pique, PAGE);
+    expect(t.svg).toMatch(/<path id="block"[^>]*inkstitch:trim_after="true"/);
+    expect(t.svg).toMatch(/<path id="hairline"[^>]*inkstitch:trim_after="true"/);
+  });
+
+  it("adds none where the source has none", () => {
+    const t = buildInkstitchTemplate([block, hairline], pique, PAGE);
+    expect(t.svg).not.toContain("trim_after");
+  });
+
+  it("writes every line of a running stitch as a path of its own, and puts the trim on the last", () => {
+    // Ink/Stitch cuts after an element, never between the lines of one: a hairline with a
+    // junction goes in as one element per line, or the jumps between its lines stay open.
+    const h = trimmed(area("H", HAIRLINE_H));
+    const t = buildInkstitchTemplate([h], pique, PAGE);
+    expect(t.objects.map((o) => [o.id, o.kind])).toEqual([["H", "running"]]);
+    const paths = t.svg.match(/<path id="H[^"]*"[^>]*>/g)!;
+    expect(paths.length).toBeGreaterThan(1);
+    expect(paths.map((d) => /id="([^"]*)"/.exec(d)![1])).toEqual(
+      paths.map((_, i) => (i === 0 ? "H" : `H_l${i}`)),
+    );
+    for (const d of paths) expect(d.match(/ M /g) ?? []).toHaveLength(0);
+    for (const d of paths.slice(0, -1)) expect(d).not.toContain("trim_after");
+    expect(paths[paths.length - 1]).toContain('inkstitch:trim_after="true"');
+  });
+
+  it("puts it on the last part of a tatami the knockdown split — where the object ends", () => {
+    const bar = trimmed(area("bar", polygonOf(rect(0, 0, 60, 10))));
+    const post = area("post", polygonOf(rect(20, -5, 10, 20)), "#c8102e");
+    const t = buildInkstitchTemplate([bar, post], pique, { ...PAGE, knockdown: true });
+    expect(t.objects.map((o) => o.id)).toEqual(["bar_p0", "bar_p1", "post"]);
+    expect(t.svg).not.toMatch(/<path id="bar_p0"[^>]*trim_after/);
+    expect(t.svg).toMatch(/<path id="bar_p1"[^>]*inkstitch:trim_after="true"/);
   });
 });

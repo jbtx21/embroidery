@@ -20,7 +20,17 @@
  *    Ink/Stitch's auto_satin (--preserve_order=true: what ends under a
  *    stroke is stitched first; --trim=true), one call per run, each call on
  *    the previous call's result -> out/<name>.routed.svg.
- * 3. output --format=dst -> out/<name>.dst.
+ * 3. Sets the thread cuts with Ink/Stitch's jump_to_trim
+ *    -> out/<name>.trimmed.svg. Without `inkstitch:trim_after` a jump between
+ *    two objects of one colour stays a jump (Ink/Stitch ties off and on around
+ *    it, but the thread lies on top of the fabric); with it the DST carries a
+ *    trim (three jump records, +2/+2, -4/-4, +2/+2, which readDst reads back as
+ *    one trim). Where a fill ends and the next object begins is known only to
+ *    Ink/Stitch — a fill ends towards the next object, but not exactly — so the
+ *    extension measures it on the real stitches and sets `trim_after` where the
+ *    jump is at least the threshold of spec §10.2 (CONNECT_DEFAULTS.jumpTrimMm,
+ *    5 mm). Up to 3 mm (its collapse length) Ink/Stitch does not even jump.
+ * 4. output --format=dst -> out/<name>.dst.
  *
  * --tatami keeps the pure tatami run: the source SVG as drawn, with the
  * preset's row spacing on every path (withPresetAttributes), straight to
@@ -37,11 +47,13 @@ import { basename, extname, resolve } from "node:path";
 import {
   analyze,
   buildInkstitchTemplate,
+  CONNECT_DEFAULTS,
   densityProfile,
   importShapes,
   initEngine,
   needleClusters,
   PRESETS,
+  untrimmedJumps,
 } from "@texma-stitch/engine";
 import { readDst, unitsToMm } from "@texma-stitch/formats";
 import { renderPlanPng } from "@texma-stitch/render";
@@ -216,6 +228,31 @@ if (tatamiOnly) {
     writeFileSync(current, stdout);
   }
   outputInput = current;
+
+  // The thread cuts (module doc, step 3): the extension sets trim_after where the
+  // jump to the next object is at least the trim threshold of spec §10.2.
+  const trimmed = await inkstitch({
+    extension: "jump_to_trim",
+    options: { "minimum-jump-length": CONNECT_DEFAULTS.jumpTrimMm },
+    svg: current,
+  });
+  const before = (readFileSync(current, "utf8").match(/inkstitch:trim_after="/gi) ?? []).length;
+  const after = (trimmed.stdout.toString("utf8").match(/inkstitch:trim_after="/gi) ?? []).length;
+  calls.push({ what: "jump_to_trim", ms: trimmed.ms });
+  if (trimmed.stderr.trim()) {
+    stderrLines.push(
+      ...trimmed.stderr
+        .trim()
+        .split("\n")
+        .map((l) => `jump_to_trim: ${l}`),
+    );
+  }
+  outputInput = resolve(outDir, `${name}.trimmed.svg`);
+  writeFileSync(outputInput, trimmed.stdout);
+  summary.push(
+    `${after - before} Fadenschnitte gesetzt (Sprung ab ${CONNECT_DEFAULTS.jumpTrimMm} mm), ` +
+      `${after} Objekte mit trim_after`,
+  );
 }
 
 const {
@@ -253,6 +290,7 @@ writeFileSync(
 
 const dichte = densityProfile(foreignStitches);
 const nadel = needleClusters(foreignStitches);
+const offen = untrimmedJumps(foreignStitches, CONNECT_DEFAULTS.jumpTrimMm);
 const flaeche = Math.max(stats.bboxMm.w * stats.bboxMm.h, 1);
 
 console.log(`Datei       ${svgPath}`);
@@ -261,7 +299,10 @@ console.log(
     `Satin-Abstand ${preset.satinSpacingMm} mm)`,
 );
 console.log(`Vorlage     out/${name}.inkstitch.svg`);
-if (!tatamiOnly && outputInput !== templatePath) console.log(`Geroutet    out/${name}.routed.svg`);
+if (!tatamiOnly && outputInput !== templatePath) {
+  console.log(`Geroutet    out/${name}.routed.svg`);
+  console.log(`Fadenschnitte out/${name}.trimmed.svg`);
+}
 console.log(`DST         out/${name}.dst`);
 console.log(`Vorschau    out/${name}.png`);
 for (const line of summary) console.log(`            ${line}`);
@@ -304,6 +345,11 @@ console.log(
 );
 console.log(
   zeile("Sprünge", ((stats.jumps / stats.stitches) * 1000).toFixed(2), "je 1000", "jumpsPer1000"),
+);
+console.log(
+  `  ${"Fäden auf dem Stoff".padEnd(22)} ${String(offen.count).padStart(8)} Sprünge über ` +
+    `${CONNECT_DEFAULTS.jumpTrimMm} mm ohne Fadenschnitt` +
+    `${offen.count > 0 ? `, längster ${offen.longestMm.toFixed(1)} mm` : ""}`,
 );
 console.log(zeile("Stichmenge", (stats.stitches / flaeche).toFixed(2), "je mm²", "stitchesPerMm2"));
 console.log(zeile("Dichtespitze", String(dichte.max), "je mm²", "densityMax"));
