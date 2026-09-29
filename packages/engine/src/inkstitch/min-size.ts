@@ -14,6 +14,12 @@
  * - **Gap**: the shapes of one colour are united and closed by half the limit
  *   (out and back, as `smoothOutline` does, spec §7.8.4). What the closing adds
  *   is a gap narrower than `GAP_MIN_MM`, unless a later shape covers it whole.
+ * - **Fabric gap** (spec §5.2, "Stofflücken zwischen Farben"): the same closing over the shapes
+ *   of ALL colours together. What it adds is fabric that stays visible between two elements — the
+ *   channel between a letter and its shadow line. There is no cover check: a shape that lies over
+ *   the place, whether stitched before or after, is part of the union, so what the closing adds
+ *   lies on no shape at all. A place a colour already reports as a gap is not reported again (see
+ *   below).
  *
  * The width where an element holds is the ordered width times the limit over the
  * measured width — a logo made larger makes every width larger in proportion. There are
@@ -22,14 +28,16 @@
  * - the **minimum size** comes from the satin strokes alone: the width from which all are at
  *   least `SATIN_STROKE_MIN_MM`, with the narrowest stroke named. Where every stroke holds it is
  *   below the ordered width — how far the logo could shrink;
- * - **all gaps open from** the largest width any gap holds from, with that gap named. Fine
- *   channels (the 0.25 mm between rim and body of varsity lettering) push it far above the
- *   minimum size; whether they may sew shut is the user's call.
+ * - **all gaps open from** the largest width any gap or fabric gap holds from, with that gap
+ *   named. Fine channels (the 0.25 mm between rim and body of varsity lettering, the 0.5 mm
+ *   between a letter and its shadow) push it far above the minimum size; whether they may sew
+ *   shut is the user's call.
  *
  * **The filter for gaps** (spec §5.2, second version). Vectorised logos have hairline slits
  * between shapes of one colour, roundings of every concave corner and slivers a micrometre
  * thin; none is a gap on the fabric. What the closing adds goes through four steps, and
- * each piece that falls out is counted (`ignored`), never dropped silently:
+ * each piece that falls out is counted (`ignored`), never dropped silently. Fabric gaps go
+ * through the same four (`fabricIgnored`):
  *
  * 1. Slivers thinner than `GAP_SLIVER_MM` come off before anything is measured: the piece is
  *    opened by half of it. A piece that is nothing but sliver is gone (`slivers`).
@@ -49,6 +57,14 @@
  * price: a strip between 0.1 and 0.15 mm has no axis at the standard sampling and is left out (a
  * blind band), and so is a compact gap under a millimetre across.
  *
+ * **One place, one finding.** The closing of all shapes contains what the closing of each colour
+ * adds (closing grows with the set), so the fabric closing meets every gap of a colour again. The
+ * polygons of the gaps a colour reports are taken off its pieces, and what is left goes through
+ * the filter once more (`duplicate`: a piece that lies wholly within reported gaps). Only what
+ * is REPORTED is taken off, not everything a colour's closing added: a piece its own filter left
+ * out (a rounding, a short gap between small shapes) may grow, with the shapes of other colours
+ * near it, into a fabric gap that counts.
+ *
  * Known limits (measured 29.09.2026 on six customer logos):
  *
  * - Small pieces that do have an axis — the wedge where three shapes meet, the tip of a notch,
@@ -60,6 +76,24 @@
  * - The standard sampling grows with the perimeter of a piece (perimeter / 300, up to 2 mm), so
  *   a large piece may lose its axis where a small one of the same width keeps it.
  * - A gap that a later shape covers only in part is reported whole.
+ * - Fabric gaps run over areas only: a stroked line (a running stitch) neither fills a fabric
+ *   gap nor makes one, as it covers no gap of a colour.
+ * - Measured 29.09.2026 (fabric gaps): Hofbräu 110 mm has 78 — channels of 0.40 mm (small
+ *   lettering) and 0.53 mm (large) between letters and their shadow lines, and pieces of 0.2 to
+ *   0.3 mm where a shadow ends or nears a letter. The second number rises from 297 to 434 mm, set
+ *   by a real channel of 0.20 mm and 4 mm length at the top of the H. Of the six customer logos
+ *   four have none or a few (0, 0, 3, 2), the two of Atzensport 59 and 65; only Atzensport 80 mm
+ *   changes its second number (494 to 517 mm), by a wedge 0.12 mm wide and 0.7 mm long. The three
+ *   of Köln are seams of 0.10 to 0.12 mm between abutting shapes of two colours: the strip of 0.05
+ *   to 0.1 mm above, now between colours.
+ * - Where a fabric gap and the gap of a colour meet, the fabric gap is what is left once the gap
+ *   of the colour is taken off: its polygon is not the whole channel, and each square millimetre
+ *   is in one finding only.
+ * - Fabric gaps have the same blind spots as the gaps of a colour (the band of 0.1 to 0.15 mm,
+ *   short gaps between small shapes) and the same wedges: where three shapes meet, now of three
+ *   colours, which happens more often than of one.
+ * - A shape under everything else (a background the size of the page) is part of the union and
+ *   leaves no fabric to find: the check does not know a background from a logo element.
  */
 import type { Point, Polygon, Rect } from "@texma-stitch/geometry";
 import {
@@ -115,16 +149,22 @@ const HOLE_MATCH_MM = 1e-3;
 /** Bisection steps for the inscribed circle: 0.4 mm down to well under a micrometre. */
 const INSCRIBED_STEPS = 20;
 
-export type MinimumSizeKind = "satin-stroke" | "gap";
+export type MinimumSizeKind = "satin-stroke" | "gap" | "fabric-gap";
 
 export type MinimumSizeFinding = {
   /**
    * The shape's id for a satin stroke; `gap-<colour>-<nnn>` for a gap, numbered per
    * colour in reading order (top to bottom, left to right) among every piece the closing added,
-   * with `-2`, `-3` for the further parts of a piece the opening fell apart.
+   * with `-2`, `-3` for the further parts of a piece the opening fell apart; `fabric-<nnn>` for a
+   * fabric gap, numbered the same way among every piece the closing of all shapes added.
    */
   id: string;
   kind: MinimumSizeKind;
+  /**
+   * The colour of the shape (satin stroke) or of the gap. A fabric gap belongs to no colour: this
+   * is the colours of the shapes it lies on, joined by `+` in the order they first appear in the
+   * document (`#d2060d+#d1b35a`).
+   */
   color: string;
   /** Width measured at the ordered size, mm. */
   measuredMm: number;
@@ -138,8 +178,8 @@ export type MinimumSizeFinding = {
   /** Logo width, mm, from which the element holds: ordered width × limit ÷ measured width. */
   holdsFromWidthMm: number;
   /**
-   * The shape (satin stroke) or the piece the closing added, slivers off (gap): what a preview
-   * marks.
+   * The shape (satin stroke) or the piece the closing added, slivers off (gap; a fabric gap
+   * without what a colour already reports): what a preview marks.
    */
   polygon: Polygon;
   /**
@@ -181,12 +221,28 @@ export type MinimumSizeIgnored = {
   covered: number;
 };
 
+/** What the filter took out of the fabric gaps: the same kinds as for a colour, and duplicates. */
+export type MinimumSizeFabricIgnored = {
+  /** Pieces of the closing of all shapes that the opening took off whole (as `slivers` above). */
+  slivers: number;
+  /** As `thin` above. */
+  thin: number;
+  /** As `compact` above: the rounding of an inner corner where two colours meet, a short gap. */
+  compact: number;
+  /** As `wide` above. */
+  wide: number;
+  /**
+   * Pieces that lie wholly within gaps a colour already reports: the place is reported once, there.
+   */
+  duplicate: number;
+};
+
 export type MinimumSizeResult = {
   /** The ordered logo width the check ran at, mm. */
   widthMm: number;
   /** The limits it ran with, mm — the options, or their defaults. */
   limits: { satinMinMm: number; gapMinMm: number };
-  /** Both kinds, the largest `holdsFromWidthMm` first. */
+  /** All three kinds, the largest `holdsFromWidthMm` first. */
   findings: MinimumSizeFinding[];
   /**
    * The minimum size, mm: the logo width from which every satin stroke is at least
@@ -200,17 +256,26 @@ export type MinimumSizeResult = {
    */
   decisive?: MinimumSizeFinding;
   /**
-   * The width from which all gaps stay open, mm: the largest `holdsFromWidthMm` of the gap
-   * findings. Absent without a gap finding.
+   * The width from which all gaps stay open, mm: the largest `holdsFromWidthMm` of the gap and
+   * fabric-gap findings. Absent without one.
    */
   gapsOpenFromWidthMm?: number;
-  /** The gap that sets `gapsOpenFromWidthMm`. */
+  /** The gap or fabric gap that sets `gapsOpenFromWidthMm`. */
   decisiveGap?: MinimumSizeFinding;
   /** Every piece the closing added, over all colours — before the filter. */
   gapPieces: number;
   /** The parts of those pieces that were measured, once the opening took the slivers off. */
   gapParts: number;
   ignored: MinimumSizeIgnored;
+  /** Every piece the closing of all shapes together added — before the filter. */
+  fabricPieces: number;
+  /**
+   * The parts of those pieces that were measured, once the opening took the slivers off and the
+   * gaps of a colour were taken off: `fabricPieces` = `fabricParts` + `slivers` + `duplicate`, and
+   * `fabricParts` = the fabric gaps found + `thin` + `compact` + `wide`.
+   */
+  fabricParts: number;
+  fabricIgnored: MinimumSizeFabricIgnored;
 };
 
 /** Logo width from which an element of `measuredMm` holds its `limitMm` (module doc). */
@@ -367,6 +432,20 @@ function gapWidthMm(
   return isHole ? { widthMm: inscribedDiameterMm(part), measure: "inscribed-circle" } : undefined;
 }
 
+/** What the filter makes of a part of a closing piece (module doc, steps 2 to 4, then the limit). */
+type Judged =
+  | { outcome: "compact" | "thin" | "wide" }
+  | { outcome: "gap"; widthMm: number; measure: MinimumSizeFinding["measure"] };
+
+/** One judgement for the gaps of a colour and for fabric gaps: the same filter, by construction. */
+function judgePart(part: Polygon, isHole: boolean, limitMm: number): Judged {
+  const measured = gapWidthMm(part, isHole);
+  if (measured === undefined) return { outcome: "compact" };
+  if (measured.widthMm < GAP_THIN_MM) return { outcome: "thin" };
+  if (measured.widthMm >= limitMm) return { outcome: "wide" };
+  return { outcome: "gap", ...measured };
+}
+
 /**
  * Does a later shape of another colour cover the gap completely (spec §5.2)? Later means
  * after the last shape of the gap's own colour that borders it: that is what lies over the
@@ -453,17 +532,9 @@ function gaps(
       }
       rest.forEach(({ part, box }, k) => {
         parts++;
-        const measured = gapWidthMm(part, isHole);
-        if (measured === undefined) {
-          ignored.compact++;
-          return;
-        }
-        if (measured.widthMm < GAP_THIN_MM) {
-          ignored.thin++;
-          return;
-        }
-        if (measured.widthMm >= limitMm) {
-          ignored.wide++;
+        const judged = judgePart(part, isHole, limitMm);
+        if (judged.outcome !== "gap") {
+          ignored[judged.outcome]++;
           return;
         }
         if (coveredByLater(part, box, color, areas, lastOfColour)) {
@@ -475,10 +546,10 @@ function gaps(
           id: k === 0 ? id : `${id}-${k + 1}`,
           kind: "gap",
           color,
-          measuredMm: measured.widthMm,
-          measure: measured.measure,
+          measuredMm: judged.widthMm,
+          measure: judged.measure,
           limitMm,
-          holdsFromWidthMm: holdsFromWidth(widthMm, limitMm, measured.widthMm),
+          holdsFromWidthMm: holdsFromWidth(widthMm, limitMm, judged.widthMm),
           polygon: part,
           at: anchor(part, box),
           runningAlternative: false,
@@ -489,6 +560,113 @@ function gaps(
   return { findings, pieces, parts, ignored };
 }
 
+/**
+ * The colours of the shapes a part lies on, in the order they first appear in the document. A
+ * piece of the closing lies on the edges of its neighbours, so it is those the grown part
+ * (`BORDER_REACH_MM`) overlaps.
+ */
+function borderingColours(part: Polygon, box: Rect, areas: Area[]): string[] {
+  const reach = grow(box, BORDER_REACH_MM);
+  const grown = offset(part, BORDER_REACH_MM);
+  const colours: string[] = [];
+  for (const a of areas) {
+    if (colours.includes(a.shape.color) || !boxesOverlap(a.box, reach)) continue;
+    if (totalArea(intersect(grown, [a.shape.polygon])) > OVERLAP_MIN_MM2)
+      colours.push(a.shape.color);
+  }
+  return colours;
+}
+
+/**
+ * Fabric between elements (module doc): what closing the shapes of ALL colours together adds,
+ * through the same filter as a gap of a colour. Nothing is covered — what the closing adds lies
+ * on no shape. The gaps a colour already reports (`reported`) are taken off first: a place is
+ * reported once, there.
+ */
+function fabricGaps(
+  areas: Area[],
+  reported: MinimumSizeFinding[],
+  widthMm: number,
+  limitMm: number,
+): {
+  findings: MinimumSizeFinding[];
+  pieces: number;
+  parts: number;
+  ignored: MinimumSizeFabricIgnored;
+} {
+  const findings: MinimumSizeFinding[] = [];
+  const ignored: MinimumSizeFabricIgnored = {
+    slivers: 0,
+    thin: 0,
+    compact: 0,
+    wide: 0,
+    duplicate: 0,
+  };
+  let parts = 0;
+
+  const closing = closingPieces(
+    areas.map((a) => a.shape.polygon),
+    limitMm / 2,
+  );
+  const boxed = closing.pieces
+    .map((piece) => ({ piece, box: polygonBbox(piece) }))
+    .sort(readingOrder);
+  const known = reported.map((f) => ({ polygon: f.polygon, box: polygonBbox(f.polygon) }));
+
+  boxed.forEach(({ piece, box: pieceBox }, i) => {
+    const isHole = isFilledHole(piece, closing.holes);
+    const opened = withoutSlivers([piece]);
+    if (opened.length === 0) {
+      ignored.slivers++;
+      return;
+    }
+    // What a colour reports comes off before anything is measured. The difference leaves a
+    // hairline along the edge where the two polygons do not quite agree: the opening takes it off.
+    const held = known.filter(
+      (k) =>
+        boxesOverlap(k.box, pieceBox) &&
+        totalArea(intersect(opened, [k.polygon])) > OVERLAP_MIN_MM2,
+    );
+    const remaining =
+      held.length === 0
+        ? opened
+        : withoutSlivers(
+            difference(
+              opened,
+              held.map((k) => k.polygon),
+            ),
+          );
+    if (remaining.length === 0) {
+      ignored.duplicate++;
+      return;
+    }
+    const rest = remaining.map((part) => ({ part, box: polygonBbox(part) })).sort(readingOrder);
+    rest.forEach(({ part, box }, k) => {
+      parts++;
+      // A hole is measured by its circle only where it is left whole.
+      const judged = judgePart(part, isHole && held.length === 0, limitMm);
+      if (judged.outcome !== "gap") {
+        ignored[judged.outcome]++;
+        return;
+      }
+      const id = `fabric-${String(i + 1).padStart(3, "0")}`;
+      findings.push({
+        id: k === 0 ? id : `${id}-${k + 1}`,
+        kind: "fabric-gap",
+        color: borderingColours(part, box, areas).join("+"),
+        measuredMm: judged.widthMm,
+        measure: judged.measure,
+        limitMm,
+        holdsFromWidthMm: holdsFromWidth(widthMm, limitMm, judged.widthMm),
+        polygon: part,
+        at: anchor(part, box),
+        runningAlternative: false,
+      });
+    });
+  });
+  return { findings, pieces: boxed.length, parts, ignored };
+}
+
 function requirePositive(name: string, value: number): void {
   if (!Number.isFinite(value) || value <= 0) {
     throw new RangeError(`${name} must be a positive number of millimetres, got ${value}`);
@@ -497,7 +675,8 @@ function requirePositive(name: string, value: number): void {
 
 /**
  * The fineness check of spec §5.2 (module doc) on the shapes of an SVG, in document order,
- * at the ordered width. Stroked lines are not areas: they neither make a gap nor cover one.
+ * at the ordered width. Stroked lines are not areas: they neither make a gap nor cover one, nor
+ * fill the fabric between two shapes.
  */
 export function checkMinimumSize(
   shapes: ImportedShape[],
@@ -516,15 +695,16 @@ export function checkMinimumSize(
 
   const satin = satinStrokes(areas, widthMm, satinMinMm);
   const gapResult = gaps(areas, widthMm, gapMinMm);
+  const fabricResult = fabricGaps(areas, gapResult.findings, widthMm, gapMinMm);
   // Largest first; ties by kind and id, never by the order the geometry happened to come in.
-  const findings = [...satin.findings, ...gapResult.findings].sort(
+  const findings = [...satin.findings, ...gapResult.findings, ...fabricResult.findings].sort(
     (p, q) =>
       q.holdsFromWidthMm - p.holdsFromWidthMm ||
       (p.kind < q.kind ? -1 : p.kind > q.kind ? 1 : 0) ||
       (p.id < q.id ? -1 : p.id > q.id ? 1 : 0),
   );
-  // The findings are sorted, so the first gap is the gap that asks for the most.
-  const decisiveGap = findings.find((f) => f.kind === "gap");
+  // The findings are sorted, so the first gap of either kind is the gap that asks for the most.
+  const decisiveGap = findings.find((f) => f.kind !== "satin-stroke");
   return {
     widthMm,
     limits: { satinMinMm, gapMinMm },
@@ -536,5 +716,8 @@ export function checkMinimumSize(
     gapPieces: gapResult.pieces,
     gapParts: gapResult.parts,
     ignored: gapResult.ignored,
+    fabricPieces: fabricResult.pieces,
+    fabricParts: fabricResult.parts,
+    fabricIgnored: fabricResult.ignored,
   };
 }

@@ -556,6 +556,23 @@ export function rimAndBody(channelMm: number, w = 20, h = 12, rimMm = 2): [Polyg
 }
 
 /**
+ * Four bars round a square hole of `holeMm`, each reaching past the next: a pinwheel. The hole
+ * is enclosed by all four and by none alone, so no single colour has a counter there. Where the
+ * bars are four colours, the hole is fabric between elements. Bars `armMm` wide, in the order
+ * top, right, bottom, left; the hole is [0, holeMm] × [0, holeMm].
+ */
+export function pinwheel(holeMm: number, armMm = 6): [Polygon, Polygon, Polygon, Polygon] {
+  const h = holeMm;
+  const a = armMm;
+  return [
+    polygonOf(rect(-a, -a, a + h, a)), // above the hole, reaching left
+    polygonOf(rect(h, -a, a, a + h)), // right of the hole, reaching up
+    polygonOf(rect(0, h, a + h, a)), // below the hole, reaching right
+    polygonOf(rect(-a, 0, a, a + h)), // left of the hole, reaching down
+  ];
+}
+
+/**
  * A block with a slot cut in from the bottom edge, `slotMm` wide and `depthMm` deep: the gap
  * between the legs of an "R".
  */

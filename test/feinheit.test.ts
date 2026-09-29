@@ -9,6 +9,7 @@ import { checkMinimumSize } from "@texma-stitch/engine";
 import {
   areaShape,
   gapBlocks,
+  pinwheel,
   polygonOf,
   punzeDisc,
   rect,
@@ -38,6 +39,20 @@ function szene() {
   return { shapes, result: checkMinimumSize(shapes, { widthMm: 80 }) };
 }
 
+/**
+ * Stoff von 0,5 mm zwischen Grau und Rot (Rang 1: hält ab ≈ 116 mm) und ein Strich von 1 mm
+ * (Rang 2, ≈ 102 mm): dieselbe Szene, nur ist die zweite Form rot statt grau.
+ */
+function szeneStoff() {
+  const [a, b] = gapBlocks(0.5);
+  const shapes = [
+    areaShape("a", a, GRAY),
+    areaShape("b", b, "#c8102e"),
+    areaShape("zier", polygonOf(rect(0, 20, 40, 1.0)), "#000000"),
+  ];
+  return { shapes, result: checkMinimumSize(shapes, { widthMm: 80 }) };
+}
+
 describe("mm", () => {
   it("druckt Millimeter mit Punkt", () => {
     expect(mm(1.3)).toBe("1.30");
@@ -46,9 +61,9 @@ describe("mm", () => {
 });
 
 describe("befundeJeArt", () => {
-  it("zählt Satinstriche und Lücken getrennt", () => {
-    const { result } = szene();
-    expect(befundeJeArt(result)).toEqual({ satin: 1, luecke: 1 });
+  it("zählt Satinstriche, Lücken und Stofflücken getrennt", () => {
+    expect(befundeJeArt(szene().result)).toEqual({ satin: 1, luecke: 1, stoff: 0 });
+    expect(befundeJeArt(szeneStoff().result)).toEqual({ satin: 1, luecke: 0, stoff: 1 });
   });
 });
 
@@ -98,6 +113,44 @@ describe("zusammenfassung", () => {
     expect(text).toContain(`${result.ignored.compact} ohne Mittelachse`);
     expect(text).toContain(`von ${result.gapPieces} Stücken des Schließens`);
   });
+
+  it("nennt die Stofflücke, die die zweite Zahl bestimmt, und zählt sie als eigene Art", () => {
+    const { result } = szeneStoff();
+    const lines = zusammenfassung(result);
+    expect(lines[1]).toContain(`Lücken offen ab  ${Math.ceil(result.gapsOpenFromWidthMm!)} mm`);
+    expect(lines[1]).toContain("bestimmt von Stofflücke fabric-001");
+    expect(lines[1]).toContain("Grenze 0.8 mm");
+    expect(lines.join("\n")).toContain(
+      "1 Satinstrich unter 1.3 mm, 0 Lücken unter 0.8 mm, " +
+        "1 Stofflücke (zwischen Farben) unter 0.8 mm",
+    );
+    // Die Mindestgröße kommt weiter allein aus den Satinstrichen.
+    expect(lines[0]).toContain(`bestimmt von Satinstrich ${result.decisive!.id}`);
+  });
+
+  it("sagt auch, was der Filter bei den Stofflücken herausgenommen hat", () => {
+    // Grau und Grau: die Lücke einer Farbe. Das Schließen aller Formen findet sie wieder und
+    // überlässt sie der Farbe — das steht in der Zusammenfassung, nicht still verschwunden.
+    const [a, b] = gapBlocks(0.5);
+    const result = checkMinimumSize(
+      [
+        areaShape("a", a, GRAY),
+        areaShape("b", b, GRAY),
+        areaShape("rot", polygonOf(rect(0, 30, 20, 3)), "#c8102e"),
+      ],
+      { widthMm: 80 },
+    );
+    expect(result.fabricIgnored.duplicate).toBe(1);
+    const line = zusammenfassung(result).find((l: string) => l.includes("Stofflücken:"))!;
+    expect(line).toContain(
+      `${result.fabricIgnored.slivers} Stücke ganz von Spänen (unter 0.01 mm)`,
+    );
+    expect(line).toContain(`${result.fabricIgnored.thin} unter 0.1 mm Breite`);
+    expect(line).toContain(`${result.fabricIgnored.compact} ohne Mittelachse`);
+    expect(line).toContain(`${result.fabricIgnored.wide} mit gemessener Breite ab der Grenze`);
+    expect(line).toContain("1 schon als Lücke einer Farbe gemeldet");
+    expect(line).toContain(`von ${result.fabricPieces} Stücken des Schließens aller Formen`);
+  });
 });
 
 describe("befundZeilen", () => {
@@ -118,6 +171,34 @@ describe("befundZeilen", () => {
     const { result } = szene();
     const first = result.findings[0]!;
     expect(befundZeilen(result.findings)[1]).toContain(`${Math.ceil(first.holdsFromWidthMm)} mm`);
+  });
+
+  it("nennt bei einer Stofflücke die Farben, zwischen denen sie liegt", () => {
+    const { result } = szeneStoff();
+    const lines = befundZeilen(result.findings);
+    expect(lines[1]).toMatch(
+      /^ {3}1 {2}Stofflücke {2}fabric-001 +0\.\d\d mm +0\.8 mm +\d+ mm {2}\(10\.3, 2\.5\) +zwischen #bebebe und #c8102e$/,
+    );
+    expect(lines[2]).not.toContain("zwischen");
+  });
+
+  it("nennt keine Farben, wo die Stofflücke keine nennt", () => {
+    const { result } = szeneStoff();
+    const ohneFarben = { ...result.findings[0]!, color: "" };
+    expect(befundZeilen([ohneFarben])[1]).not.toContain("zwischen");
+  });
+
+  it("nennt bei einem Loch zwischen Farben beides: die Farben und den einbeschriebenen Kreis", () => {
+    const [o, r, u, l] = pinwheel(0.5);
+    const shapes = [
+      areaShape("o", o, "#111111"),
+      areaShape("r", r, "#222222"),
+      areaShape("u", u, "#333333"),
+      areaShape("l", l, "#444444"),
+    ];
+    const lines = befundZeilen(checkMinimumSize(shapes, { widthMm: 80 }).findings);
+    expect(lines[1]).toContain("zwischen #111111 und #222222 und #333333 und #444444");
+    expect(lines[1]).toContain("Loch: Breite = einbeschriebener Kreis");
   });
 
   it("weist eine dünne Satinform als mögliche Zierlinie aus", () => {
@@ -157,6 +238,26 @@ describe("feinheitSvg", () => {
     expect(svg.match(/>S2</g)).toHaveLength(2);
   });
 
+  it("kennzeichnet eine Stofflücke mit F und sagt es im Kopf", () => {
+    const { shapes, result } = szeneStoff();
+    const svg = feinheitSvg(shapes, result, { name: "probe", heightMm: 30 });
+    // Rang 1 ist die Stofflücke, Rang 2 der Strich — je zweimal im Bild (Rand, Schrift).
+    expect(svg.match(/>F1</g)).toHaveLength(2);
+    expect(svg.match(/>S2</g)).toHaveLength(2);
+    expect(svg).not.toContain(">L1<");
+    expect(svg).toContain("F Stofflücke");
+    expect(svg).toContain(
+      `Lücken offen ab ${Math.ceil(result.gapsOpenFromWidthMm!)} mm (fabric-001`,
+    );
+    expect(svg).toContain("1 Stofflücke");
+    // Der Strich wird rot gezeichnet, die Stofflücke blau — sie liegt oft neben einem roten Strich.
+    const rot = svg.split(`<g fill="#d40000"`)[1]!.split("</g>")[0]!;
+    expect(rot.match(/<path /g)).toHaveLength(1);
+    const blau = svg.split(`<g fill="#0057d9"`)[1]!.split("</g>")[0]!;
+    expect(blau.match(/<path /g)).toHaveLength(1);
+    expect(svg).toContain("blau: Stofflücke");
+  });
+
   it("stellt die Seite und, wo Formen darüber hinausreichen, auch diese dar", () => {
     const { shapes, result } = szene();
     const svg = feinheitSvg(shapes, result, { name: "probe", heightMm: 30 });
@@ -166,6 +267,21 @@ describe("feinheitSvg", () => {
     expect(Number(viewBox[3])).toBe(80);
     expect(Number(viewBox[2])).toBeLessThan(0);
     expect(Number(viewBox[2]) + Number(viewBox[4])).toBeCloseTo(30, 2);
+  });
+
+  it("lässt die Seite weg, wo keine Form sie berührt — der viewBox-Ursprung, den der Import nicht abzieht", () => {
+    // Hofbräu: viewBox="29.9 367.2 …", die Formen liegen rund 76 mm unter der Seite. Das Bild
+    // zeigt die Formen, nicht zwei Drittel Leere.
+    const shapes = [
+      areaShape("a", polygonOf(rect(0, 100, 10, 5)), GRAY),
+      areaShape("b", polygonOf(rect(10.5, 100, 10, 5)), GRAY),
+    ];
+    const result = checkMinimumSize(shapes, { widthMm: 80 });
+    const svg = feinheitSvg(shapes, result, { name: "probe", heightMm: 30 });
+    const viewBox = /viewBox="(\S+) (\S+) (\S+) (\S+)"/.exec(svg)!;
+    expect(Number(viewBox[3])).toBeCloseTo(20.5, 2); // die Breite der Formen, nicht der 80 mm der Seite
+    expect(Number(viewBox[2])).toBeGreaterThan(30); // beginnt unter der Seite (Kopf darüber)
+    expect(Number(viewBox[2]) + Number(viewBox[4])).toBeCloseTo(105, 2);
   });
 
   it("schreibt beide Zahlen in den Kopf", () => {

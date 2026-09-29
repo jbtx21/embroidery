@@ -1,12 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Polygon } from "@texma-stitch/geometry";
-import { initGeometry, polygonArea } from "@texma-stitch/geometry";
+import { initGeometry, intersect, polygonArea } from "@texma-stitch/geometry";
 import {
   areaShape,
   gapBlocks,
   L_SHAPE,
   lineShape,
   polygonOf,
+  pinwheel,
   pt,
   punzeDisc,
   rect,
@@ -193,12 +194,15 @@ describe("checkMinimumSize — gaps within a colour", () => {
     expect(r.findings).toEqual([]);
   });
 
-  it("looks per colour: the same gap between two colours is no gap", () => {
+  it("looks per colour: the same gap between two colours is no gap of a colour", () => {
+    // Fabric between two colours is looked for over all shapes together (see below): it is
+    // not the gap of either colour, and it is reported as its own kind.
     const [a, b] = gapBlocks(0.5);
     const r = checkMinimumSize([areaShape("a", a, GRAY), areaShape("b", b, "#c8102e")], {
       widthMm: B,
     });
-    expect(r.findings).toEqual([]);
+    expect(r.findings.filter((f) => f.kind === "gap")).toEqual([]);
+    expect(r.findings.map((f) => f.kind)).toEqual(["fabric-gap"]);
   });
 
   it("does not see a gap where two shapes of one colour overlap", () => {
@@ -424,6 +428,345 @@ describe("checkMinimumSize — gaps within a colour", () => {
     const byId = new Map(r.findings.map((f) => [f.id, f]));
     expect(byId.get("gap-bebebe-001")!.at.y).toBeCloseTo(2.5, 1);
     expect(byId.get("gap-bebebe-002")!.at.y).toBeCloseTo(22.5, 1);
+  });
+});
+
+describe("checkMinimumSize — fabric gaps between colours (spec §5.2)", () => {
+  const RED = "#c8102e";
+  const GOLD = "#d1b35a";
+  /** Area (mm²) that two polygons share. */
+  const overlapMm2 = (p: Polygon, q: Polygon): number =>
+    intersect([p], [q]).reduce((sum, x) => sum + polygonArea(x), 0);
+  const gray = (id: string, poly: Polygon): ReturnType<typeof areaShape> =>
+    areaShape(id, poly, GRAY);
+  const red = (id: string, poly: Polygon): ReturnType<typeof areaShape> => areaShape(id, poly, RED);
+
+  it("finds the fabric between two blocks of different colours 0.5 mm apart", () => {
+    const [a, b] = gapBlocks(0.5);
+    const r = checkMinimumSize([gray("a", a), red("b", b)], { widthMm: B });
+    expect(r.findings).toHaveLength(1);
+    const f = r.findings[0]!;
+    expect(f.kind).toBe("fabric-gap");
+    expect(f.id).toBe("fabric-001");
+    // The colours it lies between, in the order of the document.
+    expect(f.color).toBe(`${GRAY}+${RED}`);
+    expect(f.limitMm).toBe(0.8);
+    expect(f.measure).toBe("median");
+    // Read every 0.1 mm like a gap within a colour: a strip of 0.5 mm reads 0.51.
+    expect(f.measuredMm).toBeGreaterThan(0.47);
+    expect(f.measuredMm).toBeLessThan(0.56);
+    expect(f.holdsFromWidthMm).toBeCloseTo((B * 0.8) / f.measuredMm, 9);
+    expect(f.runningAlternative).toBe(false);
+    // The piece is the strip between the blocks: 0.5 mm wide, the height of the blocks.
+    expect(polygonArea(f.polygon)).toBeGreaterThan(0.9 * 0.5 * 5);
+    expect(polygonArea(f.polygon)).toBeLessThan(0.5 * 5 + 1e-6);
+    expect(f.at.x).toBeCloseTo(10.25, 1);
+    expect(f.at.y).toBeCloseTo(2.5, 1);
+    // No colour has a gap of its own here.
+    expect(r.gapPieces).toBe(0);
+    expect(r.fabricPieces).toBe(1);
+    expect(r.fabricParts).toBe(1);
+  });
+
+  it("leaves 1.0 mm of fabric between two colours alone", () => {
+    const [a, b] = gapBlocks(1.0);
+    const r = checkMinimumSize([gray("a", a), red("b", b)], { widthMm: B });
+    expect(r.findings).toEqual([]);
+    expect(r.fabricPieces).toBe(0);
+  });
+
+  it("sees no fabric where two colours overlap or abut", () => {
+    const overlap = checkMinimumSize(
+      [gray("a", polygonOf(rect(0, 0, 10, 5))), red("b", polygonOf(rect(9, 0, 10, 5)))],
+      { widthMm: B },
+    );
+    const [a, b] = gapBlocks(0);
+    const abut = checkMinimumSize([gray("a", a), red("b", b)], { widthMm: B });
+    expect(overlap.findings).toEqual([]);
+    expect(abut.findings).toEqual([]);
+  });
+
+  it("reports a place once that is the gap of a colour and fabric at the same time", () => {
+    // The gap between two grey blocks. A red bar far away makes "all shapes" differ from grey,
+    // but the strip between the blocks is the same in both closings — one finding, not two.
+    const [a, b] = gapBlocks(0.5);
+    const r = checkMinimumSize(
+      [gray("a", a), gray("b", b), red("balken", shift(bar(3, 20), 0, 30))],
+      {
+        widthMm: B,
+      },
+    );
+    expect(r.findings.map((f) => f.kind)).toEqual(["gap"]);
+    expect(r.findings[0]!.id).toBe("gap-bebebe-001");
+    // The closing of all shapes found the strip too, and left it to the colour.
+    expect(r.fabricPieces).toBe(1);
+    expect(r.fabricParts).toBe(0);
+    expect(r.fabricIgnored.duplicate).toBe(1);
+  });
+
+  it("reports the strip between two grey blocks as the gap of grey and the channel over them as fabric", () => {
+    // A red bar 0.5 mm above two grey blocks that are 0.5 mm apart: closed together the three
+    // shapes leave a T. Its stem is the gap of grey; the bar of the T is new.
+    const [a, b] = gapBlocks(0.5);
+    const r = checkMinimumSize(
+      [gray("a", a), gray("b", b), red("balken", polygonOf(rect(0, -3.5, 20.5, 3)))],
+      { widthMm: B },
+    );
+    expect(r.findings.map((f) => f.kind).sort()).toEqual(["fabric-gap", "gap"]);
+    const gap = r.findings.find((f) => f.kind === "gap")!;
+    const fabric = r.findings.find((f) => f.kind === "fabric-gap")!;
+    expect(gap.at.y).toBeCloseTo(2.5, 1);
+    // The channel runs over both blocks, 0.5 mm high; the stem is not part of it.
+    expect(fabric.at.x).toBeCloseTo(10.25, 1);
+    expect(fabric.at.y).toBeCloseTo(-0.25, 1);
+    expect(polygonArea(fabric.polygon)).toBeGreaterThan(0.9 * 0.5 * 20.5);
+    expect(polygonArea(fabric.polygon)).toBeLessThan(0.5 * 20.5 + 0.02);
+    expect(fabric.color).toBe(`${GRAY}+${RED}`);
+    // Not a square millimetre is reported twice.
+    expect(overlapMm2(fabric.polygon, gap.polygon)).toBeLessThan(1e-3);
+    // The fabric piece was not a duplicate: only part of it belonged to the gap of grey.
+    expect(r.fabricIgnored.duplicate).toBe(0);
+  });
+
+  it("finds the channel between a rim of one colour and a body of another — a ring", () => {
+    const [rim, body] = rimAndBody(0.25);
+    const r = checkMinimumSize([gray("rand", rim), red("koerper", body)], { widthMm: B });
+    expect(r.findings).toHaveLength(1);
+    const f = r.findings[0]!;
+    expect(f.kind).toBe("fabric-gap");
+    expect(f.polygon.holes).toHaveLength(1);
+    expect(f.measuredMm).toBeGreaterThan(0.22);
+    expect(f.measuredMm).toBeLessThan(0.3);
+    expect(f.color).toBe(`${GRAY}+${RED}`);
+  });
+
+  it("finds the gap beside the shadow line of a letter — 0.53 mm between red and gold (Hofbräu, 110 mm)", () => {
+    const r = checkMinimumSize(
+      [
+        red("buchstabe", polygonOf(rect(0, 0, 30, 2.4))),
+        areaShape("schatten", polygonOf(rect(0, 2.93, 30, 0.75)), GOLD),
+      ],
+      { widthMm: 110 },
+    );
+    const fabric = r.findings.filter((f) => f.kind === "fabric-gap");
+    expect(fabric).toHaveLength(1);
+    expect(fabric[0]!.color).toBe(`${RED}+${GOLD}`);
+    expect(fabric[0]!.measuredMm).toBeGreaterThan(0.5);
+    expect(fabric[0]!.measuredMm).toBeLessThan(0.58);
+    // 110 mm × 0.8 ÷ 0.53: the fabric between them stays open from about 166 mm.
+    expect(r.gapsOpenFromWidthMm!).toBeGreaterThan(150);
+    expect(r.gapsOpenFromWidthMm!).toBeLessThan(180);
+    // The shadow line itself is a fine satin stroke of 0.75 mm — the other kind of finding.
+    expect(r.findings.some((f) => f.kind === "satin-stroke" && f.id === "schatten")).toBe(true);
+  });
+
+  it("finds the hole that four colours enclose together — measured by the circle that fits in it", () => {
+    const [top, right, bottom, left] = pinwheel(0.5);
+    const r = checkMinimumSize(
+      [
+        areaShape("o", top, "#111111"),
+        areaShape("r", right, "#222222"),
+        areaShape("u", bottom, "#333333"),
+        areaShape("l", left, "#444444"),
+      ],
+      { widthMm: B },
+    );
+    expect(r.findings).toHaveLength(1);
+    const f = r.findings[0]!;
+    expect(f.kind).toBe("fabric-gap");
+    expect(f.measure).toBe("inscribed-circle");
+    expect(f.measuredMm).toBeGreaterThan(0.48);
+    expect(f.measuredMm).toBeLessThan(0.52);
+    expect(f.color).toBe("#111111+#222222+#333333+#444444");
+    expect(f.at.x).toBeCloseTo(0.25, 2);
+    expect(f.at.y).toBeCloseTo(0.25, 2);
+  });
+
+  it("calls the same hole the counter of a colour where one colour encloses it, and says so once", () => {
+    const [top, right, bottom, left] = pinwheel(0.5);
+    const r = checkMinimumSize(
+      [gray("o", top), gray("r", right), gray("u", bottom), gray("l", left)],
+      { widthMm: B },
+    );
+    expect(r.findings.map((f) => f.kind)).toEqual(["gap"]);
+    expect(r.findings[0]!.measure).toBe("inscribed-circle");
+    expect(r.fabricIgnored.duplicate).toBe(1);
+    expect(r.fabricParts).toBe(0);
+  });
+
+  it("takes the same noise out: a seam of 0.008 mm between two colours is no fabric", () => {
+    const [a, b] = gapBlocks(0.008);
+    const r = checkMinimumSize([gray("a", a), red("b", b)], { widthMm: B });
+    expect(r.findings).toEqual([]);
+    expect(r.fabricPieces).toBe(1);
+    expect(r.fabricIgnored.slivers).toBe(1);
+    expect(r.fabricParts).toBe(0);
+  });
+
+  it("does not count a hairline of 0.02 mm between two colours either: no medial axis", () => {
+    const [a, b] = gapBlocks(0.02);
+    const r = checkMinimumSize([gray("a", a), red("b", b)], { widthMm: B });
+    expect(r.findings).toEqual([]);
+    expect(r.fabricIgnored.slivers).toBe(0);
+    expect(r.fabricIgnored.compact).toBe(1);
+  });
+
+  it("does not take the rounding of an inner corner where two colours meet for fabric", () => {
+    // The L of `lShape`, cut into its two arms: one grey, one red.
+    const r = checkMinimumSize(
+      [
+        gray("waagrecht", polygonOf(rect(0, 0, 30, 8))),
+        red("senkrecht", polygonOf(rect(0, 8, 8, 22))),
+      ],
+      { widthMm: B },
+    );
+    expect(r.findings).toEqual([]);
+    expect(r.fabricPieces).toBe(1);
+    expect(r.fabricIgnored.compact).toBe(1);
+  });
+
+  it("does not count a hole of 0.08 mm — under 0.1 mm there is nothing on the fabric", () => {
+    const [top, right, bottom, left] = pinwheel(0.08);
+    const r = checkMinimumSize(
+      [
+        areaShape("o", top, "#111111"),
+        areaShape("r", right, "#222222"),
+        areaShape("u", bottom, "#333333"),
+        areaShape("l", left, "#444444"),
+      ],
+      { widthMm: B },
+    );
+    expect(r.findings).toEqual([]);
+    expect(r.fabricIgnored.thin).toBe(1);
+  });
+
+  it("sees no fabric where a third shape lies over the gap, whatever its colour or place in the order", () => {
+    const [a, b] = gapBlocks(0.5);
+    const over = checkMinimumSize(
+      [gray("a", a), red("b", b), areaShape("kontur", coverOverGap(), BLACK)],
+      { widthMm: B },
+    );
+    const under = checkMinimumSize(
+      [areaShape("grund", coverOverGap(), BLACK), gray("a", a), red("b", b)],
+      { widthMm: B },
+    );
+    expect(over.findings).toEqual([]);
+    expect(under.findings).toEqual([]);
+  });
+
+  it("takes only areas for shapes — a stroked line neither fills the fabric nor makes a gap", () => {
+    const [a, b] = gapBlocks(0.5);
+    const line = lineShape("linie", [pt(10.25, -1), pt(10.25, 6)], BLACK);
+    const r = checkMinimumSize([gray("a", a), red("b", b), line], { widthMm: B });
+    expect(r.findings.map((f) => f.kind)).toEqual(["fabric-gap"]);
+    expect(checkMinimumSize([line], { widthMm: B }).fabricPieces).toBe(0);
+  });
+
+  it("numbers the pieces in reading order over all colours, whatever the document order", () => {
+    const [a, b] = gapBlocks(0.5);
+    const [c, d] = gapBlocks(0.5);
+    const r = checkMinimumSize(
+      [gray("c", shift(c, 0, 20)), red("d", shift(d, 0, 20)), gray("a", a), red("b", b)],
+      { widthMm: B },
+    );
+    const byId = new Map(r.findings.map((f) => [f.id, f]));
+    expect(byId.get("fabric-001")!.at.y).toBeCloseTo(2.5, 1);
+    expect(byId.get("fabric-002")!.at.y).toBeCloseTo(22.5, 1);
+  });
+
+  it("counts toward the second number, and leaves the minimum size to the satin strokes", () => {
+    // Fabric of 0.5 mm between grey and red; a gap of 0.7 mm within grey elsewhere; a stroke of 1.0 mm.
+    const [a, b] = gapBlocks(0.5, 10, 8);
+    const [c, d] = gapBlocks(0.7, 10, 8);
+    const r = checkMinimumSize(
+      [
+        gray("a", a),
+        red("b", b),
+        gray("c", shift(c, 0, 30)),
+        gray("d", shift(d, 0, 30)),
+        areaShape("zier", shift(bar(1.0), 0, 60), BLACK),
+      ],
+      { widthMm: B },
+    );
+    // By the width they hold from, the largest first: fabric 0.5 mm → 125 mm, stroke 1.0 mm →
+    // 104 mm, gap 0.7 mm → 91 mm.
+    expect(r.findings.map((f) => f.kind)).toEqual(["fabric-gap", "satin-stroke", "gap"]);
+    const [fabric, stroke] = r.findings as [
+      (typeof r.findings)[number],
+      (typeof r.findings)[number],
+    ];
+    expect(r.decisiveGap).toBe(fabric);
+    expect(r.gapsOpenFromWidthMm).toBe(fabric.holdsFromWidthMm);
+    // The strokes alone set the minimum size — although the fabric asks for more.
+    expect(r.decisive).toBe(stroke);
+    expect(r.minimumWidthMm).toBe(stroke.holdsFromWidthMm);
+    expect(r.gapsOpenFromWidthMm!).toBeGreaterThan(r.minimumWidthMm!);
+  });
+
+  it("is the gap that decides where no colour has a gap at all", () => {
+    const [a, b] = gapBlocks(0.5, 10, 8);
+    const r = checkMinimumSize([gray("a", a), red("b", b)], { widthMm: B });
+    expect(r.decisiveGap!.kind).toBe("fabric-gap");
+    expect(r.gapsOpenFromWidthMm).toBe(r.findings[0]!.holdsFromWidthMm);
+    expect(r.minimumWidthMm).toBeUndefined();
+  });
+
+  it("takes the gap limit as its own", () => {
+    const [a, b] = gapBlocks(0.5);
+    // Closed by 0.2 mm, a gap of 0.5 mm stays open.
+    expect(
+      checkMinimumSize([gray("a", a), red("b", b)], { widthMm: B, gapMinMm: 0.4 }).findings,
+    ).toEqual([]);
+    const [c, d] = gapBlocks(0.9);
+    const wide = checkMinimumSize([gray("c", c), red("d", d)], { widthMm: B, gapMinMm: 1.0 });
+    expect(wide.findings.map((f) => f.kind)).toEqual(["fabric-gap"]);
+    expect(wide.findings[0]!.limitMm).toBe(1.0);
+  });
+
+  it("accounts for every piece the closing of all shapes added: found, or said to be left out", () => {
+    const [a, b] = gapBlocks(0.5); // fabric: found
+    const [c, d] = gapBlocks(0.5); // one colour: the gap of a colour, so a duplicate
+    const [e, f] = gapBlocks(0.008); // a seam: a sliver
+    const [t, u, v, w] = pinwheel(0.08); // a hole under 0.1 mm: thin
+    const at = (poly: Polygon): Polygon => shift(poly, 60, 100);
+    const r = checkMinimumSize(
+      [
+        gray("a", a),
+        red("b", b),
+        gray("c", shift(c, 0, 30)),
+        gray("d", shift(d, 0, 30)),
+        gray("e", shift(e, 0, 60)),
+        red("f", shift(f, 0, 60)),
+        areaShape("t", at(t), "#111111"),
+        areaShape("u", at(u), "#222222"),
+        areaShape("v", at(v), "#333333"),
+        areaShape("w", at(w), "#444444"),
+        gray("waagrecht", shift(polygonOf(rect(0, 0, 30, 8)), 60, 30)), // an inner corner: compact
+        red("senkrecht", shift(polygonOf(rect(0, 8, 8, 22)), 60, 30)),
+      ],
+      { widthMm: B },
+    );
+    const fabric = r.findings.filter((x) => x.kind === "fabric-gap").length;
+    expect(fabric).toBe(1);
+    expect(r.fabricIgnored).toEqual({ slivers: 1, thin: 1, compact: 1, wide: 0, duplicate: 1 });
+    // Every part that was measured is a finding or one of the three left-out kinds; a piece the
+    // opening took whole, or that a gap of a colour already holds whole, has no part at all.
+    const { thin, compact, wide, slivers, duplicate } = r.fabricIgnored;
+    expect(r.fabricParts).toBe(fabric + thin + compact + wide);
+    expect(r.fabricPieces).toBe(r.fabricParts + slivers + duplicate);
+  });
+
+  it("accounts for nothing where there is nothing, and gives the same result for the same input", () => {
+    const none = checkMinimumSize([], { widthMm: B });
+    expect(none.fabricPieces).toBe(0);
+    expect(none.fabricParts).toBe(0);
+    expect(none.fabricIgnored).toEqual({ slivers: 0, thin: 0, compact: 0, wide: 0, duplicate: 0 });
+
+    const [a, b] = gapBlocks(0.5);
+    const shapes = [gray("a", a), red("b", b), areaShape("zier", shift(bar(1.0), 0, 20), BLACK)];
+    expect(checkMinimumSize(shapes, { widthMm: B })).toEqual(
+      checkMinimumSize(shapes, { widthMm: B }),
+    );
   });
 });
 

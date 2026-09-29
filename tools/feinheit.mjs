@@ -5,12 +5,16 @@
  * packages/engine/src/inkstitch/min-size.ts — hier steht nur, wie es aussieht.
  *
  * Zwei Zahlen (Spec §5.2, zweite Fassung): die **Mindestgröße** aus den Satinstrichen allein
- * und „**Lücken offen ab**“ aus den Lücken; beide mit dem Element, das sie bestimmt.
+ * und „**Lücken offen ab**“ aus den Lücken; beide mit dem Element, das sie bestimmt. Zu den
+ * Lücken zählen die Lücken innerhalb einer Farbe (L) und die **Stofflücken** zwischen Farben
+ * (F, Spec „Stofflücken zwischen Farben“): Stoff, der zwischen zwei Elementen offen bleibt.
  *
- * Das Vorschaubild: alle Formen hellgrau, jeder Befund rot (ein Satinstrich als Form, eine
- * Lücke als das Stück, das das Schließen ergänzt hat), die größten und die beiden bestimmenden
- * Elemente mit ihrer Nummer aus der Liste beschriftet. Nichts davon geht in die Vorlage — die
- * Prüfung meldet nur.
+ * Das Vorschaubild: alle Formen hellgrau, jeder Befund farbig (ein Satinstrich als Form in Rot,
+ * eine Lücke in Rot und eine Stofflücke in Blau als das Stück, das das Schließen ergänzt hat),
+ * die größten und die beiden bestimmenden Elemente mit ihrer Nummer aus der Liste beschriftet.
+ * Blau, weil eine Stofflücke oft neben einem roten Satinstrich liegt (der Spalt zwischen einem
+ * Buchstaben und der Schattenlinie) und in demselben Rot nicht zu erkennen wäre. Nichts davon
+ * geht in die Vorlage — die Prüfung meldet nur.
  */
 import { Buffer } from "node:buffer";
 import { createRequire } from "node:module";
@@ -20,7 +24,10 @@ import { GAP_SLIVER_MM, GAP_THIN_MM } from "@texma-stitch/engine";
 /** Millimeter mit Punkt, wie die übrigen Werkzeuge ihre Zahlen drucken. */
 export const mm = (value, digits = 2) => value.toFixed(digits);
 
-export const ART = { "satin-stroke": "Satinstrich", gap: "Lücke" };
+export const ART = { "satin-stroke": "Satinstrich", gap: "Lücke", "fabric-gap": "Stofflücke" };
+
+/** Der Buchstabe vor der Nummer im Vorschaubild: S Satinstrich, L Lücke, F Stofflücke. */
+const KENNUNG = { "satin-stroke": "S", gap: "L", "fabric-gap": "F" };
 
 /** „hält ab“ wird aufgerundet: „ab 246 mm“ ist dann wahr, „ab 245 mm“ nicht. */
 const haeltAb = (f) => `${Math.ceil(f.holdsFromWidthMm)} mm`;
@@ -32,8 +39,8 @@ const zahl = (n, eins, viele) => `${n} ${n === 1 ? eins : viele}`;
 
 /** Wie viele Befunde jeder Art es gibt. */
 export function befundeJeArt(result) {
-  const satin = result.findings.filter((f) => f.kind === "satin-stroke").length;
-  return { satin, luecke: result.findings.length - satin };
+  const je = (kind) => result.findings.filter((f) => f.kind === kind).length;
+  return { satin: je("satin-stroke"), luecke: je("gap"), stoff: je("fabric-gap") };
 }
 
 /** Die Beschriftungen der Zusammenfassung sind gleich breit: die Zahlen stehen untereinander. */
@@ -41,11 +48,12 @@ const spalte = (name) => name.padEnd(17);
 
 /**
  * Was die Prüfung ergab, als Zeilen: die Mindestgröße aus den Satinstrichen mit dem Strich,
- * der sie bestimmt; „Lücken offen ab“ mit der Lücke, die es bestimmt; die Zahl der Befunde je
- * Art; und was der Filter für Lücken herausgenommen hat (Regel 8: nichts verschwindet still).
+ * der sie bestimmt; „Lücken offen ab“ mit der Lücke oder Stofflücke, die es bestimmt; die Zahl
+ * der Befunde je Art; und was der Filter für Lücken und für Stofflücken herausgenommen hat
+ * (Regel 8: nichts verschwindet still).
  */
 export function zusammenfassung(result) {
-  const { satin, luecke } = befundeJeArt(result);
+  const { satin, luecke, stoff } = befundeJeArt(result);
   const lines = [];
 
   const d = result.decisive;
@@ -69,7 +77,7 @@ export function zusammenfassung(result) {
   if (g) {
     lines.push(
       `${spalte("Lücken offen ab")}${Math.ceil(result.gapsOpenFromWidthMm)} mm — bestimmt von ` +
-        `Lücke ${g.id} bei ${lage(g)} mm: gemessen ${mm(g.measuredMm)} mm, Grenze ${g.limitMm} mm`,
+        `${ART[g.kind]} ${g.id} bei ${lage(g)} mm: gemessen ${mm(g.measuredMm)} mm, Grenze ${g.limitMm} mm`,
     );
   } else {
     lines.push(
@@ -79,7 +87,8 @@ export function zusammenfassung(result) {
 
   lines.push(
     `${spalte("Befunde")}${zahl(satin, "Satinstrich", "Satinstriche")} unter ${result.limits.satinMinMm} mm, ` +
-      `${zahl(luecke, "Lücke", "Lücken")} unter ${result.limits.gapMinMm} mm`,
+      `${zahl(luecke, "Lücke", "Lücken")} unter ${result.limits.gapMinMm} mm, ` +
+      `${zahl(stoff, "Stofflücke", "Stofflücken")} (zwischen Farben) unter ${result.limits.gapMinMm} mm`,
   );
   const i = result.ignored;
   lines.push(
@@ -87,6 +96,13 @@ export function zusammenfassung(result) {
       `${i.thin} unter ${GAP_THIN_MM} mm Breite · ${i.compact} ohne Mittelachse ` +
       `(Ecken-Rundungen, kurze Lücken) · ${i.wide} mit gemessener Breite ab der Grenze · ` +
       `${i.covered} von einer späteren Form überdeckt (von ${result.gapPieces} Stücken des Schließens)`,
+  );
+  const f = result.fabricIgnored;
+  lines.push(
+    `${spalte("  Stofflücken:")}${f.slivers} Stücke ganz von Spänen (unter ${GAP_SLIVER_MM} mm) · ` +
+      `${f.thin} unter ${GAP_THIN_MM} mm Breite · ${f.compact} ohne Mittelachse · ` +
+      `${f.wide} mit gemessener Breite ab der Grenze · ${f.duplicate} schon als Lücke einer Farbe ` +
+      `gemeldet (von ${result.fabricPieces} Stücken des Schließens aller Formen)`,
   );
   return lines;
 }
@@ -103,11 +119,15 @@ export function befundZeilen(findings, { max = Infinity } = {}) {
       `${"Grenze".padStart(8)} ${"hält ab".padStart(9)}  ${"Lage (mm)".padEnd(14)} Hinweis`,
   ];
   shown.forEach((f, i) => {
-    const hinweis = f.runningAlternative
-      ? "alternativ Laufstich (dünne Zierlinie?)"
-      : f.measure === "inscribed-circle"
-        ? "Loch: Breite = einbeschriebener Kreis"
-        : "";
+    // Eine Stofflücke gehört keiner Farbe: sie liegt zwischen den Farben der Formen ringsum.
+    const hinweise = [
+      f.kind === "fabric-gap" && f.color !== ""
+        ? `zwischen ${f.color.split("+").join(" und ")}`
+        : "",
+      f.runningAlternative ? "alternativ Laufstich (dünne Zierlinie?)" : "",
+      f.measure === "inscribed-circle" ? "Loch: Breite = einbeschriebener Kreis" : "",
+    ].filter((h) => h !== "");
+    const hinweis = hinweise.join("; ");
     lines.push(
       (
         `${String(i + 1).padStart(4)}  ${ART[f.kind].padEnd(11)} ${f.id.padEnd(idW)} ` +
@@ -129,6 +149,7 @@ export function befundZeilen(findings, { max = Infinity } = {}) {
 const GRAU = "#e2e2e2";
 const GRAU_LINIE = "#a6a6a6";
 const ROT = "#d40000";
+const BLAU = "#0057d9";
 
 const num = (n) => (Math.round(n * 1e3) / 1e3).toString();
 const ringD = (ring) => `M${ring.map((p) => `${num(p.x)},${num(p.y)}`).join("L")}Z`;
@@ -136,12 +157,18 @@ const ringD = (ring) => `M${ring.map((p) => `${num(p.x)},${num(p.y)}`).join("L")
 const polygonD = (poly) => [poly.outer, ...poly.holes].map(ringD).join("");
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-/** Alle Formen samt Seite, damit nichts abgeschnitten wird, was außerhalb der Seite liegt. */
+/**
+ * Alle Formen samt Seite, damit nichts abgeschnitten wird, was außerhalb der Seite liegt. Die Seite
+ * zählt nur, wo sie die Formen berührt: der Import zieht den Ursprung eines viewBox nicht ab
+ * (Hofbräu: `viewBox="29.9 367.2 …"`), die Formen liegen dann weit neben der Seite, und das
+ * Bild bestünde zu zwei Dritteln aus Leere.
+ */
 function ausdehnung(shapes, widthMm, heightMm) {
-  let minX = 0;
-  let minY = 0;
-  let maxX = widthMm;
-  let maxY = heightMm;
+  const seite = { minX: 0, minY: 0, maxX: widthMm, maxY: heightMm };
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
   for (const s of shapes) {
     if (s.kind !== "area") continue;
     for (const p of s.polygon.outer) {
@@ -151,7 +178,16 @@ function ausdehnung(shapes, widthMm, heightMm) {
       maxY = Math.max(maxY, p.y);
     }
   }
-  return { minX, minY, maxX, maxY };
+  if (minX > maxX) return seite; // keine Fläche: die Seite
+  const beruehrt =
+    minX <= seite.maxX && seite.minX <= maxX && minY <= seite.maxY && seite.minY <= maxY;
+  if (!beruehrt) return { minX, minY, maxX, maxY };
+  return {
+    minX: Math.min(minX, seite.minX),
+    minY: Math.min(minY, seite.minY),
+    maxX: Math.max(maxX, seite.maxX),
+    maxY: Math.max(maxY, seite.maxY),
+  };
 }
 
 /**
@@ -171,7 +207,7 @@ export function feinheitSvg(
   const font = w / 62;
   const kopf = font * 5.8;
   const px = pxBreite / w;
-  const { satin, luecke } = befundeJeArt(result);
+  const { satin, luecke, stoff } = befundeJeArt(result);
   const rang = new Map(result.findings.map((f, i) => [f, i + 1]));
   // Die größten, und immer die beiden Elemente, die die Zahlen bestimmen.
   const oben = Math.min(beschriftet, result.findings.length);
@@ -207,13 +243,18 @@ export function feinheitSvg(
       (g
         ? `Lücken offen ab ${Math.ceil(result.gapsOpenFromWidthMm)} mm (${g.id}, ${mm(g.measuredMm)} mm)`
         : `keine zu feinen Lücken`) +
-        ` · ${zahl(satin, "Satinstrich", "Satinstriche")} · ${zahl(luecke, "Lücke", "Lücken")}`,
+        ` · ${zahl(satin, "Satinstrich", "Satinstriche")} · ${zahl(luecke, "Lücke", "Lücken")}` +
+        ` · ${zahl(stoff, "Stofflücke", "Stofflücken")}`,
       false,
     ],
-    [`grau: alle Formen · rot: zu fein (ein Satinstrich als Form, eine Lücke als Stück)`, false],
+    [
+      `grau: alle Formen · rot: zu fein (ein Satinstrich als Form, eine Lücke als Stück) · ` +
+        `blau: Stofflücke (Stück)`,
+      false,
+    ],
     [
       `beschriftet: die ${oben} mit der größten Mindestbreite und die bestimmenden · ` +
-        `L Lücke, S Satinstrich · Nummer wie in der Liste`,
+        `L Lücke, F Stofflücke, S Satinstrich · Nummer wie in der Liste`,
       false,
     ],
   ];
@@ -236,14 +277,22 @@ export function feinheitSvg(
 
   // Die Umrandung gibt einer Lücke von einem Viertelmillimeter auf dem Bild mindestens
   // anderthalb Pixel: ohne sie verschwände sie im Grau. Die Füllung ist der Befund.
-  out.push(
-    `<g fill="${ROT}" fill-rule="evenodd" stroke="${ROT}" stroke-width="${num(1.5 / px)}" stroke-linejoin="round">`,
-  );
-  for (const f of result.findings) out.push(`<path d="${polygonD(f.polygon)}"/>`);
-  out.push(`</g>`);
+  // Rot: Satinstriche und Lücken; Blau darüber: Stofflücken.
+  for (const [farbe, art] of [
+    [ROT, (f) => f.kind !== "fabric-gap"],
+    [BLAU, (f) => f.kind === "fabric-gap"],
+  ]) {
+    const befunde = result.findings.filter(art);
+    if (befunde.length === 0) continue;
+    out.push(
+      `<g fill="${farbe}" fill-rule="evenodd" stroke="${farbe}" stroke-width="${num(1.5 / px)}" stroke-linejoin="round">`,
+    );
+    for (const f of befunde) out.push(`<path d="${polygonD(f.polygon)}"/>`);
+    out.push(`</g>`);
+  }
 
   // Beschriftung: erst mit weißem Rand, dann die Schrift — auch auf dem Grau lesbar.
-  const label = (f) => `${f.kind === "gap" ? "L" : "S"}${rang.get(f)}`;
+  const label = (f) => `${KENNUNG[f.kind]}${rang.get(f)}`;
   for (const pass of [0, 1]) {
     out.push(
       `<g font-family="sans-serif" font-size="${num(font)}" font-weight="bold" text-anchor="middle" ` +
@@ -252,7 +301,11 @@ export function feinheitSvg(
           : `fill="#8a0000">`),
     );
     for (const f of marken) {
-      out.push(`<text x="${num(f.at.x)}" y="${num(f.at.y + font * 0.35)}">${label(f)}</text>`);
+      // Die Schrift einer Stofflücke ist dunkelblau wie ihr Stück (der Rand bleibt weiß).
+      const farbe = pass === 1 && f.kind === "fabric-gap" ? ` fill="#00287a"` : "";
+      out.push(
+        `<text x="${num(f.at.x)}" y="${num(f.at.y + font * 0.35)}"${farbe}>${label(f)}</text>`,
+      );
     }
     out.push(`</g>`);
   }
