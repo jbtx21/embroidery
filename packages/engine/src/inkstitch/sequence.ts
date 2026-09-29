@@ -18,7 +18,7 @@
  * and touching objects need no jump at all.
  */
 import type { Polygon } from "@texma-stitch/geometry";
-import { pointInPolygon, rings } from "@texma-stitch/geometry";
+import { intersect, pointInPolygon, polygonArea, polygonBbox, rings } from "@texma-stitch/geometry";
 import { coverPrecedence } from "../order.js";
 
 /** One object of the template, as far as its order goes. */
@@ -362,4 +362,67 @@ export function sequenceByColour(
     blocks: colourBlockCount(order.map((i) => nodes[i]!.colour)),
     lowerBound,
   };
+}
+
+/** A box in mm: top left corner and extent. */
+export type SwapBox = { x: number; y: number; w: number; h: number };
+
+/** Two overlapping objects whose order two stitch orders disagree on (`orderSwaps`). */
+export type OrderSwap = {
+  /** Index into the nodes of the one that comes first in the design — lies under the other. */
+  under: number;
+  /** Index of the one that comes after it in the design. */
+  over: number;
+  /** What the two shapes overlap by, mm². */
+  overlapMm2: number;
+  /** The box round the whole overlap. */
+  at: SwapBox;
+  /** How many separate pieces the overlap falls into (a rim along an outline is many). */
+  pieces: number;
+  /** The box round the largest piece — where to look first when `at` is wide. */
+  largest: SwapBox;
+};
+
+const swapBoxOf = (polygons: Polygon[]): SwapBox => {
+  const boxes = polygons.map((p) => polygonBbox(p));
+  const minX = Math.min(...boxes.map((b) => b.minX));
+  const minY = Math.min(...boxes.map((b) => b.minY));
+  const maxX = Math.max(...boxes.map((b) => b.maxX));
+  const maxY = Math.max(...boxes.map((b) => b.maxY));
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+};
+
+/**
+ * The overlaps whose order `to` turns round against `from` — two stitch orders of
+ * the same nodes, `from` the one that lets every overlap bind (spec §10.1) and `to`
+ * one that lets the small ones go (`SequenceOptions.minOverlapMm2`). Where such a
+ * pair lies, the thread that was on top is underneath now: the largest overlap
+ * first, so that whoever inspects them starts with the one that shows.
+ */
+export function orderSwaps(nodes: SequenceNode[], from: number[], to: number[]): OrderSwap[] {
+  const n = nodes.length;
+  const posFrom = new Array<number>(n).fill(0);
+  const posTo = new Array<number>(n).fill(0);
+  from.forEach((i, k) => (posFrom[i] = k));
+  to.forEach((i, k) => (posTo[i] = k));
+
+  const after = coverPrecedence(nodes.map((x) => x.cover));
+  const swaps: OrderSwap[] = [];
+  for (let i = 0; i < n; i++) {
+    for (const j of after[i]!) {
+      if (posFrom[i]! < posFrom[j]! === posTo[i]! < posTo[j]!) continue;
+      const shared = intersect([nodes[i]!.cover!], [nodes[j]!.cover!]);
+      if (shared.length === 0) continue;
+      const largest = shared.reduce((best, p) => (polygonArea(p) > polygonArea(best) ? p : best));
+      swaps.push({
+        under: i,
+        over: j,
+        overlapMm2: shared.reduce((sum, p) => sum + polygonArea(p), 0),
+        at: swapBoxOf(shared),
+        pieces: shared.length,
+        largest: swapBoxOf([largest]),
+      });
+    }
+  }
+  return swaps.sort((a, b) => b.overlapMm2 - a.overlapMm2 || a.under - b.under || a.over - b.over);
 }

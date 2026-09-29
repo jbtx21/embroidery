@@ -45,7 +45,12 @@ Skript sie selbst, wenn `apt-get` und Root-Rechte vorhanden sind — sonst nennt
 ```bash
 pnpm inkstitch <svg> [preset]        # Vorlage (Satin/Laufstich/Tatami) -> auto_satin -> DST + PNG + Kennzahlen nach ./out/
 pnpm inkstitch <svg> [preset] --tatami   # reiner Tatami-Lauf: die Quelle wie gezeichnet, nur Reihenabstand gesetzt
+pnpm inkstitch <svg> [preset] --ueberlappung 20   # Variante: Überlappungen unter 20 mm² binden die Farbfolge nicht (Standard: jede, §10.1)
 ```
+
+`--ueberlappung` ist eine Variante für die Sichtprüfung, kein Standard: die Ausgabe listet die
+Überlappungen, deren Reihenfolge sich gegenüber §10.1 umdreht (Kennungen, Farben, Fläche, Lage in
+mm), und `out/<name>.tausch.json` hat alle.
 
 Für einzelne Ink/Stitch-Erweiterungen direkt (z. B. zum Verketten mehrerer Schritte):
 

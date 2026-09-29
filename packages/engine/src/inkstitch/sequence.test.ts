@@ -1,12 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Polygon } from "@texma-stitch/geometry";
 import { initGeometry } from "@texma-stitch/geometry";
-import { circle, polygonOf, rect } from "../../test/fixtures/shapes.js";
+import { circle, polygonOf, pt, rect } from "../../test/fixtures/shapes.js";
 import {
   blockLowerBound,
   blockPlan,
   colourBlockCount,
   colourKey,
+  orderSwaps,
   sequenceByColour,
 } from "./sequence.js";
 import type { SequenceNode } from "./sequence.js";
@@ -169,5 +170,95 @@ describe("sequenceByColour (spec §10.1)", () => {
   it("gives an empty order for nothing, and leaves a single object as it is", () => {
     expect(sequenceByColour([])).toEqual({ order: [], blocks: 0, lowerBound: 0 });
     expect(sequenceByColour([node("a", at(0))])).toEqual({ order: [0], blocks: 1, lowerBound: 1 });
+  });
+});
+
+describe("orderSwaps (which overlaps a smaller threshold turns round)", () => {
+  // a(0..10) and b(9..19) overlap by 1 mm², b and a(18..28) by 1 mm²: a, b, a costs three blocks.
+  const nodes = [node("a", at(0)), node("b", at(9, 9)), node("a", at(18, 18))];
+  let standard: number[] = [];
+  let relaxed: number[] = [];
+  beforeAll(() => {
+    standard = sequenceByColour(nodes).order;
+    relaxed = sequenceByColour(nodes, { minOverlapMm2: 2 }).order;
+  });
+
+  it("lists the overlap whose order the threshold turns round, and where it lies", () => {
+    expect(standard).toEqual([0, 1, 2]);
+    expect(relaxed).toEqual([0, 2, 1]);
+    const swaps = orderSwaps(nodes, standard, relaxed);
+    expect(swaps).toHaveLength(1);
+    // b lay under the second a in the design and in §10.1's order; now the second a is stitched first.
+    expect(swaps[0]).toMatchObject({ under: 1, over: 2 });
+    expect(swaps[0]!.overlapMm2).toBeCloseTo(1, 6);
+    expect(swaps[0]!.at).toEqual({ x: 18, y: 18, w: 1, h: 1 });
+    // One piece: the box round the largest is the box round the whole.
+    expect(swaps[0]!.pieces).toBe(1);
+    expect(swaps[0]!.largest).toEqual(swaps[0]!.at);
+  });
+
+  it("names how many pieces the overlap falls into, and where the largest one lies", () => {
+    // b is a bar; the second a is a U whose two prongs (10 x 4 and 5 x 4 mm) reach into it.
+    const bar = polygonOf(rect(0, 6, 30, 10));
+    const u = polygonOf([
+      pt(0, 0),
+      pt(25, 0),
+      pt(25, 10),
+      pt(20, 10),
+      pt(20, 4),
+      pt(10, 4),
+      pt(10, 10),
+      pt(0, 10),
+    ]);
+    const forked = [node("a", at(100)), node("b", bar), node("a", u)];
+    const std = sequenceByColour(forked).order;
+    const rel = sequenceByColour(forked, { minOverlapMm2: 100 }).order;
+    // The bar lies under the U in §10.1's order; 60 mm² under the threshold, the U comes first.
+    expect(std.indexOf(1)).toBeLessThan(std.indexOf(2));
+    expect(rel.indexOf(2)).toBeLessThan(rel.indexOf(1));
+    const swaps = orderSwaps(forked, std, rel);
+    expect(swaps).toHaveLength(1);
+    expect(swaps[0]!.overlapMm2).toBeCloseTo(60, 6);
+    expect(swaps[0]!.pieces).toBe(2);
+    // The box round both prongs, and the box round the wider one.
+    expect(swaps[0]!.at).toEqual({ x: 0, y: 6, w: 25, h: 4 });
+    expect(swaps[0]!.largest).toEqual({ x: 0, y: 6, w: 10, h: 4 });
+  });
+
+  it("lists nothing where the two orders agree", () => {
+    expect(orderSwaps(nodes, standard, standard)).toEqual([]);
+    expect(orderSwaps(nodes, relaxed, relaxed)).toEqual([]);
+  });
+
+  it("does not list a pair that never overlapped", () => {
+    // 0 and 2 do not touch: they change places freely and are no swap.
+    const far = [node("a", at(0)), node("b", at(50)), node("a", at(100))];
+    expect(orderSwaps(far, [0, 1, 2], [0, 2, 1])).toEqual([]);
+  });
+
+  it("puts the largest overlap first", () => {
+    // Two pairs, 1 mm² and 4 mm², both turned round.
+    const two = [
+      node("a", at(0)),
+      node("b", at(9, 9)),
+      node("a", at(18, 18)),
+      node("b", at(100)),
+      node("a", at(108, 8)),
+    ];
+    const std = sequenceByColour(two).order;
+    const rel = sequenceByColour(two, { minOverlapMm2: 5 }).order;
+    const swaps = orderSwaps(two, std, rel);
+    expect(swaps.length).toBeGreaterThanOrEqual(2);
+    const areas = swaps.map((x) => x.overlapMm2);
+    expect(areas).toEqual([...areas].sort((x, y) => y - x));
+  });
+
+  it("skips nodes that bind nothing", () => {
+    const withLine = [...nodes, node("c", undefined)];
+    expect(orderSwaps(withLine, [0, 1, 2, 3], [0, 2, 1, 3])).toHaveLength(1);
+  });
+
+  it("gives nothing for nothing", () => {
+    expect(orderSwaps([], [], [])).toEqual([]);
   });
 });

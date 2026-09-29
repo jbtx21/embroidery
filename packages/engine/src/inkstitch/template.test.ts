@@ -763,3 +763,57 @@ describe("pull and push compensation of the tatami areas (spec §8.1.1)", () => 
     }
   });
 });
+
+describe("minOverlapMm2 option: what a threshold on the overlaps changes in the order (spec §10.1)", () => {
+  // Three areas in a row, blue, red, blue, each overlapping the next by 1.5 x 12 = 18 mm².
+  const blue = "#1f3a93";
+  const red = "#c8102e";
+  const a = area("a", polygonOf(rect(0, 0, 12, 12)), blue);
+  const b = area("b", polygonOf(rect(10.5, 0, 12, 12)), red);
+  const c = area("c", polygonOf(rect(21, 0, 12, 12)), blue);
+
+  it("keeps every overlap binding unless asked — and lists no swaps", () => {
+    const t = buildInkstitchTemplate([a, b, c], pique, { ...PAGE, order: "colour" });
+    expect(t.objects.map((o) => o.id)).toEqual(["a", "b", "c"]);
+    expect(t.colourBlocks).toBe(3);
+    expect(t.orderSwaps).toBeUndefined();
+    expect(t.colourBlocksStandard).toBeUndefined();
+  });
+
+  it("lets an overlap under the threshold go, and lists what turned round", () => {
+    const t = buildInkstitchTemplate([a, b, c], pique, {
+      ...PAGE,
+      order: "colour",
+      minOverlapMm2: 20,
+    });
+    expect(t.objects.map((o) => o.id)).toEqual(["a", "c", "b"]);
+    expect(t.colourBlocks).toBe(2);
+    expect(t.colourBlocksStandard).toBe(3);
+    // b lay under c (18 mm² of overlap); now c is stitched first and b lies over it.
+    expect(t.orderSwaps).toHaveLength(1);
+    expect(t.orderSwaps![0]).toMatchObject({
+      under: { id: "b", colour: red },
+      over: { id: "c", colour: blue },
+    });
+    expect(t.orderSwaps![0]!.overlapMm2).toBeCloseTo(18, 6);
+    expect(t.orderSwaps![0]!.at).toEqual({ x: 21, y: 0, w: 1.5, h: 12 });
+    expect(t.orderSwaps![0]).toMatchObject({ pieces: 1, largest: { x: 21, y: 0, w: 1.5, h: 12 } });
+  });
+
+  it("is the standard again for a threshold that no overlap is under", () => {
+    const t = buildInkstitchTemplate([a, b, c], pique, {
+      ...PAGE,
+      order: "colour",
+      minOverlapMm2: 1,
+    });
+    expect(t.objects.map((o) => o.id)).toEqual(["a", "b", "c"]);
+    expect(t.orderSwaps).toEqual([]);
+    expect(t.colourBlocksStandard).toBe(3);
+  });
+
+  it("does nothing without the colour order — it is a threshold for that order", () => {
+    const t = buildInkstitchTemplate([a, b, c], pique, { ...PAGE, minOverlapMm2: 20 });
+    expect(t.objects.map((o) => o.id)).toEqual(["a", "b", "c"]);
+    expect(t.orderSwaps).toBeUndefined();
+  });
+});

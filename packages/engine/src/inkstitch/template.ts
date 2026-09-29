@@ -52,7 +52,8 @@ import { classifyShape, SATIN_NARROW_WARN_MM } from "./classify.js";
 import type { SatinColumnPlan } from "./columns.js";
 import { satinColumns, STAYS_TATAMI } from "./columns.js";
 import { cutOutSatin, knockdownAreas, TEMPLATE_TOUCH_UNDERLAP_MM } from "./knockdown.js";
-import { colourBlockCount, sequenceByColour } from "./sequence.js";
+import { colourBlockCount, orderSwaps, sequenceByColour } from "./sequence.js";
+import type { SwapBox } from "./sequence.js";
 import { compensateArea, fillAngles, gridUnderlay, tatamiAttributes } from "./tatami.js";
 import { strokeGraph } from "./strokes.js";
 
@@ -140,6 +141,25 @@ export type UnderlayReport = {
   without: { id: string; pieces: number }[];
 };
 
+/**
+ * An overlap whose order the `minOverlapMm2` threshold turns round against the
+ * standard order of §10.1: `under` lay under `over` in the design (and in the
+ * standard order); with the threshold `over` is stitched first, so `under`
+ * now lies on top of it where they overlap.
+ */
+export type TemplateOrderSwap = {
+  under: { id: string; colour: string };
+  over: { id: string; colour: string };
+  /** What the two shapes overlap by, mm². */
+  overlapMm2: number;
+  /** The box round the whole overlap, mm, in the coordinates of the design. */
+  at: SwapBox;
+  /** How many separate pieces the overlap falls into (a rim along an outline is many). */
+  pieces: number;
+  /** The box round the largest piece — where to look first when `at` is wide. */
+  largest: SwapBox;
+};
+
 /** What the pull and push compensation did to the tatami areas (spec §8.1.1). */
 export type CompensationReport = {
   /** Areas the push would have cut apart, compensated by the pull alone, with the parts it would have made. */
@@ -159,6 +179,10 @@ export type TemplateResult = {
   colourBlocks: number;
   /** The fewest blocks the overlaps allow — present when `TemplateOptions.order` is `"colour"`. */
   colourBlocksLowerBound?: number;
+  /** Blocks the standard order of §10.1 makes — present when `minOverlapMm2` is set with the colour order. */
+  colourBlocksStandard?: number;
+  /** Overlaps `minOverlapMm2` turns round against the standard order, largest first — same condition. */
+  orderSwaps?: TemplateOrderSwap[];
   /** Present when `TemplateOptions.knockdown` was on. */
   knockdown?: KnockdownReport;
   compensation: CompensationReport;
@@ -174,6 +198,11 @@ export type TemplateOptions = {
    * colours as far as the overlaps allow (spec §10.1). Default: `"document"`.
    */
   order?: "document" | "colour";
+  /**
+   * With `order: "colour"`: an overlap under this area (mm²) does not bind the order. Default: any
+   * overlap does (spec §10.1). The result lists the overlaps that turn round because of it.
+   */
+  minOverlapMm2?: number;
   /** Cut what later tatami areas cover out of the earlier ones (spec §4.1). Default: off. */
   knockdown?: boolean;
 };
@@ -439,12 +468,38 @@ const tatamiArea = (planned: Planned[]): number =>
 /** Stage within a colour (spec §10.1): areas, then satin, then lines. */
 const stageOf = (p: Planned): number => (p.kind === "tatami" ? 0 : p.kind === "satin" ? 1 : 3);
 
-/** The objects grouped by colour where the overlaps allow it (`sequence.ts`). */
-function orderByColour(planned: Planned[]): { planned: Planned[]; lowerBound: number } {
-  const result = sequenceByColour(
-    planned.map((p) => ({ colour: p.color, rank: stageOf(p), cover: p.cover })),
-  );
-  return { planned: result.order.map((i) => planned[i]!), lowerBound: result.lowerBound };
+/**
+ * The objects grouped by colour where the overlaps allow it (`sequence.ts`). With a
+ * threshold the small overlaps do not bind, and the overlaps whose order that turns
+ * round are listed against the standard order.
+ */
+function orderByColour(
+  planned: Planned[],
+  minOverlapMm2: number | undefined,
+): {
+  planned: Planned[];
+  lowerBound: number;
+  standard?: { blocks: number; swaps: TemplateOrderSwap[] };
+} {
+  const nodes = planned.map((p) => ({ colour: p.color, rank: stageOf(p), cover: p.cover }));
+  const result = sequenceByColour(nodes, minOverlapMm2 === undefined ? {} : { minOverlapMm2 });
+  const ordered = result.order.map((i) => planned[i]!);
+  if (minOverlapMm2 === undefined) return { planned: ordered, lowerBound: result.lowerBound };
+
+  const standard = sequenceByColour(nodes);
+  const swaps = orderSwaps(nodes, standard.order, result.order).map((w) => ({
+    under: { id: planned[w.under]!.id, colour: planned[w.under]!.color },
+    over: { id: planned[w.over]!.id, colour: planned[w.over]!.color },
+    overlapMm2: w.overlapMm2,
+    at: w.at,
+    pieces: w.pieces,
+    largest: w.largest,
+  }));
+  return {
+    planned: ordered,
+    lowerBound: result.lowerBound,
+    standard: { blocks: standard.blocks, swaps },
+  };
 }
 
 /** Gives every tatami its stitch angle, in the stitch order (`tatami.ts`). */
@@ -706,10 +761,12 @@ export function buildInkstitchTemplate(
   const warnings: Warning[] = [];
   let planned = planShapes(shapes, preset, warnings);
   let lowerBound: number | undefined;
+  let standard: { blocks: number; swaps: TemplateOrderSwap[] } | undefined;
   if (opts.order === "colour") {
-    const ordered = orderByColour(planned);
+    const ordered = orderByColour(planned, opts.minOverlapMm2);
     planned = ordered.planned;
     lowerBound = ordered.lowerBound;
+    standard = ordered.standard;
   }
   let knockdown: KnockdownReport | undefined;
   if (opts.knockdown) {
@@ -736,6 +793,9 @@ export function buildInkstitchTemplate(
     warnings,
     colourBlocks: colourBlockCount(objects.map((o) => o.color)),
     ...(lowerBound === undefined ? {} : { colourBlocksLowerBound: lowerBound }),
+    ...(standard === undefined
+      ? {}
+      : { colourBlocksStandard: standard.blocks, orderSwaps: standard.swaps }),
     ...(knockdown ? { knockdown } : {}),
     compensation: compensated.report,
     underlay: underlayReport,

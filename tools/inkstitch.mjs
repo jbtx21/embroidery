@@ -2,7 +2,12 @@
  * Ink/Stitch as the stitch generator, TEXMA Stitch as template prep + result
  * check (docs/adr/0001-inkstitch-als-stich-engine.md, decision 28.09.2026).
  *
- *   pnpm inkstitch <svg> [preset] [--tatami]
+ *   pnpm inkstitch <svg> [preset] [--tatami] [--ueberlappung <mm2>]
+ *
+ * --ueberlappung <mm2> lets overlaps under that area go in the colour order — the
+ * standard is spec §10.1: any overlap binds. It is a variant for a look at the
+ * result, not a setting: the output lists the overlaps whose order it turns round
+ * (ids, colours, area, place), and out/<name>.tausch.json has all of them.
  *
  * Satin (default) — lettering and narrow shapes set the way a puncher sets
  * them:
@@ -162,17 +167,39 @@ const pruefeFeinheit = (imported) =>
     ? checkMinimumSize(imported.shapes, { widthMm: imported.widthMm })
     : undefined;
 
+const VALUE_FLAGS = ["--ueberlappung"];
 const args = process.argv.slice(2);
 const tatamiOnly = args.includes("--tatami");
-const [svgArg, presetArg = "pique"] = args.filter((a) => !a.startsWith("--"));
+const [svgArg, presetArg = "pique"] = args.filter(
+  (a, i) => !a.startsWith("--") && !VALUE_FLAGS.includes(args[i - 1]),
+);
+
+/** The number after a switch, or undefined without the switch; a wrong one ends the run. */
+function numberFlag(flag, { min }) {
+  const at = args.indexOf(flag);
+  if (at < 0) return undefined;
+  const value = Number(args[at + 1]);
+  if (args[at + 1] === undefined || !Number.isFinite(value) || value < min) {
+    console.error(
+      `${flag} braucht eine Zahl${min > 0 ? " über 0" : " ab 0"}, nicht "${args[at + 1] ?? ""}"`,
+    );
+    process.exit(1);
+  }
+  return value;
+}
+const minOverlapMm2 = numberFlag("--ueberlappung", { min: 0 });
 
 if (!svgArg) {
-  console.error("Aufruf: pnpm inkstitch <svg> [preset] [--tatami]");
+  console.error("Aufruf: pnpm inkstitch <svg> [preset] [--tatami] [--ueberlappung <mm2>]");
   console.error(`Presets: ${Object.keys(PRESETS).join(", ")}`);
   process.exit(1);
 }
 if (!(presetArg in PRESETS)) {
   console.error(`Unbekanntes Preset "${presetArg}". Bekannt: ${Object.keys(PRESETS).join(", ")}`);
+  process.exit(1);
+}
+if (tatamiOnly && minOverlapMm2 !== undefined) {
+  console.error("--ueberlappung gilt für die Farbfolge der Vorlage und nicht mit --tatami");
   process.exit(1);
 }
 if (!isInkstitchReady()) {
@@ -196,6 +223,7 @@ let fallbacks = [];
 let narrowLines = [];
 let smoothed = [];
 let knockdown;
+let orderVariant;
 let underlay;
 let compensation;
 let feinheit;
@@ -219,6 +247,7 @@ if (tatamiOnly) {
     heightMm: imported.heightMm,
     order: "colour",
     knockdown: true,
+    ...(minOverlapMm2 === undefined ? {} : { minOverlapMm2 }),
   });
   templateMs = performance.now() - started;
   writeFileSync(templatePath, template.svg);
@@ -243,6 +272,23 @@ if (tatamiOnly) {
   narrowLines = template.objects.filter((o) => o.kind === "running" && o.reason);
   smoothed = template.objects.filter((o) => o.kind === "satin" && o.smoothedMm > 0);
   knockdown = template.knockdown;
+  if (template.orderSwaps !== undefined) {
+    orderVariant = {
+      minOverlapMm2,
+      colourBlocksStandard: template.colourBlocksStandard,
+      colourBlocks: template.colourBlocks,
+      swaps: template.orderSwaps,
+    };
+    writeFileSync(
+      resolve(outDir, `${name}.tausch.json`),
+      `${JSON.stringify(orderVariant, null, 1)}\n`,
+    );
+    summary.push(
+      `Überlappungen unter ${minOverlapMm2} mm² binden die Reihenfolge nicht (--ueberlappung): ` +
+        `${template.colourBlocksStandard} → ${template.colourBlocks} Farbblöcke, ` +
+        `${template.orderSwaps.length} Überlappungen drehen um`,
+    );
+  }
   underlay = template.underlay;
   compensation = template.compensation;
   if (underlay.grid + underlay.without.length > 0) {
@@ -390,6 +436,28 @@ if (knockdown) {
     if (knockdown.satin.length > 12) {
       console.log(`    … und ${knockdown.satin.length - 12} weitere (nicht aufgelistet)`);
     }
+  }
+}
+if (orderVariant) {
+  const { swaps } = orderVariant;
+  console.log(
+    `\nReihenfolge (--ueberlappung ${minOverlapMm2} mm²; der Standard ist §10.1: jede ` +
+      `Überlappung bindet): ${swaps.length} Überlappungen drehen um`,
+  );
+  const mm = (v) => v.toFixed(1);
+  for (const w of swaps.slice(0, 15)) {
+    console.log(
+      `  ${w.under.id} (${w.under.colour}) und ${w.over.id} (${w.over.colour}): ` +
+        `${w.overlapMm2.toFixed(1)} mm² bei x ${mm(w.at.x)}, y ${mm(w.at.y)} ` +
+        `(${mm(w.at.w)} × ${mm(w.at.h)} mm)` +
+        (w.pieces > 1
+          ? `, ${w.pieces} Stücke, das größte bei x ${mm(w.largest.x)}, y ${mm(w.largest.y)}`
+          : "") +
+        ` — jetzt liegt ${w.under.id} oben`,
+    );
+  }
+  if (swaps.length > 15) {
+    console.log(`  … und ${swaps.length - 15} weitere (alle in out/${name}.tausch.json)`);
   }
 }
 if (underlay && underlay.without.length > 0) {
