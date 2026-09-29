@@ -1,6 +1,12 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Polygon, Polyline } from "@texma-stitch/geometry";
-import { initGeometry, offsetDirectional, polygonArea } from "@texma-stitch/geometry";
+import {
+  initGeometry,
+  offset,
+  offsetDirectional,
+  pointInPolygon,
+  polygonArea,
+} from "@texma-stitch/geometry";
 import { GLYPHS } from "../../test/fixtures/glyphs.js";
 import {
   annulus,
@@ -308,24 +314,115 @@ describe("knockdown option (spec §4.1)", () => {
     expect(t.knockdown!.split).toEqual([{ id: "bar", parts: 2 }]);
   });
 
-  it("never cuts a satin column and never cuts out of one (rule 1)", () => {
+  it("never cuts a satin column out of a tatami over it (§4.1 rule 1); the other way round see §4.2", () => {
     const letter = area("letter", moved(GLYPHS.T!, 5), "#c8102e");
     const ground = area("ground", polygonOf(rect(0, 0, 40, 30)), "#1f3a93");
-    // A tatami under the letter is not touched by it…
-    const a = buildInkstitchTemplate([ground, letter], pique, { ...PAGE, knockdown: true });
-    expect(a.objects.map((o) => [o.shapeId, o.kind])).toEqual([
-      ["ground", "tatami"],
-      ["letter", "satin"],
-    ]);
-    expect(/<path id="ground" d="([^"]*)"/.exec(a.svg)![1]!.match(/M /g)).toHaveLength(1);
-    // …and a tatami over the letter does not cut it.
+    // A tatami over the letter does not cut it.
     const b = buildInkstitchTemplate([letter, ground], pique, { ...PAGE, knockdown: true });
     expect(b.objects.map((o) => [o.shapeId, o.kind])).toEqual([
       ["letter", "satin"],
       ["ground", "tatami"],
     ]);
     expect(b.satinRuns).toHaveLength(1);
-    expect(b.knockdown).toMatchObject({ changed: 0 });
+    expect(b.knockdown).toMatchObject({ changed: 0, satin: [] });
+  });
+});
+
+describe("satin spares the tatami beneath it (spec §4.2 rule 1)", () => {
+  const ground = area("ground", polygonOf(rect(0, 0, 40, 30)), "#1f3a93");
+  const letter = area("letter", moved(GLYPHS.T!, 5), "#c8102e");
+  const flat = { ...pique, pullCompMm: 0, pushCompMm: 0 };
+  const knock = { ...PAGE, knockdown: true };
+  const drawn = (svg: string, id: string): Polygon => {
+    const d = new RegExp(`<path id="${id}" d="([^"]*)"`).exec(svg)![1]!;
+    const rings: Polyline[] = d
+      .split("Z")
+      .map((r) => r.trim())
+      .filter(Boolean)
+      .map((r) =>
+        r
+          .replace(/^M /, "")
+          .split(" L ")
+          .map((q) => {
+            const [x, y] = q.split(",").map(Number);
+            return pt(x!, y!);
+          }),
+      );
+    return { outer: rings[0]!, holes: rings.slice(1) };
+  };
+
+  it("cuts the place of a later letter out of the tatami beneath it, and says what it cut", () => {
+    const t = buildInkstitchTemplate([ground, letter], flat, knock);
+    expect(t.objects.map((o) => [o.shapeId, o.kind])).toEqual([
+      ["ground", "tatami"],
+      ["letter", "satin"],
+    ]);
+    const g = drawn(t.svg, "ground");
+    expect(g.holes).toHaveLength(1);
+    // The letter shrunk by the preset's underlap (0.2 mm): that is what is taken out.
+    const cut = polygonArea(offset(letter.polygon, -pique.underlapMm)[0]!);
+    expect(t.knockdown!.satin).toHaveLength(1);
+    expect(t.knockdown!.satin[0]!.id).toBe("ground");
+    expect(t.knockdown!.satin[0]!.mm2).toBeCloseTo(cut, 1);
+    expect(t.knockdown).toMatchObject({ changed: 1, covered: [], split: [] });
+    expect(t.knockdown!.areaMm2.after).toBeCloseTo(t.knockdown!.areaMm2.before - cut, 1);
+    // 0.1 mm inside the stem's edge the tatami still runs, further in it is spared.
+    expect(pointInPolygon(g, pt(5 + 3.531 + 0.1, 6))).toBe(true);
+    expect(pointInPolygon(g, pt(5 + 3.531 + 1.35, 6))).toBe(false);
+  });
+
+  it("leaves the tatami whole where the satin covers less than 20 mm² of it", () => {
+    const bar = area("bar", polygonOf(rect(10, 5, 2, 8)), "#c8102e"); // 16 mm²
+    const t = buildInkstitchTemplate([ground, bar], flat, knock);
+    expect(t.objects.map((o) => o.kind)).toEqual(["tatami", "satin"]);
+    expect(drawn(t.svg, "ground").holes).toHaveLength(0);
+    expect(t.knockdown!.satin).toEqual([]);
+  });
+
+  it("measures the 20 mm² on all satin shapes together", () => {
+    const bar1 = area("bar1", polygonOf(rect(10, 5, 2, 8)), "#c8102e");
+    const bar2 = area("bar2", polygonOf(rect(20, 5, 2, 8)), "#c8102e");
+    const t = buildInkstitchTemplate([ground, bar1, bar2], flat, knock);
+    expect(drawn(t.svg, "ground").holes).toHaveLength(2);
+    expect(t.knockdown!.satin).toHaveLength(1);
+    expect(t.knockdown!.satin[0]!.mm2).toBeCloseTo(2 * 1.6 * 7.6, 1);
+  });
+
+  it("does not cut for a running stitch — a line spares nothing", () => {
+    const hair = area("hair", moved(HAIRLINE_H, 5), "#c8102e");
+    const t = buildInkstitchTemplate([ground, hair], flat, knock);
+    expect(t.objects.map((o) => o.kind)).toEqual(["tatami", "running"]);
+    expect(drawn(t.svg, "ground").holes).toHaveLength(0);
+    expect(t.knockdown!.satin).toEqual([]);
+  });
+
+  it("goes by the stitch order: a satin stitched before the tatami cuts nothing out of it", () => {
+    const t = buildInkstitchTemplate([letter, ground], flat, knock);
+    expect(t.objects.map((o) => o.kind)).toEqual(["satin", "tatami"]);
+    expect(drawn(t.svg, "ground").holes).toHaveLength(0);
+  });
+
+  it("stitches an area that lettering covers completely no more, and says so", () => {
+    // A satin bar 4.9 mm wide over a 4.4 x 5 mm tatami (no stroke in it): 22 mm², all under the
+    // bar shrunk by 0.2 mm — nothing is left of it.
+    const piece = area("piece", polygonOf(rect(20.25, 5, 4.4, 5)), "#1f3a93");
+    const wide = area("wide", polygonOf(rect(20, 0, 4.9, 30)), "#c8102e");
+    const t = buildInkstitchTemplate([piece, wide], flat, knock);
+    expect(t.objects.map((o) => [o.shapeId, o.kind])).toEqual([["wide", "satin"]]);
+    expect(t.knockdown!.covered).toEqual(["piece"]);
+    expect(t.warnings).toContainEqual(
+      expect.objectContaining({ code: "FILL_COVERED", severity: "info", objectId: "piece" }),
+    );
+  });
+
+  it("hands every part when the satin cuts the area in two", () => {
+    const post = area("post", polygonOf(rect(18, -5, 4, 40)), "#c8102e");
+    const t = buildInkstitchTemplate([ground, post], flat, knock);
+    expect(t.objects.map((o) => o.id)).toEqual(["ground_p0", "ground_p1", "post"]);
+    expect(t.knockdown!.split).toEqual([{ id: "ground", parts: 2 }]);
+    expect(t.warnings).toContainEqual(
+      expect.objectContaining({ code: "SHAPE_SPLIT", objectId: "ground" }),
+    );
   });
 });
 

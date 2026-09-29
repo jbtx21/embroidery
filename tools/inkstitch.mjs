@@ -371,7 +371,7 @@ if (fallbacks.length > 0) {
 }
 if (knockdown) {
   console.log(
-    `\nKnockdown (Spec §4.1): ${knockdown.changed} Tatami-Flächen verändert, ` +
+    `\nKnockdown (Spec §4.1, §4.2): ${knockdown.changed} Tatami-Flächen verändert, ` +
       `${knockdown.covered.length} ganz verdeckt, ${knockdown.split.length} in Teile zerfallen`,
   );
   console.log(
@@ -379,6 +379,18 @@ if (knockdown) {
   );
   for (const id of knockdown.covered) console.log(`  FILL_COVERED  ${id} (nicht gestickt)`);
   for (const f of knockdown.split) console.log(`  SHAPE_SPLIT   ${f.id}: ${f.parts} Teile`);
+  if (knockdown.satin.length > 0) {
+    const mm2 = knockdown.satin.reduce((sum, c) => sum + c.mm2, 0);
+    console.log(
+      `  Satin spart aus (Spec §4.2): ${knockdown.satin.length} Tatami-Flächen, ${mm2.toFixed(0)} mm²`,
+    );
+    for (const c of knockdown.satin.slice(0, 12)) {
+      console.log(`    ${c.id}: ${c.mm2.toFixed(1)} mm² ausgespart`);
+    }
+    if (knockdown.satin.length > 12) {
+      console.log(`    … und ${knockdown.satin.length - 12} weitere (nicht aufgelistet)`);
+    }
+  }
 }
 if (underlay && underlay.without.length > 0) {
   const shown = underlay.without.slice(0, 12);

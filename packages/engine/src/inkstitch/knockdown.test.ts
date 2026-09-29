@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { initGeometry, polygonArea, pointInPolygon } from "@texma-stitch/geometry";
 import { polygonOf, pt, rect } from "../../test/fixtures/shapes.js";
 import { KNOCKDOWN_MIN_MM2, KNOCKDOWN_UNDERLAP_MM } from "../resolve-overlaps.js";
-import { knockdownAreas } from "./knockdown.js";
+import { cutOutSatin, knockdownAreas } from "./knockdown.js";
 import type { KnockdownItem } from "./knockdown.js";
 
 beforeAll(async () => {
@@ -85,5 +85,81 @@ describe("knockdownAreas (spec §4.1 on the tatami areas of the template)", () =
 
   it("gives back an empty result for no areas", () => {
     expect(knockdownAreas([])).toEqual({ areas: new Map(), covered: [], warnings: [] });
+  });
+});
+
+describe("cutOutSatin (spec §4.2 rule 1: satin spares the tatami beneath it)", () => {
+  const ground = [polygonOf(rect(0, 0, 40, 30))];
+  const shape = (x: number, y: number, w: number, h: number) => polygonOf(rect(x, y, w, h));
+  const UNDERLAP = 0.2;
+
+  it("takes the place of a later satin shape out of the area, 0.2 mm short of its edge", () => {
+    const r = cutOutSatin(ground, [shape(10, 5, 20, 10)], UNDERLAP);
+    // The satin shape shrunk by 0.2 mm on every side: 19.6 x 9.6.
+    expect(r.coveredMm2).toBeCloseTo(200, 6);
+    expect(r.cutMm2).toBeCloseTo(19.6 * 9.6, 1);
+    expect(r.parts).toHaveLength(1);
+    expect(areaOf(r.parts)).toBeCloseTo(1200 - 19.6 * 9.6, 1);
+    // 0.1 mm inside the satin's edge the tatami still runs, 0.3 mm inside it is cut.
+    expect(pointInPolygon(r.parts[0]!, pt(10.1, 10))).toBe(true);
+    expect(pointInPolygon(r.parts[0]!, pt(10.3, 10))).toBe(false);
+  });
+
+  it("does not cut where the satin covers less than 20 mm² of the area — and hands back the same list", () => {
+    const r = cutOutSatin(ground, [shape(10, 5, 2, 8)], UNDERLAP);
+    expect(r.coveredMm2).toBeCloseTo(16, 6);
+    expect(r.cutMm2).toBe(0);
+    expect(r.parts).toBe(ground);
+  });
+
+  it("measures the threshold on all satin shapes together, not on each", () => {
+    const one = shape(10, 5, 2, 8);
+    const two = shape(20, 5, 2, 8);
+    expect(cutOutSatin(ground, [one], UNDERLAP).parts).toBe(ground);
+    const both = cutOutSatin(ground, [one, two], UNDERLAP);
+    expect(both.coveredMm2).toBeCloseTo(32, 6);
+    // Each is cut: 1.6 x 7.6 mm.
+    expect(both.cutMm2).toBeCloseTo(2 * 1.6 * 7.6, 1);
+    expect(both.parts).not.toBe(ground);
+  });
+
+  it("does not count a satin shape that lies elsewhere", () => {
+    const r = cutOutSatin(ground, [shape(100, 100, 30, 30)], UNDERLAP);
+    expect(r).toEqual({ parts: ground, coveredMm2: 0, cutMm2: 0 });
+    expect(r.parts).toBe(ground);
+  });
+
+  it("cuts flush where the preset has no underlap", () => {
+    const r = cutOutSatin(ground, [shape(10, 5, 20, 10)], 0);
+    expect(r.cutMm2).toBeCloseTo(200, 1);
+  });
+
+  it("leaves nothing of an area that satin covers completely", () => {
+    const r = cutOutSatin([polygonOf(rect(12, 6, 6, 6))], [shape(10, 4, 10, 10)], UNDERLAP);
+    expect(r.parts).toEqual([]);
+    expect(r.cutMm2).toBeCloseTo(36, 1);
+  });
+
+  it("hands every part when a satin bar cuts the area in two", () => {
+    const r = cutOutSatin(ground, [shape(18, -5, 4, 40)], UNDERLAP);
+    expect(r.parts).toHaveLength(2);
+  });
+
+  it("cuts out of every part of an area that is already in pieces", () => {
+    const parts = [polygonOf(rect(0, 0, 20, 30)), polygonOf(rect(25, 0, 15, 30))];
+    // 9 mm² over the left part, 12 over the right one: 21 together, over the threshold.
+    const r = cutOutSatin(parts, [shape(16, 5, 3, 3), shape(26, 5, 3, 4)], UNDERLAP);
+    expect(r.coveredMm2).toBeCloseTo(21, 6);
+    expect(r.cutMm2).toBeCloseTo(2.6 * 2.6 + 2.6 * 3.6, 1);
+    expect(r.parts).toHaveLength(2);
+  });
+
+  it("does nothing for no satin and for no area", () => {
+    expect(cutOutSatin(ground, [], UNDERLAP).parts).toBe(ground);
+    expect(cutOutSatin([], [shape(0, 0, 10, 10)], UNDERLAP)).toEqual({
+      parts: [],
+      coveredMm2: 0,
+      cutMm2: 0,
+    });
   });
 });
