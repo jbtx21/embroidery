@@ -12,7 +12,7 @@
  *    every shape classified by width — running stitch, native Ink/Stitch
  *    satin columns (one per stroke of a letter: rails, rungs, the preset's
  *    parameters), or tatami — plus the reason for every shape that was meant
- *    for satin and stays tatami.
+ *    for satin and stays tatami, or, under 1 mm, is set as a running stitch.
  * 2. Routes every run of neighbouring same-coloured satin columns with
  *    Ink/Stitch's auto_satin (--preserve_order=true: what ends under a
  *    stroke is stitched first; --trim=true), one call per run, each call on
@@ -148,6 +148,7 @@ const calls = [];
 const stderrLines = [];
 let summary = [];
 let fallbacks = [];
+let narrowLines = [];
 let smoothed = [];
 let templateMs = 0;
 let outputInput = templatePath;
@@ -180,6 +181,7 @@ if (tatamiOnly) {
     `${template.satinRuns.length} Satin-Folgen für auto_satin`,
   ];
   fallbacks = template.objects.filter((o) => o.kind === "tatami" && o.reason);
+  narrowLines = template.objects.filter((o) => o.kind === "running" && o.reason);
   smoothed = template.objects.filter((o) => o.kind === "satin" && o.smoothedMm > 0);
 
   let current = templatePath;
@@ -258,6 +260,10 @@ for (const line of summary) console.log(`            ${line}`);
 if (fallbacks.length > 0) {
   console.log(`\nBleibt Tatami (als Satin oder Laufstich vorgesehen, ${fallbacks.length})`);
   for (const f of fallbacks) console.log(`  ${f.shapeId}: ${f.reason}`);
+}
+if (narrowLines.length > 0) {
+  console.log(`\nLaufstich statt Satinsäule (unter 1 mm, ${narrowLines.length})`);
+  for (const f of narrowLines) console.log(`  ${f.shapeId}: ${f.reason}`);
 }
 if (smoothed.length > 0) {
   console.log(`\nSatin auf geglätteter Kontur (${smoothed.length})`);

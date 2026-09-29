@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { Polygon } from "@texma-stitch/geometry";
 import { initGeometry } from "@texma-stitch/geometry";
 import { GLYPHS } from "../../test/fixtures/glyphs.js";
-import { polygonOf, pt, rect } from "../../test/fixtures/shapes.js";
+import { HOLED_BAR, polygonOf, pt, rect } from "../../test/fixtures/shapes.js";
 import type { ImportedShape } from "../import/svg.js";
 import { PRESETS } from "../presets.js";
 import { satinColumns } from "./columns.js";
@@ -187,5 +187,65 @@ describe("buildInkstitchTemplate", () => {
     ]);
     expect(r.satinRuns).toEqual([]);
     expect(r.warnings.some((w) => w.objectId === "dot" && w.code === "AUTOSATIN_MIXED")).toBe(true);
+  });
+});
+
+describe("narrow shapes no column holds", () => {
+  const holed = area("holed", HOLED_BAR);
+
+  it("sets a shape under 1 mm as a running stitch along its axis, with the reason", () => {
+    const r = buildInkstitchTemplate([holed], pique, PAGE);
+    expect(r.objects).toMatchObject([
+      {
+        id: "holed",
+        kind: "running",
+        shapeId: "holed",
+        reason: expect.stringMatching(/rails cross/),
+      },
+    ]);
+    expect(r.satinRuns).toEqual([]);
+    // Written the way a hairline is: named running stitch, not a fill, not a column.
+    expect(r.svg).toMatch(/<path id="holed"[^>]*inkstitch:stroke_method="running_stitch"/);
+    expect(r.svg).not.toContain("satin_column");
+    expect(r.svg).not.toContain("row_spacing_mm");
+    // The line runs the length of the bar, on the bar.
+    const d = /<path id="holed" d="([^"]*)"/.exec(r.svg)![1]!;
+    const xs = [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => Number(m[1]));
+    const ys = [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => Number(m[2]));
+    expect(Math.min(...xs)).toBeLessThan(2);
+    expect(Math.max(...xs)).toBeGreaterThan(18);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(1);
+  });
+
+  it("says what it did: one note that names the running stitch, no claim of tatami or a tight column", () => {
+    const r = buildInkstitchTemplate([holed], pique, PAGE);
+    const mine = r.warnings.filter((w) => w.objectId === "holed");
+    expect(mine.map((w) => w.code)).toEqual(["AUTOSATIN_MIXED"]);
+    expect(mine[0]!.severity).toBe("info");
+    expect(mine[0]!.message).toContain("running stitch");
+    expect(mine.some((w) => w.message.includes("stays tatami"))).toBe(false);
+    expect(mine.some((w) => w.code === "SATIN_TOO_NARROW")).toBe(false);
+  });
+
+  it("puts the fallback where the shape stands in the order, not with the columns", () => {
+    const r = buildInkstitchTemplate(
+      [area("before", moved(GLYPHS.T!, 0)), holed, area("after", moved(GLYPHS.L!, 40))],
+      pique,
+      PAGE,
+    );
+    expect(r.objects.map((o) => [o.shapeId, o.kind])).toEqual([
+      ["before", "satin"],
+      ["holed", "running"],
+      ["after", "satin"],
+    ]);
+    // The running stitch breaks the run of satin: two runs, one column plan each.
+    expect(r.satinRuns).toHaveLength(2);
+  });
+
+  it("keeps a shape from 1 mm up as tatami when no column holds it", () => {
+    // 3 x 3 mm: median width 3 mm, no stroke — tatami, as before.
+    const r = buildInkstitchTemplate([area("dot", polygonOf(rect(5, 5, 3, 3)))], pique, PAGE);
+    expect(r.objects).toMatchObject([{ kind: "tatami", reason: "no stroke found" }]);
   });
 });

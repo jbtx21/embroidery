@@ -1622,6 +1622,13 @@ function planLetter(shape: Polygon, opts: SatinColumnsOptions): SatinColumnsResu
 export const SMOOTHING_STEPS_MM = [0.2, 0.3, 0.4];
 
 /**
+ * How the note `satinColumns` writes for a letter it leaves to tatami ends. The
+ * template drops it where it sets the shape as a running stitch instead
+ * (`template.ts`) — the note would otherwise say the opposite of what happens.
+ */
+export const STAYS_TATAMI = "stays tatami.";
+
+/**
  * Satin columns for one letter (module doc). Never throws on odd geometry:
  * a letter that cannot be set comes back with `ok: false` and the reason.
  *
@@ -1684,7 +1691,7 @@ export function satinColumns(shape: Polygon, opts: SatinColumnsOptions): SatinCo
   plain.warnings.push(
     warn(
       WARNING.AUTOSATIN_MIXED,
-      `"${idPrefix}": ${plain.reason} — stays tatami.`,
+      `"${idPrefix}": ${plain.reason} — ${STAYS_TATAMI}`,
       "info",
       idPrefix,
     ),

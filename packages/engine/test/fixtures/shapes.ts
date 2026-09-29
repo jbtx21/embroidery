@@ -401,6 +401,14 @@ export function texturedBar(length = 20, width = 1.6, holes = 8, holeMm = 0.25):
 export const TEXTURED_BAR = texturedBar();
 
 /**
+ * A narrow bar (0.83 mm median width) whose holes are drawn, not texture: the
+ * two rails of its column cross at them and smoothing would fill a share of a
+ * clean outline (`isTextureSmoothing`), so no satin column holds it — the case
+ * the Köln logo has three times at 0.7 to 0.9 mm (Ink/Stitch template, point 0).
+ */
+export const HOLED_BAR = texturedBar(20, 1.0, 8, 0.4);
+
+/**
  * A slab-serif "T" (varsity lettering, STUTTGART logo): drop serifs at both
  * ends of the crossbar, a foot block under the stem. Between a serif and the
  * stem the crossbar's axis is shorter than it is wide — the crossbar is a

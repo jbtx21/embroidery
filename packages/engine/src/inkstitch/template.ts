@@ -11,7 +11,10 @@
  *   parameters (spec §7.2 pull compensation from the column's own width, §7.3
  *   zigzag spacing, §7.4 split above 7 mm, §7.6 underlay by width). Where the
  *   columns do not hold (`SatinColumnsResult.reason`), the shape stays tatami
- *   and the reason goes into the warnings and the object list.
+ *   and the reason goes into the warnings and the object list — unless it is
+ *   under `SATIN_NARROW_WARN_MM`: a shape that thin is a line, and a fill of it
+ *   is rows of one or two stitches (Köln: density peak 30 → 34). It is set as a
+ *   running stitch along its axis then, with the reason.
  * - **tatami**: the outline as a fill, `inkstitch:row_spacing_mm` from the
  *   preset.
  *
@@ -28,9 +31,9 @@ import type { ImportedShape } from "../import/svg.js";
 import type { Preset } from "../presets.js";
 import type { Warning } from "../types.js";
 import { warn, WARNING } from "../warnings.js";
-import { classifyShape } from "./classify.js";
+import { classifyShape, SATIN_NARROW_WARN_MM } from "./classify.js";
 import type { SatinColumnPlan } from "./columns.js";
-import { satinColumns } from "./columns.js";
+import { satinColumns, STAYS_TATAMI } from "./columns.js";
 import { strokeGraph } from "./strokes.js";
 
 /** Satin wider than this is split into staggered stitches (spec §7.4, `maxWidthMm`). */
@@ -74,7 +77,14 @@ function smoothLine(line: Polyline, reach: number): Polyline {
 
 export type TemplateObject =
   | { id: string; kind: "tatami"; shapeId: string; color: string; reason?: string }
-  | { id: string; kind: "running"; shapeId: string; color: string }
+  | {
+      id: string;
+      kind: "running";
+      shapeId: string;
+      color: string;
+      /** Set for a shape meant for satin that no column held and that is too narrow for a fill. */
+      reason?: string;
+    }
   | {
       id: string;
       kind: "satin";
@@ -235,7 +245,7 @@ export function buildInkstitchTemplate(
     );
     objects.push({ id, kind: "tatami", shapeId, color, ...(reason ? { reason } : {}) });
   };
-  const running = (shapeId: string, lines: Polyline[], color: string): void => {
+  const running = (shapeId: string, lines: Polyline[], color: string, reason?: string): void => {
     closeRun();
     const id = xmlId(shapeId);
     // Named explicitly: a plain stroke without a dash pattern is a narrow zigzag
@@ -248,7 +258,7 @@ export function buildInkstitchTemplate(
       `<path id="${xmlEscape(id)}" d="${lines.map(lineD).join(" ")}" ` +
         `style="fill:none;stroke:${xmlEscape(color)};stroke-width:0.1"${inkAttrs(attrs)}/>`,
     );
-    objects.push({ id, kind: "running", shapeId, color });
+    objects.push({ id, kind: "running", shapeId, color, ...(reason ? { reason } : {}) });
   };
 
   for (const shape of shapes) {
@@ -259,7 +269,9 @@ export function buildInkstitchTemplate(
       continue;
     }
     const cls = classifyShape(shape.polygon, shape.id);
-    warnings.push(...cls.warnings);
+    // A satin candidate's notes wait for its plan: where it ends up as a line, the
+    // "tight column" note would describe a column that is never set.
+    if (cls.shapeClass !== "satin") warnings.push(...cls.warnings);
     if (cls.shapeClass === "tatami") {
       tatami(shape.id, shape.polygon, shape.color);
       continue;
@@ -283,7 +295,25 @@ export function buildInkstitchTemplate(
     }
     const id = xmlId(shape.id);
     const plan = satinColumns(shape.polygon, { underlapMm: preset.underlapMm, idPrefix: id });
-    warnings.push(...plan.warnings);
+    if (!plan.ok && cls.widthMm < SATIN_NARROW_WARN_MM) {
+      // Too narrow for a fill and not held as a column: a line along the axis.
+      const lines = runningLines(shape.polygon, shape.id);
+      if (lines.length > 0) {
+        warnings.push(
+          ...plan.warnings.filter((w) => !w.message.endsWith(STAYS_TATAMI)),
+          warn(
+            WARNING.AUTOSATIN_MIXED,
+            `"${id}": ${plan.reason} — ${cls.widthMm.toFixed(2)} mm wide, under ` +
+              `${SATIN_NARROW_WARN_MM} mm: stitched as a running stitch along its axis.`,
+            "info",
+            id,
+          ),
+        );
+        running(shape.id, lines, shape.color, plan.reason);
+        continue;
+      }
+    }
+    warnings.push(...cls.warnings, ...plan.warnings);
     if (!plan.ok) {
       tatami(shape.id, shape.polygon, shape.color, plan.reason);
       continue;
