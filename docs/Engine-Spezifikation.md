@@ -21,6 +21,10 @@ Stand: 19.09.2026 · Zielgruppe: Entwicklung (Claude Code) · Status: Entwurf f�
 **Änderung 29.09.2026** — §7.8 neu: Satin für die Ink/Stitch-Vorlage (Einteilung nach Breite mit
 Satin ab 0,7 mm, Strichplan, Säulen, Glätten rauer Konturen, Prüfgrenzen). §7.4 verweist darauf. §5.2 neu:
 Feinheit und Mindestgröße (Satinstrich mindestens 1,3 mm, Lücke mindestens 0,8 mm als Schätzwert).
+§4.2 neu: Aussparen in der Ink/Stitch-Vorlage (Satin spart die Fläche darunter aus, 0,2 mm;
+angrenzende Flächen 0,3 mm statt 0,8 mm). §7.8.5: schmale Rückfälle werden Laufstich. §8.8 neu:
+Tatami in der Ink/Stitch-Vorlage (Preset-Werte, Unterlage nur wo sie hält, Zug und Schub im
+Umriss).
 
 ---
 
@@ -233,6 +237,23 @@ Regeln:
 Nichts wird verworfen: eine untere Fläche, die vollständig verschwindet, wird nicht
 gestickt und meldet `FILL_COVERED` als `info` — das ist eine Aussage, keine stille
 Reparatur (Regel 8).
+
+### 4.2 Aussparen in der Ink/Stitch-Vorlage *(29.09.2026)*
+
+Die Vorlage für Ink/Stitch (§7.8, §8.8) spart nach §4.1 aus, mit zwei Abweichungen
+(Entscheidung 29.09.2026). Die eingefrorene Engine (`resolveOverlaps`) bleibt bei §4.1.
+
+1. **Satin spart die Fläche darunter aus.** Eine Satinform, die später gestickt wird als eine
+   Tatami-Fläche unter ihr, schneidet ihren Platz aus dieser Fläche; die Fläche bleibt
+   `underlapMm` (Preset, Piqué 0,2 mm) unter der Satinkante. Die 0,8 mm aus Regel 4 sparten bei
+   Schrift mit 1 mm Strich gar nichts aus. Die Schwelle 20 mm² (Regel 3) gilt für den Platz, den
+   **alle** Satinformen zusammen aus einer Fläche schneiden — ein Schriftzug auf einem Banner
+   schneidet, ein einzelner Strich, der eine Fläche streift, nicht. Laufstich schneidet
+   weiterhin nie. Gemessen vorher: unter Satin lagen je Logo 3–10 % aller Stiche, und dort saßen
+   die meisten Zellen über 18 Stichen/mm² (STUTTGART 250 mm: 13 von 17).
+2. **Angrenzende Flächen (Regel 5) greifen 0,3 mm statt 0,8 mm untereinander.** Ohne die Regel
+   halbierten sich im Köln-Logo die Zellen über 18 (30 → 15), die Nadelhäufung sank von 8 auf 6.
+   0,3 mm hält gegen Blitzer an der Naht, bis der Probestick zeigt, ob mehr nötig ist.
 
 ---
 
@@ -633,6 +654,11 @@ steht in der Ausgabe (Regel 8).
 | Anteil einer Säule auf anderen (`COLUMN_OVERLAP_MAX`) | höchstens 60 % | mehr heißt: der Plan hat eine Kreuzung als einen Strich gelesen; sich kreuzende Striche teilen bis ein Drittel (4: 31 %, X: 19 %) |
 | Deckung aller Säulen einer Form | mindestens 0,85 (`COLUMN_COVERAGE_MIN`, §5.1) | sonst bleibt Stoff sichtbar |
 
+Ausnahme *(29.09.2026)*: Eine Form unter 1,0 mm (`SATIN_NARROW_WARN_MM`), die als Säule nicht
+hält, wird **einfacher Laufstich** entlang der Achse statt Tatami. Eine Fläche aus ein, zwei
+Reihen auf so schmaler Form ist dichter und unruhiger als der Faden, den die Form bis 0,7 mm
+ohnehin bekäme. Gemessen im Köln-Logo: Dichtespitze 34 → 30.
+
 #### 7.8.6 Reihenfolge und Verbindungen
 
 Die Säulen einer Form kommen in Stichfolge (was unter einem Strich endet, zuerst). Satinformen
@@ -862,6 +888,30 @@ von 82 → 14 (STUTTGART 80 mm); 13/221 → 10/22 (250 mm); 13/36 → 8/13 (Köl
 Versatz auf 0,15 mm zurück, und was dann noch häuft, sind nicht mehr identische Punkte,
 sondern 13 verschiedene Punkte in einer Zelle. Weiter kommt man nur über die **Zahl der
 Durchgänge** — die Sektionsreihenfolge (Bänder statt Greedy), nicht über den Versatz.
+
+### 8.8 Tatami in der Ink/Stitch-Vorlage *(29.09.2026)*
+
+Die Tatami-Flächen der Vorlage (`packages/engine/src/inkstitch/tatami.ts`) tragen die Werte des
+Presets (§14) als `inkstitch:`-Attribute: Reihenabstand, Stichlänge, Versatz und den Stichwinkel
+nach §8.2 mit der Kreuzungsregel aus §5.1. Jeder Attributname ist gegen die Ink/Stitch-Quelle
+geprüft, und der Rauchtest zeigt je Attribut, dass es die Stiche ändert — einen falsch
+geschriebenen Namen übergeht Ink/Stitch still. Drei Punkte weichen vom Wortlaut von §8 ab:
+
+1. **Zug und Schub (§8.1.1) stehen im Umriss** der Fläche, mit demselben Versatz wie `fill.ts`,
+   nicht im Ink/Stitch-Attribut `pull_compensation_mm`. Das Attribut wirkt, baut die Fläche
+   aber bei jedem Stichplan aus ihren Reihen neu auf und kennt keinen Schub. Gemessen: STUTTGART
+   80 mm 64 s → 325 s, Köln 90 mm 245 s → 989 s, STUTTGART 250 mm nach über einer Stunde nicht
+   fertig statt 6 Minuten. Zerlegt der Schub eine Fläche (Haarflächen im Eislingen-Logo: 42 und
+   18 mm² in 55 und 110 Teile), bekommt sie nur den Zug; verschwindet sie ganz, bleibt sie wie
+   gezeichnet (§8.1.1) — beides mit Meldung. Der Umriss wird auf ein 1-µm-Raster gelegt, weil
+   sich sonst dünne Spitzen in Ink/Stitchs Geometrie selbst kreuzen.
+2. **Die Gitterunterlage (§8.6) nur, wo sie hält**: der eingerückte Umriss bleibt ein Stück, ist
+   an einer Stelle mindestens 0,8 mm breit, und jede Lage trifft eine Reihe. Sonst stickt
+   Ink/Stitch jedes Stück der Unterlage als eigene Gruppe ohne Fadenschnitt dazwischen —
+   gemessen: in fünf von sechs Logos Fäden über 5 mm auf dem Stoff (bis 79 mm), Nadelhäufung bis
+   14. Anteil der Tatami-Fläche mit Unterlage: STUTTGART 80 mm 81 %, Köln 4 %, Eislingen 96 %.
+3. **Keine Konturunterlage** (§8.6): Ink/Stitchs Füllung hat nur die Gitterunterlage. Offener
+   Punkt — ginge über eigene Konturobjekte je Fläche.
 
 ---
 
