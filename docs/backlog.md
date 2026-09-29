@@ -3,7 +3,54 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Ink/Stitch-Vorlage, Zugausgleich je Rail und Profi-Vergleich Hofbräu (29.09.2026)
+
+Nach der Rücknahme von §4.2 (Spec §4.2 neu gefasst) und dem neuen §7.8.3 „Zugausgleich lässt
+Stofflücken offen" umgesetzt (`50d4ca7`, `rail-pull.ts`) und am Hofbräu-Motiv (Vorlage aus dem PDF des
+Nutzers, nicht im Repo; 110 mm, Preset `cap`, 19 rote Buchstaben von 2,4 mm, 60 goldene
+Schattenlinien von 0,75 mm) und an den sechs Kundenlogos gemessen.
+
+- **Der Spalt bleibt offen.** Abstand der Einstiche Gold → nächster roter Einstich in der DST
+  (goldene Einstiche mit einem roten innerhalb von 1,2 mm; Median, Anteil unter 0,3 mm), dazu der
+  gezeichnete Abstand der Konturen im Entwurf:
+
+  | Ausschnitt            |   gezeichnet | symmetrisch (§7.2) | je Rail (§7.8.3) |
+  | --------------------- | -----------: | -----------------: | ---------------: |
+  | ganzes Motiv          | 0,465 (19 %) |        0,30 (49 %) |      0,50 (21 %) |
+  | „Ho" von Hofbräu      | 0,476 (23 %) |        0,28 (52 %) |      0,50 (30 %) |
+  | „Stu" von Stuttgarter | 0,394 (23 %) |        0,32 (48 %) |      0,41 (24 %) |
+
+  Symmetrisch schrumpft der Spalt um rund 0,2 mm (die Hälfte der goldenen Einstiche hat einen roten
+  unter 0,3 mm neben sich), je Rail liegt er wieder beim gezeichneten Wert. In den Bildern
+  (12 bis 100 Pixel je mm, Garnfarben auf Schwarz) liegt zwischen Rot und Gold schwarzer Stoff,
+  vorher berühren sich beide. Stiche 9.446 → 9.426, Nadelhäufung 8 → 6, 28 Säulen unter 1,0 mm
+  und 61 Rails am Stoffspalt ohne Ausgleich (kleinster Spalt 0,17 mm).
+
+- **Regel (a) allein öffnet den Spalt genauso; Regel (b) kostet.** Im Versuch (Scratchpad, beide
+  Regeln einzeln abschaltbar): nur „Rail am Stoffspalt ohne Ausgleich" gibt am Hofbräu-Motiv dieselbe
+  Verteilung (Median 0,50, 21 % unter 0,3 mm), denn beide Rails, die sich gegenüberliegen, sind
+  ausgenommen. „Säule unter 1,0 mm ohne Ausgleich" ändert daran nichts, verschlechtert aber die Kennzahlen:
+  STUTTGART 80 mm Nadelhäufung 7 → 10 und Zellen über 18 5 → 7, Köln 30 → 40 und Zellen ab 6
+  Einstichen 11 → 15, Atzensport 200 mm 3 → 5; mit nur (a) hat STUTTGART 80 mm dieselben Kennzahlen wie
+  vorher. Die Zelle mit 10 Einstichen liegt an einer Zickzackspitze am Ende einer schmalen Säule. Frage
+  an die Spec: (b) beibehalten (dünne Linien so schmal wie gezeichnet) oder auf Säulen an einem
+  Stoffspalt beschränken? §16 (Nadelhäufung ≤ 8 an STUTTGART 80 mm) ist mit (b) verfehlt.
+- **Was die Spec offenließ.** (1) Untergrenze des Spalts: 0,1 mm (die DST-Auflösung, wie §5.2
+  Regel 3); ein Spalt darunter ist eine Haarnaht zwischen gezeichneten Formen, die der Faden ohnehin
+  schließt. Ohne Untergrenze bekämen berührende Formen mit Nähten von 0,01 mm keinen Ausgleich.
+  (2) Der Median über die Säule: liegt die andere Form nur an einem Teil der Säule (weniger als die
+  Hälfte der Sprossen), behält die Rail ihren Ausgleich. (3) Eine Säule ohne Sprossen (kurzer
+  Balken mit schrägen Enden) hat nichts, woran sich messen ließe, und behält ihren Ausgleich.
+  (4) Ink/Stitchs `pull_compensation_percent` setzt die Vorlage nicht; dort ist nichts asymmetrisch zu
+  setzen.
+- **Offen: der Zug der Tatami-Flächen.** §7.8.3 gilt für Satinsäulen. Tatami-Flächen bekommen Zug 0,2 mm
+  entlang der Reihen und Schub 0,1 mm quer dazu im Umriss (`compensateArea`, §8.1.1) und wachsen so
+  ebenfalls in einen Stoffspalt zu einer Nachbarform hinein; die Spec sagt dazu nichts.
+
 ## Ink/Stitch-Vorlage, Folge von Schritt 3 (29.09.2026) — §4.2 gemessen, Farbfolge-Variante, Breite
+
+_(Nachtrag: §4.2 ist am selben Tag zurückgenommen worden, die Messungen unten sind die Begründung
+(Spec §4.2 in `1ceb429`, Rücknahme im Code in `1c9aa6d`; beide Wege bleiben als Optionen).)_
 
 Nach der Entscheidung des Nutzers (Spec §4.2, §7.8.5, §8.8 nachgezogen) umgesetzt und an den
 sechs Kundenlogos gemessen: Preset `pique`, kalter Ink/Stitch-Cache, Vergleich mit dem Stand nach

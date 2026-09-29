@@ -523,3 +523,37 @@ Farbblöcke weiter 6 statt ≤ 4. Regel 1 (mehr Stiche und Zellen über 18 an ST
 (Köln schlechter) bringen nicht, was §4.2 erwartet; Zahlen, Ursache und Vorschläge (relative
 Schwelle für die Farbfolge, Weite der Regel 2) in `docs/backlog.md`. STUTTGART 80 mm auf
 120 mm (`--breite 120`): 27.836 Stiche, Dichtespitze 28, Nadelhäufung 9.
+
+_(Überholt am selben Tag: der Nutzer hat §4.2 zurückgenommen, die Vorlage folgt wieder §4.1; die
+Tabelle „Endstand" oben ist der Stand mit §4.2 und gilt nicht mehr. Unten der Stand danach.)_
+
+**Rücknahme §4.2 und Zugausgleich je Rail (29.09.2026, Folge von Schritt 3).** Nach den Messungen hat
+der Nutzer §4.2 zurückgenommen (Spec §4.2 neu gefasst), und nach dem Vergleich mit der Profi-Mütze
+„Stuttgarter Hofbräu" gilt neu §7.8.3 „Zugausgleich lässt Stofflücken offen":
+
+- **Rücknahme** (`1c9aa6d`): `satinCutout` und `touchUnderlapMm` sind Optionen der Vorlage
+  (`--aussparen`, `--naht <mm>`), im Standard aus bzw. 0,8 mm. Die DST aller sechs Logos ist
+  byte-gleich mit dem Endstand von Schritt 3 (Tabelle „Stand nach Punkt 4" oben); `--ueberlappung`
+  und `--breite` liegen hinter ihren Schaltern und ändern am Standardweg nichts.
+- **Zugausgleich je Rail** (`50d4ca7`, `rail-pull.ts`): Ink/Stitch nimmt `pull_compensation_mm="a b"`,
+  `a` für die erste Rail des Pfads, `b` für die zweite. Eine Rail zu einem Stoffspalt unter 1,0 mm
+  (bis zur nächsten anderen Form liegt nur Stoff) bekommt keinen Ausgleich, eine Säule unter 1,0 mm
+  keinen auf beiden Rails. Der Spalt wird je Rail entlang der Sprossen nach außen gemessen, der Median
+  über die Säule entscheidet; eine berührende oder überdeckende Form und ein Spalt unter 0,1 mm zählen
+  nicht als Spalt. Rauchtest: die Stiche der einen Rail wandern um den Wert, die der anderen nicht, und
+  der Spalt Rot/Gold in der DST bleibt offen. `--zug-symmetrisch` gibt den Stand davor.
+
+Stand nach Punkt 4 → mit Zugausgleich je Rail, Preset `pique`:
+
+| Motiv                      |          Stiche | Dichtespitze | Zellen >18 | Nadelhäufung | Zellen ab 6 |
+| -------------------------- | --------------: | -----------: | ---------: | -----------: | ----------: |
+| STUTTGART 80 mm            | 13.578 → 13.577 |      22 → 21 |      5 → 7 |       7 → 10 |       3 → 3 |
+| STUTTGART 250 mm           | 74.674 → 74.674 |      29 → 29 |    15 → 15 |        9 → 9 |     33 → 32 |
+| Berufsfeuerwehr Köln 90 mm | 20.711 → 20.680 |      29 → 29 |    30 → 40 |        8 → 8 |     11 → 15 |
+| Eislingen Print 200 mm     | 32.669 → 32.659 |      20 → 20 |      1 → 1 |        6 → 6 |       1 → 1 |
+| Atzensport Hofbräu 80 mm   | 12.005 → 11.928 |      23 → 23 |      3 → 1 |        7 → 7 |       2 → 3 |
+| Atzensport Hofbräu 200 mm  | 46.508 → 46.483 |      22 → 23 |      4 → 4 |        6 → 6 |       3 → 5 |
+
+Sprünge, Trims und Farbblöcke sind bei allen sechs unverändert. Gegen §16 (STUTTGART 80 mm) ist die
+Nadelhäufung mit 10 (≤ 8) nicht mehr erreicht; sie kommt von der Regel für Säulen unter 1,0 mm, nicht
+vom Stoffspalt (Einzelheiten und Hofbräu-Zahlen in `docs/backlog.md`).
