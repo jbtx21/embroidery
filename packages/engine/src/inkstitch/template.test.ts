@@ -249,3 +249,70 @@ describe("narrow shapes no column holds", () => {
     expect(r.objects).toMatchObject([{ kind: "tatami", reason: "no stroke found" }]);
   });
 });
+
+describe("knockdown option (spec §4.1)", () => {
+  const under = area("under", polygonOf(rect(0, 0, 40, 30)), "#1f3a93");
+  const over = area("over", polygonOf(rect(10, 5, 20, 20)), "#c8102e");
+
+  it("leaves the areas whole unless asked", () => {
+    const t = buildInkstitchTemplate([under, over], pique, PAGE);
+    expect(t.objects.map((o) => o.id)).toEqual(["under", "over"]);
+    expect(t.knockdown).toBeUndefined();
+    const d = /<path id="under" d="([^"]*)"/.exec(t.svg)![1]!;
+    expect(d.match(/M /g)).toHaveLength(1); // no hole
+  });
+
+  it("cuts the later tatami out of the earlier one and says what it did", () => {
+    const t = buildInkstitchTemplate([under, over], pique, { ...PAGE, knockdown: true });
+    expect(t.objects.map((o) => [o.id, o.kind])).toEqual([
+      ["under", "tatami"],
+      ["over", "tatami"],
+    ]);
+    const d = /<path id="under" d="([^"]*)"/.exec(t.svg)![1]!;
+    expect(d.match(/M /g)).toHaveLength(2); // the outline and the hole
+    expect(t.knockdown).toMatchObject({ changed: 1, covered: [], split: [] });
+    expect(t.knockdown!.areaMm2.after).toBeLessThan(t.knockdown!.areaMm2.before);
+  });
+
+  it("leaves out a tatami that a later one covers completely, with FILL_COVERED", () => {
+    const hidden = area("hidden", polygonOf(rect(12, 7, 10, 10)), "#101820");
+    const t = buildInkstitchTemplate([hidden, over], pique, { ...PAGE, knockdown: true });
+    expect(t.objects.map((o) => o.id)).toEqual(["over"]);
+    expect(t.svg).not.toContain('id="hidden"');
+    expect(t.knockdown!.covered).toEqual(["hidden"]);
+    expect(t.warnings).toContainEqual(
+      expect.objectContaining({ code: "FILL_COVERED", severity: "info", objectId: "hidden" }),
+    );
+  });
+
+  it("writes every part of an area the cut splits as a tatami of its own, in its place", () => {
+    const bar = area("bar", polygonOf(rect(0, 0, 60, 10)));
+    const post = area("post", polygonOf(rect(20, -5, 10, 20)), "#c8102e");
+    const t = buildInkstitchTemplate([bar, post], pique, { ...PAGE, knockdown: true });
+    expect(t.objects.map((o) => o.id)).toEqual(["bar_p0", "bar_p1", "post"]);
+    expect(t.objects.slice(0, 2).every((o) => o.shapeId === "bar" && o.kind === "tatami")).toBe(
+      true,
+    );
+    expect(t.knockdown!.split).toEqual([{ id: "bar", parts: 2 }]);
+  });
+
+  it("never cuts a satin column and never cuts out of one (rule 1)", () => {
+    const letter = area("letter", moved(GLYPHS.T!, 5), "#c8102e");
+    const ground = area("ground", polygonOf(rect(0, 0, 40, 30)), "#1f3a93");
+    // A tatami under the letter is not touched by it…
+    const a = buildInkstitchTemplate([ground, letter], pique, { ...PAGE, knockdown: true });
+    expect(a.objects.map((o) => [o.shapeId, o.kind])).toEqual([
+      ["ground", "tatami"],
+      ["letter", "satin"],
+    ]);
+    expect(/<path id="ground" d="([^"]*)"/.exec(a.svg)![1]!.match(/M /g)).toHaveLength(1);
+    // …and a tatami over the letter does not cut it.
+    const b = buildInkstitchTemplate([letter, ground], pique, { ...PAGE, knockdown: true });
+    expect(b.objects.map((o) => [o.shapeId, o.kind])).toEqual([
+      ["letter", "satin"],
+      ["ground", "tatami"],
+    ]);
+    expect(b.satinRuns).toHaveLength(1);
+    expect(b.knockdown).toMatchObject({ changed: 0 });
+  });
+});

@@ -13,6 +13,8 @@
  *    satin columns (one per stroke of a letter: rails, rungs, the preset's
  *    parameters), or tatami — plus the reason for every shape that was meant
  *    for satin and stays tatami, or, under 1 mm, is set as a running stitch.
+ *    Covered tatami areas are cut out of the ones below them (knockdown, spec
+ *    §4.1).
  * 2. Routes every run of neighbouring same-coloured satin columns with
  *    Ink/Stitch's auto_satin (--preserve_order=true: what ends under a
  *    stroke is stitched first; --trim=true), one call per run, each call on
@@ -150,6 +152,7 @@ let summary = [];
 let fallbacks = [];
 let narrowLines = [];
 let smoothed = [];
+let knockdown;
 let templateMs = 0;
 let outputInput = templatePath;
 
@@ -166,6 +169,7 @@ if (tatamiOnly) {
   const template = buildInkstitchTemplate(imported.shapes, preset, {
     widthMm: imported.widthMm,
     heightMm: imported.heightMm,
+    knockdown: true,
   });
   templateMs = performance.now() - started;
   writeFileSync(templatePath, template.svg);
@@ -183,6 +187,7 @@ if (tatamiOnly) {
   fallbacks = template.objects.filter((o) => o.kind === "tatami" && o.reason);
   narrowLines = template.objects.filter((o) => o.kind === "running" && o.reason);
   smoothed = template.objects.filter((o) => o.kind === "satin" && o.smoothedMm > 0);
+  knockdown = template.knockdown;
 
   let current = templatePath;
   for (const [i, ids] of template.satinRuns.entries()) {
@@ -260,6 +265,17 @@ for (const line of summary) console.log(`            ${line}`);
 if (fallbacks.length > 0) {
   console.log(`\nBleibt Tatami (als Satin oder Laufstich vorgesehen, ${fallbacks.length})`);
   for (const f of fallbacks) console.log(`  ${f.shapeId}: ${f.reason}`);
+}
+if (knockdown) {
+  console.log(
+    `\nKnockdown (Spec §4.1): ${knockdown.changed} Tatami-Flächen verändert, ` +
+      `${knockdown.covered.length} ganz verdeckt, ${knockdown.split.length} in Teile zerfallen`,
+  );
+  console.log(
+    `  Tatami-Fläche ${knockdown.areaMm2.before.toFixed(0)} → ${knockdown.areaMm2.after.toFixed(0)} mm²`,
+  );
+  for (const id of knockdown.covered) console.log(`  FILL_COVERED  ${id} (nicht gestickt)`);
+  for (const f of knockdown.split) console.log(`  SHAPE_SPLIT   ${f.id}: ${f.parts} Teile`);
 }
 if (narrowLines.length > 0) {
   console.log(`\nLaufstich statt Satinsäule (unter 1 mm, ${narrowLines.length})`);

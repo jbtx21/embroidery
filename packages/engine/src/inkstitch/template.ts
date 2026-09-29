@@ -24,9 +24,12 @@
  * colour form a run — one `auto_satin` call each routes it, so the travel
  * between columns runs under the satin and never across a colour or an
  * object stitched in between.
+ *
+ * `TemplateOptions.knockdown` cuts what a later tatami covers out of the tatami
+ * below it (spec §4.1, `knockdown.ts`) — the stitch order decides which is which.
  */
 import type { Point, Polygon, Polyline } from "@texma-stitch/geometry";
-import { cumulativeLengths, simplify } from "@texma-stitch/geometry";
+import { cumulativeLengths, polygonArea, simplify } from "@texma-stitch/geometry";
 import type { ImportedShape } from "../import/svg.js";
 import type { Preset } from "../presets.js";
 import type { Warning } from "../types.js";
@@ -34,6 +37,7 @@ import { warn, WARNING } from "../warnings.js";
 import { classifyShape, SATIN_NARROW_WARN_MM } from "./classify.js";
 import type { SatinColumnPlan } from "./columns.js";
 import { satinColumns, STAYS_TATAMI } from "./columns.js";
+import { knockdownAreas } from "./knockdown.js";
 import { strokeGraph } from "./strokes.js";
 
 /** Satin wider than this is split into staggered stitches (spec §7.4, `maxWidthMm`). */
@@ -95,19 +99,35 @@ export type TemplateObject =
       smoothedMm: number;
     };
 
+/** What the knockdown did to the tatami areas (spec §4.1). */
+export type KnockdownReport = {
+  /** Tatami areas whose outline changed: cut, split, grown under a neighbour, or left out. */
+  changed: number;
+  /** Areas that later ones cover completely — not stitched (`FILL_COVERED`). */
+  covered: string[];
+  /** Areas the cut fell apart into, with the number of parts — each part is an object. */
+  split: { id: string; parts: number }[];
+  /** Tatami area before and after, mm². */
+  areaMm2: { before: number; after: number };
+};
+
 export type TemplateResult = {
   svg: string;
-  /** One per source shape that became an object, in document order. */
+  /** One per source shape that became an object (a split tatami: one per part), in stitch order. */
   objects: TemplateObject[];
   /** Column ids of each run of neighbouring same-coloured satin objects — one `auto_satin` each. */
   satinRuns: string[][];
   warnings: Warning[];
+  /** Present when `TemplateOptions.knockdown` was on. */
+  knockdown?: KnockdownReport;
 };
 
 export type TemplateOptions = {
   /** Page size of the source document, so the template lines up with it. */
   widthMm: number;
   heightMm: number;
+  /** Cut what later tatami areas cover out of the earlier ones (spec §4.1). Default: off. */
+  knockdown?: boolean;
 };
 
 const num = (n: number): string => (Math.round(n * 1e4) / 1e4).toString();
@@ -217,48 +237,40 @@ function runningLines(shape: Polygon, id: string): Polyline[] {
     .filter((pts) => pts.length >= 2);
 }
 
-/**
- * The template for a set of imported shapes (module doc). `preset` supplies
- * the densities and compensations; nothing else is guessed.
- */
-export function buildInkstitchTemplate(
-  shapes: ImportedShape[],
-  preset: Preset,
-  opts: TemplateOptions,
-): TemplateResult {
-  const warnings: Warning[] = [];
-  const objects: TemplateObject[] = [];
-  const body: string[] = [];
-  const satinRuns: string[][] = [];
-  let run: { color: string; ids: string[] } | undefined;
-  const closeRun = (): void => {
-    if (run && run.ids.length > 0) satinRuns.push(run.ids);
-    run = undefined;
-  };
+/** A shape planned as an object, before anything is cut, ordered or written. */
+type PlannedBase = { id: string; shapeId: string; color: string };
+type PlannedTatami = PlannedBase & { kind: "tatami"; polygon: Polygon; reason?: string };
+type PlannedRunning = PlannedBase & { kind: "running"; lines: Polyline[]; reason?: string };
+type PlannedSatin = PlannedBase & {
+  kind: "satin";
+  columns: SatinColumnPlan[];
+  coverage: number;
+  smoothedMm: number;
+};
+type Planned = PlannedTatami | PlannedRunning | PlannedSatin;
 
-  const tatami = (shapeId: string, poly: Polygon, color: string, reason?: string): void => {
-    closeRun();
-    const id = xmlId(shapeId);
-    body.push(
-      `<path id="${xmlEscape(id)}" d="${polygonD(poly)}" style="fill:${xmlEscape(color)};stroke:none"` +
-        `${inkAttrs({ row_spacing_mm: num(preset.fillRowSpacingMm) })}/>`,
-    );
-    objects.push({ id, kind: "tatami", shapeId, color, ...(reason ? { reason } : {}) });
+/** Decides what every shape becomes (module doc), in document order. */
+function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]): Planned[] {
+  const planned: Planned[] = [];
+  const tatami = (shapeId: string, polygon: Polygon, color: string, reason?: string): void => {
+    planned.push({
+      kind: "tatami",
+      id: xmlId(shapeId),
+      shapeId,
+      color,
+      polygon,
+      ...(reason ? { reason } : {}),
+    });
   };
   const running = (shapeId: string, lines: Polyline[], color: string, reason?: string): void => {
-    closeRun();
-    const id = xmlId(shapeId);
-    // Named explicitly: a plain stroke without a dash pattern is a narrow zigzag
-    // to Ink/Stitch ("simple satin", 0.2-mm steps), not a running stitch.
-    const attrs: Record<string, string> = {
-      stroke_method: "running_stitch",
-      running_stitch_length_mm: num(RUNNING_STITCH_MM),
-    };
-    body.push(
-      `<path id="${xmlEscape(id)}" d="${lines.map(lineD).join(" ")}" ` +
-        `style="fill:none;stroke:${xmlEscape(color)};stroke-width:0.1"${inkAttrs(attrs)}/>`,
-    );
-    objects.push({ id, kind: "running", shapeId, color, ...(reason ? { reason } : {}) });
+    planned.push({
+      kind: "running",
+      id: xmlId(shapeId),
+      shapeId,
+      color,
+      lines,
+      ...(reason ? { reason } : {}),
+    });
   };
 
   for (const shape of shapes) {
@@ -318,36 +330,172 @@ export function buildInkstitchTemplate(
       tatami(shape.id, shape.polygon, shape.color, plan.reason);
       continue;
     }
-    if (!run || run.color !== shape.color) {
-      closeRun();
-      run = { color: shape.color, ids: [] };
-    }
-    const inner = plan.columns.map(
-      (c) =>
-        `<path id="${xmlEscape(c.id)}" d="${satinColumnD(c)}" ` +
-        `style="fill:none;stroke:${xmlEscape(shape.color)};stroke-width:0.1"` +
-        `${inkAttrs(satinColumnAttributes(c.widthMm, preset))}/>`,
-    );
-    body.push(`<g id="${xmlEscape(id)}">${inner.join("")}</g>`);
-    run.ids.push(...plan.columns.map((c) => c.id));
-    objects.push({
-      id,
+    planned.push({
       kind: "satin",
+      id,
       shapeId: shape.id,
       color: shape.color,
-      columnIds: plan.columns.map((c) => c.id),
+      columns: plan.columns,
       coverage: plan.coverage,
       smoothedMm: plan.smoothedMm,
     });
   }
+  return planned;
+}
+
+const tatamiArea = (planned: Planned[]): number =>
+  planned.reduce((sum, p) => (p.kind === "tatami" ? sum + polygonArea(p.polygon) : sum), 0);
+
+/**
+ * Cuts the tatami areas, later out of earlier (spec §4.1, `knockdown.ts`). An
+ * area the cut splits becomes one object per part, each in the place of the
+ * whole; one that is covered completely is left out, and says so.
+ */
+function applyKnockdown(
+  planned: Planned[],
+  warnings: Warning[],
+): { planned: Planned[]; report: KnockdownReport } {
+  const items = planned.flatMap((p) =>
+    p.kind === "tatami" ? [{ id: p.id, polygon: p.polygon }] : [],
+  );
+  const result = knockdownAreas(items);
+  warnings.push(...result.warnings);
+
+  const out: Planned[] = [];
+  const split: KnockdownReport["split"] = [];
+  let changed = 0;
+  for (const p of planned) {
+    if (p.kind !== "tatami") {
+      out.push(p);
+      continue;
+    }
+    const parts = result.areas.get(p.id);
+    if (parts === undefined) {
+      changed++;
+    } else if (parts.length === 1) {
+      // The very same polygon comes back for an area nothing touched.
+      if (parts[0] === p.polygon) out.push(p);
+      else {
+        changed++;
+        out.push({ ...p, polygon: parts[0]! });
+      }
+    } else {
+      changed++;
+      split.push({ id: p.id, parts: parts.length });
+      parts.forEach((polygon, i) => out.push({ ...p, id: `${p.id}_p${i}`, polygon }));
+    }
+  }
+  return {
+    planned: out,
+    report: {
+      changed,
+      covered: result.covered,
+      split,
+      areaMm2: { before: tatamiArea(planned), after: tatamiArea(out) },
+    },
+  };
+}
+
+/** Writes the planned objects, in their order, as the SVG body (module doc). */
+function emitTemplate(
+  planned: Planned[],
+  preset: Preset,
+): { body: string; objects: TemplateObject[]; satinRuns: string[][] } {
+  const objects: TemplateObject[] = [];
+  const body: string[] = [];
+  const satinRuns: string[][] = [];
+  let run: { color: string; ids: string[] } | undefined;
+  const closeRun = (): void => {
+    if (run && run.ids.length > 0) satinRuns.push(run.ids);
+    run = undefined;
+  };
+
+  for (const p of planned) {
+    if (p.kind === "tatami") {
+      closeRun();
+      body.push(
+        `<path id="${xmlEscape(p.id)}" d="${polygonD(p.polygon)}" style="fill:${xmlEscape(p.color)};stroke:none"` +
+          `${inkAttrs({ row_spacing_mm: num(preset.fillRowSpacingMm) })}/>`,
+      );
+      objects.push({
+        id: p.id,
+        kind: "tatami",
+        shapeId: p.shapeId,
+        color: p.color,
+        ...(p.reason ? { reason: p.reason } : {}),
+      });
+    } else if (p.kind === "running") {
+      closeRun();
+      // Named explicitly: a plain stroke without a dash pattern is a narrow zigzag
+      // to Ink/Stitch ("simple satin", 0.2-mm steps), not a running stitch.
+      const attrs: Record<string, string> = {
+        stroke_method: "running_stitch",
+        running_stitch_length_mm: num(RUNNING_STITCH_MM),
+      };
+      body.push(
+        `<path id="${xmlEscape(p.id)}" d="${p.lines.map(lineD).join(" ")}" ` +
+          `style="fill:none;stroke:${xmlEscape(p.color)};stroke-width:0.1"${inkAttrs(attrs)}/>`,
+      );
+      objects.push({
+        id: p.id,
+        kind: "running",
+        shapeId: p.shapeId,
+        color: p.color,
+        ...(p.reason ? { reason: p.reason } : {}),
+      });
+    } else {
+      if (!run || run.color !== p.color) {
+        closeRun();
+        run = { color: p.color, ids: [] };
+      }
+      const inner = p.columns.map(
+        (c) =>
+          `<path id="${xmlEscape(c.id)}" d="${satinColumnD(c)}" ` +
+          `style="fill:none;stroke:${xmlEscape(p.color)};stroke-width:0.1"` +
+          `${inkAttrs(satinColumnAttributes(c.widthMm, preset))}/>`,
+      );
+      body.push(`<g id="${xmlEscape(p.id)}">${inner.join("")}</g>`);
+      run.ids.push(...p.columns.map((c) => c.id));
+      objects.push({
+        id: p.id,
+        kind: "satin",
+        shapeId: p.shapeId,
+        color: p.color,
+        columnIds: p.columns.map((c) => c.id),
+        coverage: p.coverage,
+        smoothedMm: p.smoothedMm,
+      });
+    }
+  }
   closeRun();
+  return { body: body.join(""), objects, satinRuns };
+}
+
+/**
+ * The template for a set of imported shapes (module doc). `preset` supplies
+ * the densities and compensations; nothing else is guessed.
+ */
+export function buildInkstitchTemplate(
+  shapes: ImportedShape[],
+  preset: Preset,
+  opts: TemplateOptions,
+): TemplateResult {
+  const warnings: Warning[] = [];
+  let planned = planShapes(shapes, preset, warnings);
+  let knockdown: KnockdownReport | undefined;
+  if (opts.knockdown) {
+    const cut = applyKnockdown(planned, warnings);
+    planned = cut.planned;
+    knockdown = cut.report;
+  }
+  const { body, objects, satinRuns } = emitTemplate(planned, preset);
 
   const svg =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" ` +
     `width="${num(opts.widthMm)}mm" height="${num(opts.heightMm)}mm" ` +
     `viewBox="0 0 ${num(opts.widthMm)} ${num(opts.heightMm)}">` +
-    body.join("") +
+    body +
     `</svg>\n`;
-  return { svg, objects, satinRuns, warnings };
+  return { svg, objects, satinRuns, warnings, ...(knockdown ? { knockdown } : {}) };
 }
