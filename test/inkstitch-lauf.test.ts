@@ -7,9 +7,14 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ARCHIV, einordnen, zeile } from "../tools/archiv.mjs";
-import { inkstitchHome, inkstitchPython, inkstitchSrc } from "../tools/inkstitch-lauf.mjs";
+import {
+  inkstitchEnv,
+  inkstitchHome,
+  inkstitchPython,
+  inkstitchSrc,
+} from "../tools/inkstitch-lauf.mjs";
 
-const KEYS = ["INKSTITCH_HOME", "INKSTITCH_SRC", "INKSTITCH_PYTHON"] as const;
+const KEYS = ["INKSTITCH_HOME", "INKSTITCH_SRC", "INKSTITCH_PYTHON", "PYTHONHASHSEED"] as const;
 
 describe("Ink/Stitch-Pfade (inkstitch/setup.sh, run.py und inkstitch-lauf.mjs lesen dieselben)", () => {
   const saved: Partial<Record<(typeof KEYS)[number], string>> = {};
@@ -46,6 +51,21 @@ describe("Ink/Stitch-Pfade (inkstitch/setup.sh, run.py und inkstitch-lauf.mjs le
     expect(inkstitchPython()).toBe("/opt/ink/venv/bin/python3");
     process.env.INKSTITCH_PYTHON = "/usr/bin/python3";
     expect(inkstitchPython()).toBe("/usr/bin/python3");
+  });
+
+  it("der Prozess bekommt einen festen Hash-Seed, auch gegen einen gesetzten", () => {
+    // Measured 29.09.2026 on the Hofbräu motif, same template, cold cache: three runs
+    // without a seed gave 9.424, 9.425 and 9.426 stitches, three with seed 0 the same DST.
+    expect(inkstitchEnv().PYTHONHASHSEED).toBe("0");
+    process.env.PYTHONHASHSEED = "random";
+    expect(inkstitchEnv().PYTHONHASHSEED).toBe("0");
+  });
+
+  it("der Prozess erbt die Umgebung und bekommt die Ink/Stitch-Quelle", () => {
+    process.env.INKSTITCH_SRC = "/src/inkstitch";
+    const env = inkstitchEnv();
+    expect(env.INKSTITCH_SRC).toBe("/src/inkstitch");
+    expect(env.PATH).toBe(process.env.PATH);
   });
 });
 

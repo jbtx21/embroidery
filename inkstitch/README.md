@@ -74,8 +74,11 @@ Die Ausgabe listet beides. `--zug-symmetrisch` gibt beiden Rails wieder den Wert
 Für einzelne Ink/Stitch-Erweiterungen direkt (z. B. zum Verketten mehrerer Schritte):
 
 ```bash
-python inkstitch/run.py --extension=<name> [--id=<id>]... [--<option>=<wert>]... <in.svg>
+PYTHONHASHSEED=0 python inkstitch/run.py --extension=<name> [--id=<id>]... [--<option>=<wert>]... <in.svg>
 ```
+
+`PYTHONHASHSEED=0` gehört dazu: ohne festen Seed ist das Ergebnis nicht deterministisch (siehe
+„Eigenheiten"). `tools/inkstitch-lauf.mjs` setzt ihn selbst.
 
 `--extension=output --format=dst` schreibt DST-Bytes nach stdout; eine Effekt-Erweiterung wie
 `fill_to_satin` oder `auto_satin` schreibt das geänderte SVG nach stdout. stderr trägt alles,
@@ -94,7 +97,8 @@ options, svg })`), das denselben Prozess startet und `{ stdout, stderr, ms }` zu
 | `INKSTITCH_PYTHON` | `$INKSTITCH_HOME/venv/bin/python3` | Übersteuert nur den Python-Interpreter (z. B. eine bereits eingerichtete venv statt einer neuen unter `INKSTITCH_HOME`). |
 
 `setup.sh`, `run.py` und `tools/inkstitch-lauf.mjs` lesen dieselben drei Variablen mit
-denselben Vorgaben.
+denselben Vorgaben. `PYTHONHASHSEED` setzt `tools/inkstitch-lauf.mjs` für den Ink/Stitch-Prozess
+immer auf `0`, auch gegen einen vorher gesetzten Wert.
 
 ## Dateien hier
 
@@ -138,6 +142,14 @@ denselben Vorgaben.
   und nimmt dabei jede Option kommentarlos an — ein Tippfehler im Optionsnamen wird nicht
   gemeldet. Effekt-Erweiterungen wie `fill_to_satin`/`auto_satin` nutzen dagegen den normalen
   `argparse`-Weg und melden eine unbekannte Option als Fehler.
+- **Ohne festen Hash-Seed nicht deterministisch** (gemessen 29.09.2026). Python würfelt den
+  Hash von Zeichenketten je Prozess neu und damit die Reihenfolge von Mengen, die Ink/Stitch
+  durchläuft. Hofbräu-Motiv, byte-gleiche Vorlage, kalter Cache: drei Läufe ohne Seed gaben
+  9.424, 9.425 und 9.426 Stiche, drei mit `PYTHONHASHSEED=0` dieselbe DST. Ink/Stitch legt
+  außerdem jeden Stichplan im Cache ab (`~/.config/inkstitch/cache/stitch_plan`, Schlüssel aus
+  Element und Nachbarn, nicht aus dem Seed): Pläne aus Läufen ohne festen Seed können dort
+  liegen und wiederkommen. Einmal leeren, danach ist der Cache ohne Folgen:
+  `rm -rf ~/.config/inkstitch/cache/stitch_plan`.
 
 ## Fadenschnitte, Sprünge und die DST (gelesen am Commit d59c9ab, 29.09.2026)
 

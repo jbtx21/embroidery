@@ -42,6 +42,18 @@ export function inkstitchPython() {
     : resolve(inkstitchHome(), "venv", "bin", "python3");
 }
 
+/**
+ * The environment of the Ink/Stitch process: ours, plus where its source lies and a
+ * fixed hash seed. Python randomises the hash of strings per process, and with it the
+ * order of sets that Ink/Stitch iterates -- measured 29.09.2026 on the Hofbräu motif
+ * with the same template and a cold cache: 9.424, 9.425 and 9.426 stitches in three
+ * runs, three byte-identical DSTs with the seed fixed (CLAUDE.md rule 3). A seed the
+ * caller set is overridden, "random" included.
+ */
+export function inkstitchEnv() {
+  return { ...process.env, INKSTITCH_SRC: inkstitchSrc(), PYTHONHASHSEED: "0" };
+}
+
 /** True once inkstitch/setup.sh has run: the checkout and the interpreter both exist. */
 export function isInkstitchReady() {
   return existsSync(resolve(inkstitchSrc(), "inkstitch.py")) && existsSync(inkstitchPython());
@@ -83,7 +95,7 @@ export function runInkstitch({ extension, ids = [], options = {}, svg }) {
     let child;
     try {
       child = spawn(inkstitchPython(), args, {
-        env: { ...process.env, INKSTITCH_SRC: inkstitchSrc() },
+        env: inkstitchEnv(),
         stdio: ["ignore", "pipe", "pipe"],
       });
     } catch (err) {
