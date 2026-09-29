@@ -381,7 +381,10 @@ von 0,013 mm Breite im Köln-Logo ergab als „Mindestgröße" 5.538 mm. Deshalb
    dem Stoff nichts.
 4. Stücke ohne Mittelachse zählen nicht (Eckrundungen); nur ein vom Schließen ganz gefülltes
    **Loch** wird mit seinem einbeschriebenen Kreis gemessen und zählt, wenn der mindestens
-   0,1 mm hat.
+   0,1 mm hat. Ob ein Stück eine Achse hat, entscheidet die **Standard-Abtastung**; die
+   0,1-mm-Abtastung liest nur seine Breite. Bei 0,1 mm Abtastung bekäme jede Eckrundung eine
+   Achse und läse 0,12 mm (gemessen: STUTTGART 80 mm 134 statt 49 Lücken). Preis: ein Streifen
+   von 0,1 bis 0,15 mm hat bei Standard-Abtastung keine Achse und fällt heraus.
 
 **Ergebnis** je zu feinem Element: Art (Satinstrich oder Lücke), gemessene Breite, Grenze, und
 die **Logobreite, ab der es hält** (bestellte Breite × Grenze ÷ gemessene Breite).
