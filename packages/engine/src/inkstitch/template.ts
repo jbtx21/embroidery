@@ -5,7 +5,7 @@
  *
  * - **running** (`classifyShape`, under `SATIN_FROM_MM`): one stroked path
  *   along the strokes of the shape's axis (`strokeGraph`), joined where they
- *   meet, three passes as a bean stitch above `SINGLE_PASS_MAX_MM` (spec §7.4).
+ *   meet — a single pass, since one thread covers up to that width (spec §7.4).
  * - **satin**: `satinColumns`, one native Ink/Stitch satin column per stroke —
  *   rails and rungs in one path, `inkstitch:satin_column` — with the preset's
  *   parameters (spec §7.2 pull compensation from the column's own width, §7.3
@@ -25,7 +25,6 @@
 import type { Point, Polygon, Polyline } from "@texma-stitch/geometry";
 import { cumulativeLengths, simplify } from "@texma-stitch/geometry";
 import type { ImportedShape } from "../import/svg.js";
-import { SINGLE_PASS_MAX_MM } from "../import/svg.js";
 import type { Preset } from "../presets.js";
 import type { Warning } from "../types.js";
 import { warn, WARNING } from "../warnings.js";
@@ -75,7 +74,7 @@ function smoothLine(line: Polyline, reach: number): Polyline {
 
 export type TemplateObject =
   | { id: string; kind: "tatami"; shapeId: string; color: string; reason?: string }
-  | { id: string; kind: "running"; shapeId: string; color: string; passes: 1 | 3 }
+  | { id: string; kind: "running"; shapeId: string; color: string }
   | {
       id: string;
       kind: "satin";
@@ -236,7 +235,7 @@ export function buildInkstitchTemplate(
     );
     objects.push({ id, kind: "tatami", shapeId, color, ...(reason ? { reason } : {}) });
   };
-  const running = (shapeId: string, lines: Polyline[], color: string, passes: 1 | 3): void => {
+  const running = (shapeId: string, lines: Polyline[], color: string): void => {
     closeRun();
     const id = xmlId(shapeId);
     // Named explicitly: a plain stroke without a dash pattern is a narrow zigzag
@@ -245,19 +244,18 @@ export function buildInkstitchTemplate(
       stroke_method: "running_stitch",
       running_stitch_length_mm: num(RUNNING_STITCH_MM),
     };
-    if (passes === 3) attrs["bean_stitch_repeats"] = "1";
     body.push(
       `<path id="${xmlEscape(id)}" d="${lines.map(lineD).join(" ")}" ` +
         `style="fill:none;stroke:${xmlEscape(color)};stroke-width:0.1"${inkAttrs(attrs)}/>`,
     );
-    objects.push({ id, kind: "running", shapeId, color, passes });
+    objects.push({ id, kind: "running", shapeId, color });
   };
 
   for (const shape of shapes) {
     if (shape.kind === "line") {
       if (!shape.color || shape.polyline.length < 2) continue;
       const line = shape.closed ? [...shape.polyline, shape.polyline[0]!] : shape.polyline;
-      running(shape.id, [line], shape.color, 1);
+      running(shape.id, [line], shape.color);
       continue;
     }
     const cls = classifyShape(shape.polygon, shape.id);
@@ -280,7 +278,7 @@ export function buildInkstitchTemplate(
         tatami(shape.id, shape.polygon, shape.color, "no axis for a running stitch");
         continue;
       }
-      running(shape.id, lines, shape.color, cls.widthMm <= SINGLE_PASS_MAX_MM ? 1 : 3);
+      running(shape.id, lines, shape.color);
       continue;
     }
     const id = xmlId(shape.id);

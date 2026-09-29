@@ -13,19 +13,24 @@ const bar = (widthMm: number, lenMm = 40): ReturnType<typeof polygonOf> =>
   polygonOf(rect(0, 0, lenMm, widthMm));
 
 describe("classifyShape (satin-prep, part 1, item 2)", () => {
-  it("classifies a hairline as running with one pass", () => {
+  it("classifies a hairline as running", () => {
     const r = classifyShape(bar(0.5));
     expect(r.shapeClass).toBe("running");
-    expect(r.repeats).toBe(1);
-    expect(r.widthMm).toBeLessThan(SINGLE_PASS_MAX_MM);
+    expect(r.widthMm).toBeLessThan(SATIN_FROM_MM);
   });
 
-  it("classifies a wider-but-still-under-satin sliver as running with three passes", () => {
-    const r = classifyShape(bar(0.75));
-    expect(r.shapeClass).toBe("running");
-    expect(r.repeats).toBe(3);
-    expect(r.widthMm).toBeGreaterThan(SINGLE_PASS_MAX_MM);
-    expect(r.widthMm).toBeLessThan(SATIN_FROM_MM);
+  it("starts satin where one thread no longer covers the width (29.09.2026)", () => {
+    // Up to SINGLE_PASS_MAX_MM a single running stitch covers the shape
+    // (spec §7.4); above it only a column does. No three-pass band in between.
+    expect(SATIN_FROM_MM).toBe(SINGLE_PASS_MAX_MM);
+    const sliver = classifyShape(bar(0.75));
+    expect(sliver.shapeClass).toBe("satin");
+    expect(sliver.warnings[0]!.code).toBe("SATIN_TOO_NARROW");
+  });
+
+  it("makes the 0.73-mm slash of NotSan 01/24 satin and keeps 0.62-mm rims running", () => {
+    expect(classifyShape(bar(0.73)).shapeClass).toBe("satin");
+    expect(classifyShape(bar(0.62)).shapeClass).toBe("running");
   });
 
   it("classifies a column at the satin floor as satin, flagged narrow", () => {
@@ -56,7 +61,7 @@ describe("classifyShape (satin-prep, part 1, item 2)", () => {
   });
 
   it("classifies the CYS SPORTS stroke width (0.89-1.22 mm measured) as satin", () => {
-    // Comment in classify.ts explains why 0.8 mm and not spec §7.4's 0.6/1.2:
+    // Comment in classify.ts explains why 0.7 mm and not spec §7.4's 0.6:
     // this word mark's strokes must come out as ONE closed satin column.
     expect(classifyShape(bar(0.89)).shapeClass).toBe("satin");
     expect(classifyShape(bar(1.22)).shapeClass).toBe("satin");

@@ -407,7 +407,7 @@ Laufzeit mit Ink/Stitchs eigenem Stichspeicher 10–25 s je Logo; im ersten Lauf
 rund 4,5 min.
 
 **Schritt 2 — Schrift als Satin, gebaut, Probestick offen.** `packages/engine/src/inkstitch/`
-teilt jede Form nach Breite ein (Satin ab 0,8 mm, darunter Laufstich, über 5 mm Tatami) und
+teilt jede Form nach Breite ein (Satin ab 0,7 mm, darunter einfacher Laufstich, über 5 mm Tatami) und
 schreibt für Schrift und schmale Formen **eigene Ink/Stitch-Satinsäulen**: Strichplan aus der
 Mittelachse, an Kreuzungen läuft das gegenläufigste Paar durch, die übrigen Striche enden
 0,2 mm unter ihm; Rails aus der Kontur, über Öffnungen als gedachte Gerade; Deckung unter 0,85
@@ -423,8 +423,8 @@ lässt jedes Stückende in einem Punkt zusammenlaufen:
 
 `pnpm inkstitch` setzt Satin jetzt als Standard (Vorlage → `auto_satin --trim` je
 Farbfolge → `output`), `--tatami` behält den reinen Tatami-Lauf. Alle fünf Schriftzüge werden
-Satin; Rückfälle stehen mit Grund in der Ausgabe (u. a. „/" in „NotSan 01/24" mit 0,73 mm als
-Laufstich). Satin gegen Tatami-Lauf:
+Satin; Rückfälle stehen mit Grund in der Ausgabe. Satin gegen Tatami-Lauf (gemessen mit der
+ersten Grenze 0,8 mm):
 
 | Motiv                      | Stiche            | Trims   | Dichtespitze | Nadelhäufung |
 | -------------------------- | ----------------- | ------- | -----------: | -----------: |
@@ -440,3 +440,10 @@ p90 5,6). Offen, mit Einzelheiten in `docs/backlog.md`: Blöcke an Strichenden (
 G-Zunge) fächern, das Glätten rauer Konturen schließt beim „R" von „CYS SPORTS" den
 Beinschlitz, Pinselreste in „SEGEN SEIN" werden kurze Laufstiche, Satin auf Tatami-Grund wird
 nicht ausgespart (Schritt 3). Farbfolge und verdeckte Flächen sind unverändert (Schritt 3).
+
+**Grenze 0,7 mm (29.09.2026, Entscheidung des Nutzers).** Satin beginnt dort, wo ein Faden die
+Breite nicht mehr deckt (`SINGLE_PASS_MAX_MM`, §7.4); den dreifachen Laufstich zwischen 0,7 und
+0,8 mm gibt es in der Vorlage nicht mehr. Der „/" in „NotSan 01/24" (0,73 mm) ist jetzt Satin.
+Im Köln-Logo werden damit sechs Formen mehr als Satin angesetzt; zwei davon (0,7–0,8 mm) halten
+als Säule nicht und fallen auf Tatami zurück, die Dichtespitze steigt dort von 30 auf 34.
+Folgepunkt für Schritt 3: schmale Rückfälle als Laufstich statt Tatami.

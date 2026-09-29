@@ -137,7 +137,8 @@ describe("buildInkstitchTemplate", () => {
       ["rule:1", "running"],
     ]);
     const hairline = t.objects.find((o) => o.shapeId === "hairline")!;
-    expect(hairline).toMatchObject({ kind: "running", passes: 1 });
+    expect(hairline).toMatchObject({ kind: "running" });
+    expect(t.svg).not.toContain("bean_stitch_repeats");
     // A straight hairline is one straight line, not every wobble of its axis.
     const d = /<path id="hairline" d="([^"]*)"/.exec(t.svg)![1]!;
     expect(d.split(" L ").length).toBeLessThanOrEqual(3);
