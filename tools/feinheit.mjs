@@ -85,7 +85,11 @@ export function befundZeilen(findings, { max = Infinity } = {}) {
       `${"Grenze".padStart(8)} ${"hält ab".padStart(9)}  ${"Lage (mm)".padEnd(14)} Hinweis`,
   ];
   shown.forEach((f, i) => {
-    const hinweis = f.runningAlternative ? "alternativ Laufstich (dünne Zierlinie?)" : "";
+    const hinweis = f.runningAlternative
+      ? "alternativ Laufstich (dünne Zierlinie?)"
+      : f.measure === "inscribed-circle"
+        ? "Loch: Breite = einbeschriebener Kreis"
+        : "";
     lines.push(
       (
         `${String(i + 1).padStart(4)}  ${ART[f.kind].padEnd(11)} ${f.id.padEnd(idW)} ` +

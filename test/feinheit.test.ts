@@ -6,7 +6,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { initGeometry } from "@texma-stitch/geometry";
 import { checkMinimumSize } from "@texma-stitch/engine";
-import { areaShape, gapBlocks, polygonOf, rect } from "../packages/engine/test/fixtures/shapes.js";
+import {
+  areaShape,
+  gapBlocks,
+  polygonOf,
+  punzeDisc,
+  rect,
+} from "../packages/engine/test/fixtures/shapes.js";
 import {
   befundeJeArt,
   befundZeilen,
@@ -113,6 +119,12 @@ describe("befundZeilen", () => {
     const lines = befundZeilen(result.findings);
     expect(lines[2]).toContain("alternativ Laufstich");
     expect(lines[1]).not.toContain("alternativ Laufstich");
+  });
+
+  it("sagt bei einem Loch, dass seine Breite der einbeschriebene Kreis ist, nicht die Mittelachse", () => {
+    const shapes = [areaShape("ring", punzeDisc(0.5), GRAY)];
+    const lines = befundZeilen(checkMinimumSize(shapes, { widthMm: 80 }).findings);
+    expect(lines[1]).toContain("Loch: Breite = einbeschriebener Kreis");
   });
 
   it("kürzt die Anzeige und sagt, wie viele fehlen", () => {

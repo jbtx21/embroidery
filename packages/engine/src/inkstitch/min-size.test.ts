@@ -65,6 +65,7 @@ describe("checkMinimumSize — satin strokes", () => {
     expect(f.id).toBe("balken");
     expect(f.color).toBe(BLACK);
     expect(f.limitMm).toBe(1.3);
+    expect(f.measure).toBe("median");
     expect(f.measuredMm).toBeGreaterThan(0.95);
     expect(f.measuredMm).toBeLessThan(1.1);
     expect(f.holdsFromWidthMm).toBeCloseTo((B * 1.3) / f.measuredMm, 9);
@@ -111,6 +112,7 @@ describe("checkMinimumSize — gaps within a colour", () => {
     expect(f.color).toBe(GRAY);
     expect(f.id).toBe("gap-bebebe-001");
     expect(f.limitMm).toBe(0.8);
+    expect(f.measure).toBe("median");
     // The median width of the piece: the medial axis reads a strip of this size a little wide.
     expect(f.measuredMm).toBeGreaterThan(0.45);
     expect(f.measuredMm).toBeLessThan(0.65);
@@ -153,6 +155,8 @@ describe("checkMinimumSize — gaps within a colour", () => {
     expect(r.findings).toHaveLength(1);
     const f = r.findings[0]!;
     expect(f.kind).toBe("gap");
+    // Said out loud: this width is the circle that fits in the hole, not a median width.
+    expect(f.measure).toBe("inscribed-circle");
     expect(f.measuredMm).toBeGreaterThan(0.48);
     expect(f.measuredMm).toBeLessThan(0.52);
     expect(f.holdsFromWidthMm).toBeCloseTo((B * 0.8) / f.measuredMm, 9);

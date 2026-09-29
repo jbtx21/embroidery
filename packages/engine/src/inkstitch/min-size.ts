@@ -90,6 +90,11 @@ export type MinimumSizeFinding = {
   color: string;
   /** Width measured at the ordered size, mm. */
   measuredMm: number;
+  /**
+   * How it was measured: the median width of the shape (spec §5.2), or, for a hole the closing
+   * fills whole — a counter, which has no medial axis — the circle that fits in it.
+   */
+  measure: "median" | "inscribed-circle";
   /** The limit it falls under, mm. */
   limitMm: number;
   /** Logo width, mm, from which the element holds: ordered width × limit ÷ measured width. */
@@ -184,6 +189,7 @@ function satinStrokes(areas: Area[], widthMm: number, limitMm: number): MinimumS
       kind: "satin-stroke",
       color: shape.color,
       measuredMm: cls.widthMm,
+      measure: "median",
       limitMm,
       holdsFromWidthMm: holdsFromWidth(widthMm, limitMm, cls.widthMm),
       polygon: shape.polygon,
@@ -249,10 +255,15 @@ function inscribedDiameterMm(piece: Polygon): number {
  * counter, a hole filled whole: a round or square one of 0.5 mm has no axis either. A counter
  * is measured by the circle that fits in it. Anything else without an axis is `undefined`.
  */
-function gapWidthMm(piece: Polygon, holes: Polygon[]): number | undefined {
+function gapWidthMm(
+  piece: Polygon,
+  holes: Polygon[],
+): { widthMm: number; measure: MinimumSizeFinding["measure"] } | undefined {
   const median = medianShapeWidthMm(piece);
-  if (Number.isFinite(median)) return median;
-  return isFilledHole(piece, holes) ? inscribedDiameterMm(piece) : undefined;
+  if (Number.isFinite(median)) return { widthMm: median, measure: "median" };
+  return isFilledHole(piece, holes)
+    ? { widthMm: inscribedDiameterMm(piece), measure: "inscribed-circle" }
+    : undefined;
 }
 
 /**
@@ -336,7 +347,7 @@ function gaps(
         ignored.compact++;
         return;
       }
-      if (measured >= limitMm) {
+      if (measured.widthMm >= limitMm) {
         ignored.wide++;
         return;
       }
@@ -348,9 +359,10 @@ function gaps(
         id: `gap-${idOfColour(color)}-${String(i + 1).padStart(3, "0")}`,
         kind: "gap",
         color,
-        measuredMm: measured,
+        measuredMm: measured.widthMm,
+        measure: measured.measure,
         limitMm,
-        holdsFromWidthMm: holdsFromWidth(widthMm, limitMm, measured),
+        holdsFromWidthMm: holdsFromWidth(widthMm, limitMm, measured.widthMm),
         polygon: piece,
         at: centre(box),
         runningAlternative: false,
