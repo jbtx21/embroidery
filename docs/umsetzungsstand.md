@@ -538,12 +538,14 @@ der Nutzer §4.2 zurückgenommen (Spec §4.2 neu gefasst), und nach dem Vergleic
 - **Zugausgleich je Rail** (`50d4ca7`, `rail-pull.ts`): Ink/Stitch nimmt `pull_compensation_mm="a b"`,
   `a` für die erste Rail des Pfads, `b` für die zweite. Eine Rail zu einem Stoffspalt unter 1,0 mm
   (bis zur nächsten anderen Form liegt nur Stoff) bekommt keinen Ausgleich, eine Säule unter 1,0 mm
-  keinen auf beiden Rails. Der Spalt wird je Rail entlang der Sprossen nach außen gemessen, der Median
-  über die Säule entscheidet; eine berührende oder überdeckende Form und ein Spalt unter 0,1 mm zählen
-  nicht als Spalt. Rauchtest: die Stiche der einen Rail wandern um den Wert, die der anderen nicht, und
-  der Spalt Rot/Gold in der DST bleibt offen. `--zug-symmetrisch` gibt den Stand davor.
+  keinen auf beiden Rails (Regel 2, in diesem Stand noch für alle schmalen Säulen — überholt, siehe
+  „Regel 2 eingeschränkt“ unten). Der Spalt wird je Rail entlang der Sprossen nach außen gemessen, der
+  Median über die Säule entscheidet; eine berührende oder überdeckende Form und ein Spalt unter 0,1 mm
+  zählen nicht als Spalt. Rauchtest: die Stiche der einen Rail wandern um den Wert, die der anderen
+  nicht, und der Spalt Rot/Gold in der DST bleibt offen. `--zug-symmetrisch` gibt den Stand davor.
 
-Stand nach Punkt 4 → mit Zugausgleich je Rail, Preset `pique`:
+Stand nach Punkt 4 → mit Zugausgleich je Rail (Zwischenstand `cb1f01c`, Regel 2 für alle schmalen
+Säulen), Preset `pique`:
 
 | Motiv                      |          Stiche | Dichtespitze | Zellen >18 | Nadelhäufung | Zellen ab 6 |
 | -------------------------- | --------------: | -----------: | ---------: | -----------: | ----------: |
@@ -557,3 +559,45 @@ Stand nach Punkt 4 → mit Zugausgleich je Rail, Preset `pique`:
 Sprünge, Trims und Farbblöcke sind bei allen sechs unverändert. Gegen §16 (STUTTGART 80 mm) ist die
 Nadelhäufung mit 10 (≤ 8) nicht mehr erreicht; sie kommt von der Regel für Säulen unter 1,0 mm, nicht
 vom Stoffspalt (Einzelheiten und Hofbräu-Zahlen in `docs/backlog.md`).
+
+**Regel 2 eingeschränkt (29.09.2026, Nutzerentscheidung; Spec §7.8.3 Regel 2 in `a622fff`).** Der
+Zwischenstand oben hat die Frage aufgeworfen, ob „Säule unter 1,0 mm ohne Ausgleich“ für alle schmalen
+Säulen gelten soll (Nadelhäufung STUTTGART 80 mm 7 → 10). Entschieden: nur für Säulen unter 1,0 mm
+(`SATIN_NARROW_WARN_MM`), von denen mindestens eine Rail nach Regel 1 an einem Stoffspalt unter 1,0 mm
+liegt (gleiche Messung: entlang der Sprossen nach außen, Median über die Säule; ein Spalt unter 0,1 mm
+und eine berührende oder überdeckende Form zählen nicht). Sie bekommen auf beiden Rails keinen
+Ausgleich; alle übrigen schmalen Säulen behalten den Ausgleich nach §7.2, symmetrisch. Breite Säulen
+ändern sich nicht (nur die Rail zum Spalt bekommt 0). Umsetzung `6eb9f2f`: `railPull` in
+`rail-pull.ts` liefert dafür `narrowAtGap`, `template.ts` schreibt die Werte je Rail, `pnpm inkstitch` nennt die schmalen Säulen am
+Spalt; `--zug-symmetrisch` gibt weiter den Stand ohne §7.8.3. Zuerst die Tests: schmale Säule ohne
+Nachbarn → symmetrisch; Nachbar in 0,5 mm auf einer Seite → 0 auf beiden Rails; breite Säule am Spalt →
+nur diese Rail; schmale Säule, deren Nachbar nur berührt → symmetrisch.
+
+Zwischenstand `cb1f01c` (Regel 2 für alle schmalen Säulen) → Regel 2 nur am Stoffspalt, Preset `pique`,
+kalter Ink/Stitch-Cache:
+
+| Motiv                      |          Stiche | Dichtespitze | Zellen >18 | Nadelhäufung | Zellen ab 6 |  Trims/1000 |
+| -------------------------- | --------------: | -----------: | ---------: | -----------: | ----------: | ----------: |
+| STUTTGART 80 mm            | 13.577 → 13.578 |      21 → 22 |      7 → 5 |       10 → 7 |       3 → 3 | 3,39 → 3,39 |
+| STUTTGART 250 mm           | 74.674 → 74.674 |      29 → 29 |    15 → 15 |        9 → 9 |     32 → 32 | 0,76 → 0,76 |
+| Berufsfeuerwehr Köln 90 mm | 20.680 → 20.711 |      29 → 29 |    40 → 30 |        8 → 8 |     15 → 11 | 4,11 → 4,10 |
+| Eislingen Print 200 mm     | 32.659 → 32.669 |      20 → 20 |      1 → 1 |        6 → 6 |       1 → 1 | 4,47 → 4,47 |
+| Atzensport Hofbräu 80 mm   | 11.928 → 11.959 |      23 → 24 |      1 → 3 |        7 → 7 |       3 → 3 | 9,73 → 9,70 |
+| Atzensport Hofbräu 200 mm  | 46.483 → 46.496 |      23 → 23 |      4 → 4 |        6 → 6 |       5 → 3 | 2,47 → 2,47 |
+
+Sprünge, Trims und Farbblöcke sind bei allen sechs unverändert. STUTTGART 80 mm hat wieder die
+Kennzahlen von „Stand nach Punkt 4“ (13.578 Stiche, Dichtespitze 22, Zellen über 18: 5,
+Nadelhäufung 7); die DST von Köln ist byte-gleich mit ihr. Gegen §16 (STUTTGART 80 mm) sind
+Dichtespitze 22 (≤ 24), Nadelhäufung 7 (≤ 8) und Trims/1000 3,4 (≤ 5,6) wieder erreicht,
+Farbblöcke bleiben bei 6 statt ≤ 4 (Spec-Frage in `docs/backlog.md`). Atzensport 80 mm liegt gegen den
+Zwischenstand etwas schlechter (Dichtespitze 24, Zellen über 18: 3 statt 1); gegen „Stand nach Punkt 4“
+(Dichtespitze 23, Zellen ab 6: 2) bleibt ein Unterschied, der von den Säulen am Stoffspalt kommt
+(Regeln 1 und 2).
+
+**Hofbräu-Mütze** (Vorlage aus dem PDF des Nutzers, nicht im Repo; Preset `cap`, 110 mm): alle 28 Säulen
+unter 1,0 mm liegen an einem Stoffspalt, keine bekommt den Ausgleich zurück; die Vorlage ist
+byte-gleich mit der vom Zwischenstand. Die DST unterscheidet sich nur um einen Stich (9.426 statt
+9.427): bei gleicher Vorlage weichen zwei Läufe an dieser Datei um einen Stich ab, zwei von drei
+Läufen sind byte-gleich. Der Spalt Rot/Gold ist unverändert (Median der Abstände Gold → nächster roter
+Einstich: ganzes Motiv 0,50 mm, „Ho“ 0,50, „Stu“ 0,41; Anteil unter 0,3 mm 21 % / 30 % / 24 %); die
+93 Rails am Stoffspalt teilen sich in 61 an breiten Säulen und 32 an den 28 schmalen.

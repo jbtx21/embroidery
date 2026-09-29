@@ -24,17 +24,27 @@ Schattenlinien von 0,75 mm) und an den sechs Kundenlogos gemessen.
   unter 0,3 mm neben sich), je Rail liegt er wieder beim gezeichneten Wert. In den Bildern
   (12 bis 100 Pixel je mm, Garnfarben auf Schwarz) liegt zwischen Rot und Gold schwarzer Stoff,
   vorher berühren sich beide. Stiche 9.446 → 9.426, Nadelhäufung 8 → 6, 28 Säulen unter 1,0 mm
-  und 61 Rails am Stoffspalt ohne Ausgleich (kleinster Spalt 0,17 mm).
+  und 93 Rails am Stoffspalt ohne Ausgleich (61 an breiten, 32 an schmalen Säulen; kleinster Spalt
+  0,17 mm).
 
-- **Regel (a) allein öffnet den Spalt genauso; Regel (b) kostet.** Im Versuch (Scratchpad, beide
-  Regeln einzeln abschaltbar): nur „Rail am Stoffspalt ohne Ausgleich" gibt am Hofbräu-Motiv dieselbe
-  Verteilung (Median 0,50, 21 % unter 0,3 mm), denn beide Rails, die sich gegenüberliegen, sind
-  ausgenommen. „Säule unter 1,0 mm ohne Ausgleich" ändert daran nichts, verschlechtert aber die Kennzahlen:
-  STUTTGART 80 mm Nadelhäufung 7 → 10 und Zellen über 18 5 → 7, Köln 30 → 40 und Zellen ab 6
-  Einstichen 11 → 15, Atzensport 200 mm 3 → 5; mit nur (a) hat STUTTGART 80 mm dieselben Kennzahlen wie
-  vorher. Die Zelle mit 10 Einstichen liegt an einer Zickzackspitze am Ende einer schmalen Säule. Frage
-  an die Spec: (b) beibehalten (dünne Linien so schmal wie gezeichnet) oder auf Säulen an einem
-  Stoffspalt beschränken? §16 (Nadelhäufung ≤ 8 an STUTTGART 80 mm) ist mit (b) verfehlt.
+- **Regel (b) — entschieden am 29.09.2026: nur für Säulen am Stoffspalt (Nutzerentscheidung, Spec
+  §7.8.3 Regel 2 in `a622fff`).** Die Frage war, ob „Säule unter 1,0 mm ohne Ausgleich“ für alle
+  schmalen Säulen gelten soll oder nur für die an einem Stoffspalt. Im Versuch (Scratchpad, beide
+  Regeln einzeln abschaltbar) gab „Rail am Stoffspalt ohne Ausgleich“ (a) allein am Hofbräu-Motiv
+  dieselbe Verteilung (Median 0,50, 21 % unter 0,3 mm), denn beide Rails, die sich gegenüberliegen,
+  sind ausgenommen; (b) für alle schmalen Säulen änderte daran nichts, verschlechterte aber die
+  Kennzahlen: STUTTGART 80 mm Nadelhäufung 7 → 10 und Zellen über 18 5 → 7, Köln 30 → 40 und Zellen ab 6
+  Einstichen 11 → 15, Atzensport 200 mm 3 → 5. Die Zelle mit 10 Einstichen liegt an einer
+  Zickzackspitze am Ende einer schmalen Säule. Umgesetzt und gemessen (`rail-pull.ts`, Preset
+  `pique`, Regel (b) für alle schmalen → nur am Stoffspalt): STUTTGART 80 mm Nadelhäufung 10 → 7,
+  Zellen über 18 7 → 5 (dieselben Kennzahlen wie vor §7.8.3, §16 mit Nadelhäufung ≤ 8 wieder
+  erreicht); Köln Zellen über 18 40 → 30, ab 6 Einstichen 15 → 11 (DST byte-gleich mit dem Stand vor
+  §7.8.3); Atzensport 200 mm Zellen ab 6 5 → 3; Atzensport 80 mm Zellen über 18 1 → 3, Dichtespitze
+  23 → 24 (die Rail-Regel (a) bleibt); STUTTGART 250 mm und Eislingen unverändert. Hofbräu-Mütze
+  unverändert: alle 28 Säulen unter 1,0 mm liegen an einem Stoffspalt, keine bekommt den Ausgleich
+  zurück, die Vorlage ist byte-gleich, der Spalt Rot/Gold gleich (Median 0,50 mm ganz und „Ho“,
+  0,41 mm „Stu“; 21 % / 30 % / 24 % unter 0,3 mm). Zahlen je Logo: `docs/umsetzungsstand.md`,
+  „Regel 2 eingeschränkt“.
 - **Was die Spec offenließ.** (1) Untergrenze des Spalts: 0,1 mm (die DST-Auflösung, wie §5.2
   Regel 3); ein Spalt darunter ist eine Haarnaht zwischen gezeichneten Formen, die der Faden ohnehin
   schließt. Ohne Untergrenze bekämen berührende Formen mit Nähten von 0,01 mm keinen Ausgleich.
