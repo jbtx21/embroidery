@@ -3,7 +3,7 @@
  * check (docs/adr/0001-inkstitch-als-stich-engine.md, decision 28.09.2026).
  *
  *   pnpm inkstitch <svg> [preset] [--tatami] [--breite <mm>] [--ueberlappung <mm2>]
- *                        [--aussparen] [--naht <mm>]
+ *                        [--aussparen] [--naht <mm>] [--zug-symmetrisch]
  *
  * --breite <mm> scales the motif proportionally to that width before anything is
  * imported (tools/breite.mjs); the output names the factor and the new size, and
@@ -19,6 +19,10 @@
  * a later satin shape spare its place out of the tatami beneath it, --naht sets how
  * far a tatami area grows under a later one it only touches (standard 0.8 mm, §4.1
  * rule 5; §4.2 asked for 0.3). Without them the knockdown is §4.1.
+ *
+ * --zug-symmetrisch gives both rails of every satin column the pull compensation
+ * of spec §7.2 again. The standard is §7.8.3: none on the rail towards a fabric gap
+ * under 1.0 mm, none for a column under 1.0 mm (the output lists them).
  *
  * Satin (default) — lettering and narrow shapes set the way a puncher sets
  * them:
@@ -183,6 +187,7 @@ const VALUE_FLAGS = ["--breite", "--ueberlappung", "--naht"];
 const args = process.argv.slice(2);
 const tatamiOnly = args.includes("--tatami");
 const satinCutout = args.includes("--aussparen");
+const railPullSymmetric = args.includes("--zug-symmetrisch");
 const [svgArg, presetArg = "pique"] = args.filter(
   (a, i) => !a.startsWith("--") && !VALUE_FLAGS.includes(args[i - 1]),
 );
@@ -207,7 +212,7 @@ const touchUnderlapMm = numberFlag("--naht", { min: 0 });
 if (!svgArg) {
   console.error(
     "Aufruf: pnpm inkstitch <svg> [preset] [--tatami] [--breite <mm>] [--ueberlappung <mm2>] " +
-      "[--aussparen] [--naht <mm>]",
+      "[--aussparen] [--naht <mm>] [--zug-symmetrisch]",
   );
   console.error(`Presets: ${Object.keys(PRESETS).join(", ")}`);
   process.exit(1);
@@ -216,9 +221,12 @@ if (!(presetArg in PRESETS)) {
   console.error(`Unbekanntes Preset "${presetArg}". Bekannt: ${Object.keys(PRESETS).join(", ")}`);
   process.exit(1);
 }
-if (tatamiOnly && (minOverlapMm2 !== undefined || satinCutout || touchUnderlapMm !== undefined)) {
+if (
+  tatamiOnly &&
+  (minOverlapMm2 !== undefined || satinCutout || touchUnderlapMm !== undefined || railPullSymmetric)
+) {
   console.error(
-    "--ueberlappung, --aussparen und --naht gelten für die Vorlage und nicht mit --tatami",
+    "--ueberlappung, --aussparen, --naht und --zug-symmetrisch gelten für die Vorlage und nicht mit --tatami",
   );
   process.exit(1);
 }
@@ -257,6 +265,7 @@ let fallbacks = [];
 let narrowLines = [];
 let smoothed = [];
 let knockdown;
+let railPull;
 let orderVariant;
 let underlay;
 let compensation;
@@ -283,6 +292,7 @@ if (tatamiOnly) {
     knockdown: true,
     ...(satinCutout ? { satinCutout: true } : {}),
     ...(touchUnderlapMm === undefined ? {} : { touchUnderlapMm }),
+    ...(railPullSymmetric ? { railPullBySide: false } : {}),
     ...(minOverlapMm2 === undefined ? {} : { minOverlapMm2 }),
   });
   templateMs = performance.now() - started;
@@ -308,6 +318,7 @@ if (tatamiOnly) {
   narrowLines = template.objects.filter((o) => o.kind === "running" && o.reason);
   smoothed = template.objects.filter((o) => o.kind === "satin" && o.smoothedMm > 0);
   knockdown = template.knockdown;
+  railPull = template.railPull;
   if (template.orderSwaps !== undefined) {
     orderVariant = {
       minOverlapMm2,
@@ -481,6 +492,20 @@ if (knockdown) {
     if (knockdown.satin.length > 12) {
       console.log(`    … und ${knockdown.satin.length - 12} weitere (nicht aufgelistet)`);
     }
+  }
+}
+if (railPull && railPull.narrow.length + railPull.gaps.length > 0) {
+  const smallest = [...railPull.gaps].sort((a, b) => a.gapMm - b.gapMm);
+  console.log(
+    `\nZugausgleich je Rail (Spec §7.8.3): ${railPull.narrow.length} Säulen unter 1,0 mm ohne ` +
+      `Ausgleich, ${railPull.gaps.length} Rails zu einem Stoffspalt unter 1,0 mm ohne Ausgleich` +
+      (smallest.length > 0 ? ` (kleinster Spalt ${smallest[0].gapMm.toFixed(2)} mm)` : ""),
+  );
+  for (const g of smallest.slice(0, 10)) {
+    console.log(`  ${g.id}: Rail ${g.side} mit ${g.gapMm.toFixed(2)} mm Stoffspalt`);
+  }
+  if (smallest.length > 10) {
+    console.log(`  … und ${smallest.length - 10} weitere Rails (nicht aufgelistet)`);
   }
 }
 if (orderVariant) {

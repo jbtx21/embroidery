@@ -8,8 +8,10 @@
  *   meet — a single pass, since one thread covers up to that width (spec §7.4).
  * - **satin**: `satinColumns`, one native Ink/Stitch satin column per stroke —
  *   rails and rungs in one path, `inkstitch:satin_column` — with the preset's
- *   parameters (spec §7.2 pull compensation from the column's own width, §7.3
- *   zigzag spacing, §7.4 split above 7 mm, §7.6 underlay by width). Where the
+ *   parameters (spec §7.2 pull compensation from the column's own width — per
+ *   rail, none towards a fabric gap under 1.0 mm and none for a column under
+ *   1.0 mm, §7.8.3, `rail-pull.ts` —, §7.3 zigzag spacing, §7.4 split above
+ *   7 mm, §7.6 underlay by width). Where the
  *   columns do not hold (`SatinColumnsResult.reason`), the shape stays tatami
  *   and the reason goes into the warnings and the object list — unless it is
  *   under `SATIN_NARROW_WARN_MM`: a shape that thin is a line, and a fill of it
@@ -54,6 +56,8 @@ import { classifyShape, SATIN_NARROW_WARN_MM } from "./classify.js";
 import type { SatinColumnPlan } from "./columns.js";
 import { satinColumns, STAYS_TATAMI } from "./columns.js";
 import { cutOutSatin, knockdownAreas } from "./knockdown.js";
+import { formIndex, isFabricGap, railPull, satinPullCompMm } from "./rail-pull.js";
+import type { Form, RailPull } from "./rail-pull.js";
 import { colourBlockCount, orderSwaps, sequenceByColour } from "./sequence.js";
 import type { SwapBox } from "./sequence.js";
 import { compensateArea, fillAngles, gridUnderlay, tatamiAttributes } from "./tatami.js";
@@ -162,6 +166,14 @@ export type TemplateOrderSwap = {
   largest: SwapBox;
 };
 
+/** What the pull compensation per rail left out (spec §7.8.3). */
+export type RailPullReport = {
+  /** Columns under `SATIN_NARROW_WARN_MM`: no pull compensation at all (rule 2). */
+  narrow: string[];
+  /** Rails at a fabric gap under 1.0 mm: none on that side (rule 1), with the median gap, mm. */
+  gaps: { id: string; side: "A" | "B"; gapMm: number }[];
+};
+
 /** What the pull and push compensation did to the tatami areas (spec §8.1.1). */
 export type CompensationReport = {
   /** Areas the push would have cut apart, compensated by the pull alone, with the parts it would have made. */
@@ -187,6 +199,8 @@ export type TemplateResult = {
   orderSwaps?: TemplateOrderSwap[];
   /** Present when `TemplateOptions.knockdown` was on. */
   knockdown?: KnockdownReport;
+  /** The pull compensation per rail, unless `TemplateOptions.railPullBySide` is off. */
+  railPull?: RailPullReport;
   compensation: CompensationReport;
   underlay: UnderlayReport;
 };
@@ -219,6 +233,12 @@ export type TemplateOptions = {
    * logo and was withdrawn.
    */
   touchUnderlapMm?: number;
+  /**
+   * The pull compensation of a satin column per rail (spec §7.8.3): none towards a fabric gap under
+   * 1.0 mm, none at all for a column under 1.0 mm. Default: on. Off: both rails of every column get
+   * the compensation of §7.2, as before.
+   */
+  railPullBySide?: boolean;
 };
 
 const num = (n: number): string => (Math.round(n * 1e4) / 1e4).toString();
@@ -234,15 +254,20 @@ const polygonD = (poly: Polygon): string =>
     .map((r) => `${lineD(r)} Z`)
     .join(" ");
 
-/** Pull compensation per side (spec §7.2): a share of the column's width, clamped. */
-export function satinPullCompMm(widthMm: number, preset: Preset): number {
-  const pct = (preset.pullCompPct / 100) * widthMm;
-  return Math.min(preset.pullCompMaxMm, Math.max(preset.pullCompMinMm, pct));
-}
+export { satinPullCompMm };
 
-/** The Ink/Stitch parameters of one satin column (module doc). */
-export function satinColumnAttributes(widthMm: number, preset: Preset): Record<string, string> {
+/**
+ * The Ink/Stitch parameters of one satin column (module doc). `pull` is the pull compensation per
+ * rail, rail A then rail B (spec §7.8.3, `rail-pull.ts`); without it both rails get the amount of
+ * §7.2 for the width. Two values are written only where the rails differ.
+ */
+export function satinColumnAttributes(
+  widthMm: number,
+  preset: Preset,
+  pull?: [number, number],
+): Record<string, string> {
   const u = preset.satinUnderlay;
+  const side = satinPullCompMm(widthMm, preset);
   const underlay: Record<string, string> =
     widthMm < UNDERLAY_WIDE_FROM_MM
       ? {
@@ -259,11 +284,14 @@ export function satinColumnAttributes(widthMm: number, preset: Preset): Record<s
   return {
     satin_column: "true",
     zigzag_spacing_mm: num(preset.satinSpacingMm),
-    pull_compensation_mm: num(satinPullCompMm(widthMm, preset)),
+    pull_compensation_mm: pullAttribute(pull ?? [side, side]),
     max_stitch_length_mm: num(SATIN_SPLIT_MM),
     ...underlay,
   };
 }
+
+const pullAttribute = ([a, b]: [number, number]): string =>
+  a === b ? num(a) : `${num(a)} ${num(b)}`;
 
 const inkAttrs = (attrs: Record<string, string>): string =>
   Object.entries(attrs)
@@ -676,10 +704,44 @@ function compensate(
 const trimAttr = (p: { trimAfter: boolean }): Record<string, string> =>
   p.trimAfter ? { trim_after: "true" } : {};
 
+/**
+ * The pull compensation of every satin column per rail (spec §7.8.3, `rail-pull.ts`), against
+ * the forms of the design: the outlines of the shapes as they were drawn, whatever the knockdown
+ * and the compensation made of the tatami areas since.
+ */
+function railPulls(
+  planned: Planned[],
+  preset: Preset,
+): { byColumn: Map<string, RailPull>; report: RailPullReport } {
+  const shapes = new Map<string, Form>();
+  for (const p of planned) {
+    if (p.cover !== undefined && !shapes.has(p.shapeId)) {
+      shapes.set(p.shapeId, { shapeId: p.shapeId, polygon: p.cover });
+    }
+  }
+  const forms = formIndex([...shapes.values()]);
+  const byColumn = new Map<string, RailPull>();
+  const report: RailPullReport = { narrow: [], gaps: [] };
+  for (const p of planned) {
+    if (p.kind !== "satin") continue;
+    const own = shapes.get(p.shapeId);
+    for (const c of p.columns) {
+      const r = railPull(c, own, forms, preset);
+      byColumn.set(c.id, r);
+      if (r.narrow) report.narrow.push(c.id);
+      (["A", "B"] as const).forEach((side, i) => {
+        if (isFabricGap(r.gapMm[i]!)) report.gaps.push({ id: c.id, side, gapMm: r.gapMm[i]! });
+      });
+    }
+  }
+  return { byColumn, report };
+}
+
 /** Writes the planned objects, in their order, as the SVG body (module doc). */
 function emitTemplate(
   planned: Planned[],
   preset: Preset,
+  pulls?: Map<string, RailPull>,
 ): {
   body: string;
   objects: TemplateObject[];
@@ -751,7 +813,7 @@ function emitTemplate(
         (c) =>
           `<path id="${xmlEscape(c.id)}" d="${satinColumnD(c)}" ` +
           `style="fill:none;stroke:${xmlEscape(p.color)};stroke-width:0.1"` +
-          `${inkAttrs(satinColumnAttributes(c.widthMm, preset))}/>`,
+          `${inkAttrs(satinColumnAttributes(c.widthMm, preset, pulls?.get(c.id)?.pull))}/>`,
       );
       body.push(`<g id="${xmlEscape(p.id)}">${inner.join("")}</g>`);
       run.ids.push(...p.columns.map((c) => c.id));
@@ -801,7 +863,12 @@ export function buildInkstitchTemplate(
   planned = withFillAngles(planned, preset);
   const compensated = compensate(planned, preset, warnings);
   planned = compensated.planned;
-  const { body, objects, satinRuns, underlayReport } = emitTemplate(planned, preset);
+  const pulls = opts.railPullBySide === false ? undefined : railPulls(planned, preset);
+  const { body, objects, satinRuns, underlayReport } = emitTemplate(
+    planned,
+    preset,
+    pulls?.byColumn,
+  );
 
   const svg =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
@@ -821,6 +888,7 @@ export function buildInkstitchTemplate(
       ? {}
       : { colourBlocksStandard: standard.blocks, orderSwaps: standard.swaps }),
     ...(knockdown ? { knockdown } : {}),
+    ...(pulls ? { railPull: pulls.report } : {}),
     compensation: compensated.report,
     underlay: underlayReport,
   };

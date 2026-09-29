@@ -90,6 +90,20 @@ describe("satinColumnAttributes", () => {
   });
 });
 
+describe("satinColumnAttributes with a pull per rail (spec §7.8.3)", () => {
+  it("writes two values, rail A then rail B, where the rails differ", () => {
+    const a = satinColumnAttributes(2.4, pique, [0, 0.288]);
+    expect(a.pull_compensation_mm).toBe("0 0.288");
+    expect(satinColumnAttributes(2.4, pique, [0.288, 0]).pull_compensation_mm).toBe("0.288 0");
+  });
+
+  it("writes one value where both rails are alike, as before", () => {
+    expect(satinColumnAttributes(2.4, pique, [0.288, 0.288]).pull_compensation_mm).toBe("0.288");
+    expect(satinColumnAttributes(0.8, pique, [0, 0]).pull_compensation_mm).toBe("0");
+    expect(satinColumnAttributes(2.4, pique).pull_compensation_mm).toBe("0.288");
+  });
+});
+
 describe("satinColumnD", () => {
   it("writes both rails, then every rung, each as its own sub-path", () => {
     const column = satinColumns(GLYPHS.T!, { underlapMm: 0.2, idPrefix: "T" }).columns[0]!;
@@ -477,6 +491,64 @@ describe("touching tatami areas under each other in the template (spec §4.1 rul
       touchUnderlapMm: 0.3,
     });
     expect(cut.knockdown!.areaMm2.after).toBeCloseTo(40 * 30 + 20 * 20 - 18.4 * 18.4, 0);
+  });
+});
+
+describe("pull compensation per rail (spec §7.8.3)", () => {
+  // The Hofbräu motif in miniature: a red stroke of 2.4 mm and, 0.53 mm below it, a gold line of 0.75 mm.
+  const cap = PRESETS.cap;
+  const red = area("red", polygonOf(rect(0, 0, 30, 2.4)), "#d2060d");
+  const gold = (gap: number): ImportedShape =>
+    area("gold", polygonOf(rect(0, 2.4 + gap, 30, 0.75)), "#d1b35a");
+  const pullOf = (svg: string, id: string): string =>
+    new RegExp(`<path id="${id}"[^>]*inkstitch:pull_compensation_mm="([^"]*)"`).exec(svg)![1]!;
+  const full = satinPullCompMm(2.4, cap);
+
+  it("gives the rail at a fabric gap under 1.0 mm none, the column under 1.0 mm none at all", () => {
+    const t = buildInkstitchTemplate([gold(0.53), red], cap, PAGE);
+    expect(t.objects.map((o) => o.kind)).toEqual(["satin", "satin"]);
+    const [a, b] = pullOf(t.svg, "red-0").split(" ").map(Number);
+    // Exactly one rail is left without: the one facing the gold line.
+    expect([a, b].sort()).toEqual([0, full].sort());
+    expect(pullOf(t.svg, "gold-0")).toBe("0");
+    expect(t.railPull!.narrow).toEqual(["gold-0"]);
+    expect(t.railPull!.gaps).toHaveLength(1);
+    expect(t.railPull!.gaps[0]).toMatchObject({ id: "red-0", side: a === 0 ? "A" : "B" });
+    expect(t.railPull!.gaps[0]!.gapMm).toBeCloseTo(0.53, 2);
+  });
+
+  it("keeps the compensation of both rails where the neighbour is no fabric gap under 1.0 mm", () => {
+    for (const gap of [0, 1.5]) {
+      const t = buildInkstitchTemplate([gold(gap), red], cap, PAGE);
+      expect(pullOf(t.svg, "red-0")).toBe(String(full));
+      expect(t.railPull!.gaps).toEqual([]);
+    }
+    const alone = buildInkstitchTemplate([red], cap, PAGE);
+    expect(pullOf(alone.svg, "red-0")).toBe(String(full));
+    expect(alone.railPull).toEqual({ narrow: [], gaps: [] });
+  });
+
+  it("measures the gap to a form of any kind: a tatami area counts as well as a satin line", () => {
+    const area2 = area("plate", polygonOf(rect(0, 2.9, 30, 10)), "#1f3a93");
+    const t = buildInkstitchTemplate([area2, red], cap, PAGE);
+    expect(pullOf(t.svg, "red-0").split(" ")).toHaveLength(2);
+    expect(t.railPull!.gaps).toHaveLength(1);
+  });
+
+  it("is switched off by railPullBySide: false — every rail as before", () => {
+    const t = buildInkstitchTemplate([gold(0.53), red], cap, { ...PAGE, railPullBySide: false });
+    expect(pullOf(t.svg, "red-0")).toBe(String(full));
+    expect(pullOf(t.svg, "gold-0")).toBe(String(satinPullCompMm(0.75, cap)));
+    expect(t.railPull).toBeUndefined();
+  });
+
+  it("does not change the order, the columns or the geometry — only the attribute", () => {
+    const on = buildInkstitchTemplate([gold(0.53), red], cap, PAGE);
+    const off = buildInkstitchTemplate([gold(0.53), red], cap, { ...PAGE, railPullBySide: false });
+    const strip = (svg: string): string =>
+      svg.replace(/ inkstitch:pull_compensation_mm="[^"]*"/g, "");
+    expect(strip(on.svg)).toBe(strip(off.svg));
+    expect(on.objects).toEqual(off.objects);
   });
 });
 

@@ -449,6 +449,133 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
   );
 
   it(
+    'Satin: pull_compensation_mm "a b" wirkt je Rail — die Stiche der einen Rail wandern nach außen, die der anderen nicht',
+    async () => {
+      // Ink/Stitch takes two values for the two rails of a column (`get_split_mm_param_as_px`); spec
+      // §7.8.3 leans on it. A vertical bar of 3 mm: the outermost stitches lie at the rails plus the
+      // compensation of their side. Rail A is the first sub-path of the template's path. The DST is
+      // centred on its stitches, so two small squares far out to both sides hold the frame still.
+      await initEngine();
+      const shape = (id: string, x: number, y: number, w: number, h: number, color: string) => ({
+        kind: "area" as const,
+        id,
+        polygon: polygonOf(rect(x, y, w, h)),
+        color,
+        attrs: {},
+        trimAfter: "auto" as const,
+      });
+      const template = buildInkstitchTemplate(
+        [
+          shape("left", 1, 5, 3, 3, "#1f3a93"),
+          shape("bar", 18.5, 5, 3, 20, "#c8102e"),
+          shape("right", 36, 5, 3, 3, "#1f3a93"),
+        ],
+        PRESETS.pique,
+        { widthMm: 40, heightMm: 30, railPullBySide: false },
+      );
+      const d = /<path id="bar-0" d="([^"]*)"/.exec(template.svg)![1]!;
+      const [railA, railB] = d.split(" M ").map((s) => s.replace(/^M /, ""));
+      const meanX = (rail: string): number => {
+        const xs = [...rail.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => Number(m[1]));
+        return xs.reduce((s, x) => s + x, 0) / xs.length;
+      };
+      const aIsLeft = meanX(railA!) < meanX(railB!);
+
+      const dir = mkdtempSync(join(tmpdir(), "texma-railpull-"));
+      try {
+        const extent = async (pull: string): Promise<{ left: number; right: number }> => {
+          const svg = join(dir, `p${pull.replace(/\W/g, "_")}.svg`);
+          writeFileSync(
+            svg,
+            template.svg.replace(
+              /inkstitch:pull_compensation_mm="[^"]*"/,
+              `inkstitch:pull_compensation_mm="${pull}"`,
+            ),
+          );
+          const r = await runInkstitch({ extension: "output", options: { format: "dst" }, svg });
+          expect(r.stderr.trim()).toBe("");
+          // The bar is at the middle of the frame, the squares 16 mm and more from it.
+          const xs = unitsToMm(readDst(new Uint8Array(r.stdout)).stitches)
+            .filter((s) => s.cmd === "stitch" && Math.abs(s.x) < 8)
+            .map((s) => s.x);
+          return { left: Math.min(...xs), right: Math.max(...xs) };
+        };
+        const [none, a, b, both] = await Promise.all([
+          extent("0 0"),
+          extent("0.4 0"),
+          extent("0 0.4"),
+          extent("0.4 0.4"),
+        ]);
+        // Left moves by the value of the left rail, right by the value of the right one.
+        const near = (v: number, w: number): void => expect(Math.abs(v - w)).toBeLessThan(0.15);
+        const [leftOnly, rightOnly] = aIsLeft ? [a, b] : [b, a];
+        near(leftOnly.left, none.left - 0.4);
+        near(leftOnly.right, none.right);
+        near(rightOnly.left, none.left);
+        near(rightOnly.right, none.right + 0.4);
+        near(both.left, none.left - 0.4);
+        near(both.right, none.right + 0.4);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 2,
+  );
+
+  it(
+    "Zugausgleich je Rail (§7.8.3): der Stoffspalt zwischen Rot und Gold bleibt in der DST offen — symmetrisch wächst er zu",
+    async () => {
+      // The Hofbräu cap in miniature (cap preset): a red stroke of 2.4 mm and, 0.53 mm below it, a gold
+      // line of 0.75 mm. Symmetric, red pulls 0.29 mm and gold 0.2 mm into the gap (0.04 mm left);
+      // per rail, the two rails that face each other stay as drawn. The gap in the DST is the distance
+      // between the stitches of the two colours, so where the DST puts its origin does not matter.
+      await initEngine();
+      const shape = (id: string, y: number, h: number, color: string) => ({
+        kind: "area" as const,
+        id,
+        polygon: polygonOf(rect(0, y, 30, h)),
+        color,
+        attrs: {},
+        trimAfter: "auto" as const,
+      });
+      const shapes = [shape("gold", 2.93, 0.75, "#d1b35a"), shape("red", 0, 2.4, "#d2060d")];
+      const dir = mkdtempSync(join(tmpdir(), "texma-luecke-"));
+      try {
+        const gap = async (railPullBySide: boolean): Promise<number> => {
+          const template = buildInkstitchTemplate(shapes, PRESETS.cap, {
+            widthMm: 40,
+            heightMm: 10,
+            railPullBySide,
+          });
+          const svg = join(dir, `g${railPullBySide}.svg`);
+          writeFileSync(svg, template.svg);
+          const r = await runInkstitch({ extension: "output", options: { format: "dst" }, svg });
+          expect(r.stderr.trim()).toBe("");
+          const all = unitsToMm(readDst(new Uint8Array(r.stdout)).stitches);
+          const change = all.findIndex((s) => s.cmd === "color");
+          expect(change).toBeGreaterThan(0);
+          const ys = (part: typeof all): number[] =>
+            part.filter((s) => s.cmd === "stitch").map((s) => s.y);
+          const first = ys(all.slice(0, change));
+          const second = ys(all.slice(change));
+          // Two blocks one above the other: the gap is between the near edges.
+          return Math.max(
+            Math.min(...second) - Math.max(...first),
+            Math.min(...first) - Math.max(...second),
+          );
+        };
+        const [symmetric, perRail] = await Promise.all([gap(false), gap(true)]);
+        expect(perRail).toBeGreaterThan(0.43);
+        expect(perRail).toBeLessThan(0.63);
+        expect(symmetric).toBeLessThan(0.2);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 2,
+  );
+
+  it(
     "fill_to_satin: Fläche + zwei Sprossen ergibt eine Satin-Spalte",
     async () => {
       const svg = resolve(fixturesDir, "fill-with-rungs.svg");

@@ -49,6 +49,7 @@ pnpm inkstitch <svg> [preset] --breite 120   # das Motiv proportional auf 120 mm
 pnpm inkstitch <svg> [preset] --ueberlappung 20   # Variante: Überlappungen unter 20 mm² binden die Farbfolge nicht (Standard: jede, §10.1)
 pnpm inkstitch <svg> [preset] --aussparen   # Variante: Satin spart die Tatami-Fläche darunter aus (Spec §4.2 Regel 1, verworfen)
 pnpm inkstitch <svg> [preset] --naht 0.3   # Variante: angrenzende Flächen greifen 0,3 mm statt 0,8 mm (Spec §4.2 Regel 2, verworfen)
+pnpm inkstitch <svg> [preset] --zug-symmetrisch   # Variante: Zugausgleich beider Rails jeder Säule wie in §7.2 (Standard: je Rail, §7.8.3)
 ```
 
 `--breite` schreibt `width` und `height` der SVG um (die viewBox bleibt) und liest das Motiv erst dann
@@ -62,6 +63,12 @@ Reihenfolge sich gegenüber §10.1 umdreht (Kennungen, Farben, Fläche, Lage in 
 Spec §4.2 am 29.09.2026 für den Knockdown probiert und nach der Messung an den sechs Kundenlogos
 zurückgenommen hat (Zahlen in `docs/backlog.md`); ohne sie gilt §4.1: Satin schneidet nichts aus,
 angrenzende Flächen greifen 0,8 mm.
+
+Der Zugausgleich der Satinsäulen ist je Rail gesetzt (Spec §7.8.3, `packages/engine/src/inkstitch/rail-pull.ts`):
+`pull_compensation_mm="a b"` gibt Ink/Stitch zwei Werte, `a` für die erste Rail des Pfads, `b` für die
+zweite. Eine Rail zu einem Stoffspalt unter 1,0 mm (bis zur nächsten anderen Form liegt nur Stoff, gemessen
+entlang der Sprossen nach außen, Median über die Säule) bekommt 0, eine Säule unter 1,0 mm bekommt auf
+beiden Rails 0; die Ausgabe listet beides. `--zug-symmetrisch` gibt beiden Rails wieder den Wert aus §7.2.
 
 Für einzelne Ink/Stitch-Erweiterungen direkt (z. B. zum Verketten mehrerer Schritte):
 
