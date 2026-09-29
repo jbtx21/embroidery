@@ -13,8 +13,9 @@
  *    satin columns (one per stroke of a letter: rails, rungs, the preset's
  *    parameters), or tatami — plus the reason for every shape that was meant
  *    for satin and stays tatami, or, under 1 mm, is set as a running stitch.
- *    Covered tatami areas are cut out of the ones below them (knockdown, spec
- *    §4.1).
+ *    The objects are stitched by colour as far as their overlaps allow
+ *    (spec §10.1: two overlapping objects are never turned round), and covered
+ *    tatami areas are cut out of the ones below them (knockdown, spec §4.1).
  * 2. Routes every run of neighbouring same-coloured satin columns with
  *    Ink/Stitch's auto_satin (--preserve_order=true: what ends under a
  *    stroke is stitched first; --trim=true), one call per run, each call on
@@ -169,6 +170,7 @@ if (tatamiOnly) {
   const template = buildInkstitchTemplate(imported.shapes, preset, {
     widthMm: imported.widthMm,
     heightMm: imported.heightMm,
+    order: "colour",
     knockdown: true,
   });
   templateMs = performance.now() - started;
@@ -183,6 +185,8 @@ if (tatamiOnly) {
     `Satin ${count("satin")} Formen (${columns} Säulen), Laufstich ${count("running")}, ` +
       `Tatami ${count("tatami")}`,
     `${template.satinRuns.length} Satin-Folgen für auto_satin`,
+    `${template.colourBlocks} Farbblöcke in der Vorlage, Untergrenze aus den Überdeckungen ` +
+      `${template.colourBlocksLowerBound}`,
   ];
   fallbacks = template.objects.filter((o) => o.kind === "tatami" && o.reason);
   narrowLines = template.objects.filter((o) => o.kind === "running" && o.reason);

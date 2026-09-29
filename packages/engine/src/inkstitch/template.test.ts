@@ -316,3 +316,89 @@ describe("knockdown option (spec §4.1)", () => {
     expect(b.knockdown).toMatchObject({ changed: 0 });
   });
 });
+
+describe("order option (spec §10.1)", () => {
+  const ground = area("ground", polygonOf(rect(0, 0, 40, 30)), "#1f3a93");
+  const letter = area("letter", moved(GLYPHS.T!, 10), "#c8102e");
+  const far = area("far", polygonOf(rect(80, 0, 20, 20)), "#1f3a93");
+
+  it("keeps the document order unless asked, and counts its colour blocks", () => {
+    const t = buildInkstitchTemplate([ground, letter, far], pique, PAGE);
+    expect(t.objects.map((o) => o.shapeId)).toEqual(["ground", "letter", "far"]);
+    expect(t.colourBlocks).toBe(3);
+    expect(t.colourBlocksLowerBound).toBeUndefined();
+  });
+
+  it("groups the colours where nothing overlaps, and keeps the letter on its ground", () => {
+    const t = buildInkstitchTemplate([ground, letter, far], pique, { ...PAGE, order: "colour" });
+    expect(t.objects.map((o) => o.shapeId)).toEqual(["ground", "far", "letter"]);
+    expect(t.colourBlocks).toBe(2);
+    expect(t.colourBlocksLowerBound).toBe(2);
+  });
+
+  it("does not put what lies under another object after it", () => {
+    // The letter is drawn first, the ground over it: the letter stays first.
+    const t = buildInkstitchTemplate([letter, ground, far], pique, { ...PAGE, order: "colour" });
+    expect(t.objects.map((o) => o.shapeId)).toEqual(["letter", "ground", "far"]);
+  });
+
+  it("lets a hairline and a stroked line bind like an area (an outline is drawn over what it outlines)", () => {
+    // A hairline over the ground, and a fill over the hairline: blue, red, blue — three blocks.
+    const hairline = area("hairline", polygonOf(rect(30, 2, 20, 0.5)), "#c8102e");
+    const cover = area("cover", polygonOf(rect(45, 0, 10, 10)), "#1f3a93");
+    const a = buildInkstitchTemplate([ground, hairline, cover], pique, {
+      ...PAGE,
+      order: "colour",
+    });
+    expect(a.objects.map((o) => o.shapeId)).toEqual(["ground", "hairline", "cover"]);
+    expect(a.colourBlocks).toBe(3);
+    // The same with a stroked line instead of a hairline.
+    const line: ImportedShape = {
+      kind: "line",
+      id: "rule",
+      polyline: [pt(30, 3), pt(50, 3)],
+      closed: false,
+      color: "#c8102e",
+      attrs: {},
+      trimAfter: "auto",
+    };
+    const b = buildInkstitchTemplate([ground, line, cover], pique, { ...PAGE, order: "colour" });
+    expect(b.objects.map((o) => o.shapeId)).toEqual(["ground", "rule", "cover"]);
+    expect(b.colourBlocks).toBe(3);
+  });
+
+  it("brings the satin of one colour together into one run", () => {
+    const t = moved(GLYPHS.T!, 0);
+    const l = moved(GLYPHS.L!, 40);
+    const between = area("between", polygonOf(rect(20, 20, 12, 8)), "#1f3a93");
+    const shapes = [area("T", t, "#c8102e"), between, area("L", l, "#c8102e")];
+    expect(buildInkstitchTemplate(shapes, pique, PAGE).satinRuns).toHaveLength(2);
+    const r = buildInkstitchTemplate(shapes, pique, { ...PAGE, order: "colour" });
+    expect(r.objects.map((o) => o.shapeId)).toEqual(["T", "L", "between"]);
+    expect(r.satinRuns).toHaveLength(1);
+  });
+
+  it("stitches areas before satin within a colour", () => {
+    const shapes = [
+      area("letter", moved(GLYPHS.T!, 0)),
+      area("block", polygonOf(rect(60, 2, 20, 20))),
+    ];
+    const r = buildInkstitchTemplate(shapes, pique, { ...PAGE, order: "colour" });
+    expect(r.objects.map((o) => o.shapeId)).toEqual(["block", "letter"]);
+  });
+
+  it("orders the areas before it cuts them, so the knockdown works on the stitch order", () => {
+    const big = area("big", polygonOf(rect(0, 0, 40, 30)), "#1f3a93");
+    const small = area("small", polygonOf(rect(10, 5, 20, 20)), "#c8102e");
+    const other = area("other", polygonOf(rect(60, 0, 10, 10)), "#1f3a93");
+    const r = buildInkstitchTemplate([big, small, other], pique, {
+      ...PAGE,
+      order: "colour",
+      knockdown: true,
+    });
+    expect(r.objects.map((o) => o.shapeId)).toEqual(["big", "other", "small"]);
+    // The big one is cut by the small one lying on it, as in the design.
+    expect(r.knockdown!.changed).toBe(1);
+    expect(/<path id="big" d="([^"]*)"/.exec(r.svg)![1]!.match(/M /g)).toHaveLength(2);
+  });
+});

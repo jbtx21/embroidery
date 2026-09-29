@@ -26,6 +26,38 @@ import type { Point, StitchObject } from "./types.js";
 const OVERLAP_EPS_MM2 = 1e-6;
 
 /**
+ * Who must stay under whom, from the areas alone (spec §10.1).
+ *
+ * `after[i]` lists the later covers the cover `i` overlaps, so `i` has to be
+ * stitched first. `undefined` is an object without an area — it binds nothing.
+ * `minOverlapMm2` is the overlap that counts; the default is any at all, as the
+ * spec has it — a hair of overlap is still an overlap.
+ */
+export function coverPrecedence(
+  covers: (Polygon | undefined)[],
+  minOverlapMm2 = OVERLAP_EPS_MM2,
+): number[][] {
+  const after: number[][] = covers.map(() => []);
+  const boxes = covers.map((c) => (c === undefined ? undefined : polygonBbox(c)));
+
+  for (let i = 0; i < covers.length; i++) {
+    const ci = covers[i];
+    const bi = boxes[i];
+    if (ci === undefined || bi === undefined) continue;
+    for (let j = i + 1; j < covers.length; j++) {
+      const cj = covers[j];
+      const bj = boxes[j];
+      if (cj === undefined || bj === undefined) continue;
+      if (bi.maxX < bj.minX || bj.maxX < bi.minX) continue;
+      if (bi.maxY < bj.minY || bj.maxY < bi.minY) continue;
+      const shared = intersect([ci], [cj]).reduce((sum, p) => sum + polygonArea(p), 0);
+      if (shared > minOverlapMm2) after[i]!.push(j);
+    }
+  }
+  return after;
+}
+
+/**
  * Who must stay under whom (spec §10.1).
  *
  * Stitched later means lying on top — that is the whole basis of the knockdown
@@ -35,7 +67,6 @@ const OVERLAP_EPS_MM2 = 1e-6;
  * Objects that do not overlap may be reordered freely.
  */
 export function precedence(objects: StitchObject[]): number[][] {
-  const covers = objects.map((o) => coverPolygon(o));
   const after: number[][] = objects.map(() => []);
 
   // A sequence is the maker's own order — a text knows where its connectors go,
@@ -48,25 +79,8 @@ export function precedence(objects: StitchObject[]): number[][] {
     lastOf.set(o.sequence, i);
   }
 
-  const boxes = covers.map((c) => (c === undefined ? undefined : polygonBbox(c)));
-
-  for (let i = 0; i < objects.length; i++) {
-    const ci = covers[i];
-    const bi = boxes[i];
-    if (ci === undefined || bi === undefined) continue;
-    for (let j = i + 1; j < objects.length; j++) {
-      const cj = covers[j];
-      const bj = boxes[j];
-      if (cj === undefined || bj === undefined) continue;
-      if (bi.maxX < bj.minX || bj.maxX < bi.minX) continue;
-      if (bi.maxY < bj.minY || bj.maxY < bi.minY) continue;
-      const shared = intersect([ci as Polygon], [cj as Polygon]).reduce(
-        (sum, p) => sum + polygonArea(p),
-        0,
-      );
-      if (shared > OVERLAP_EPS_MM2) after[i]!.push(j);
-    }
-  }
+  const overlaps = coverPrecedence(objects.map((o) => coverPolygon(o)));
+  for (const [i, list] of overlaps.entries()) after[i]!.push(...list);
   return after;
 }
 

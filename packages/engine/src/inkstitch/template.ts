@@ -25,11 +25,19 @@
  * between columns runs under the satin and never across a colour or an
  * object stitched in between.
  *
- * `TemplateOptions.knockdown` cuts what a later tatami covers out of the tatami
- * below it (spec §4.1, `knockdown.ts`) — the stitch order decides which is which.
+ * `TemplateOptions.order` groups the colours as far as the overlaps allow
+ * (spec §10.1, `sequence.ts`), and `TemplateOptions.knockdown` cuts what a later
+ * tatami covers out of the tatami below it (spec §4.1, `knockdown.ts`) — the
+ * stitch order decides which is which, so the order comes first.
  */
 import type { Point, Polygon, Polyline } from "@texma-stitch/geometry";
-import { cumulativeLengths, polygonArea, simplify } from "@texma-stitch/geometry";
+import {
+  cumulativeLengths,
+  normalizeRing,
+  offsetPolyline,
+  polygonArea,
+  simplify,
+} from "@texma-stitch/geometry";
 import type { ImportedShape } from "../import/svg.js";
 import type { Preset } from "../presets.js";
 import type { Warning } from "../types.js";
@@ -38,6 +46,7 @@ import { classifyShape, SATIN_NARROW_WARN_MM } from "./classify.js";
 import type { SatinColumnPlan } from "./columns.js";
 import { satinColumns, STAYS_TATAMI } from "./columns.js";
 import { knockdownAreas } from "./knockdown.js";
+import { colourBlockCount, sequenceByColour } from "./sequence.js";
 import { strokeGraph } from "./strokes.js";
 
 /** Satin wider than this is split into staggered stitches (spec §7.4, `maxWidthMm`). */
@@ -118,6 +127,10 @@ export type TemplateResult = {
   /** Column ids of each run of neighbouring same-coloured satin objects — one `auto_satin` each. */
   satinRuns: string[][];
   warnings: Warning[];
+  /** Colour blocks of the stitch order (a run of one colour is one block). */
+  colourBlocks: number;
+  /** The fewest blocks the overlaps allow — present when `TemplateOptions.order` is `"colour"`. */
+  colourBlocksLowerBound?: number;
   /** Present when `TemplateOptions.knockdown` was on. */
   knockdown?: KnockdownReport;
 };
@@ -126,6 +139,11 @@ export type TemplateOptions = {
   /** Page size of the source document, so the template lines up with it. */
   widthMm: number;
   heightMm: number;
+  /**
+   * Stitch order: `"document"` keeps the stacking order of the source, `"colour"` groups the
+   * colours as far as the overlaps allow (spec §10.1). Default: `"document"`.
+   */
+  order?: "document" | "colour";
   /** Cut what later tatami areas cover out of the earlier ones (spec §4.1). Default: off. */
   knockdown?: boolean;
 };
@@ -237,8 +255,26 @@ function runningLines(shape: Polygon, id: string): Polyline[] {
     .filter((pts) => pts.length >= 2);
 }
 
+/** Half the width of the strip a stroked line is taken to lie on when the order asks what it covers. */
+export const LINE_COVER_HALF_MM = 0.25;
+
+/** The strip a stroked line lies on, for the order — the largest piece if it folds back on itself. */
+function lineCover(line: Polyline): Polygon | undefined {
+  const strip = normalizeRing([
+    ...offsetPolyline(line, LINE_COVER_HALF_MM),
+    ...offsetPolyline(line, -LINE_COVER_HALF_MM).reverse(),
+  ]);
+  return strip.sort((a, b) => polygonArea(b) - polygonArea(a))[0];
+}
+
 /** A shape planned as an object, before anything is cut, ordered or written. */
-type PlannedBase = { id: string; shapeId: string; color: string };
+type PlannedBase = {
+  id: string;
+  shapeId: string;
+  color: string;
+  /** What the object lies on, for the order: the outline of its shape. */
+  cover: Polygon | undefined;
+};
 type PlannedTatami = PlannedBase & { kind: "tatami"; polygon: Polygon; reason?: string };
 type PlannedRunning = PlannedBase & { kind: "running"; lines: Polyline[]; reason?: string };
 type PlannedSatin = PlannedBase & {
@@ -258,16 +294,24 @@ function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]
       id: xmlId(shapeId),
       shapeId,
       color,
+      cover: polygon,
       polygon,
       ...(reason ? { reason } : {}),
     });
   };
-  const running = (shapeId: string, lines: Polyline[], color: string, reason?: string): void => {
+  const running = (
+    shapeId: string,
+    lines: Polyline[],
+    color: string,
+    cover: Polygon | undefined,
+    reason?: string,
+  ): void => {
     planned.push({
       kind: "running",
       id: xmlId(shapeId),
       shapeId,
       color,
+      cover,
       lines,
       ...(reason ? { reason } : {}),
     });
@@ -277,7 +321,7 @@ function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]
     if (shape.kind === "line") {
       if (!shape.color || shape.polyline.length < 2) continue;
       const line = shape.closed ? [...shape.polyline, shape.polyline[0]!] : shape.polyline;
-      running(shape.id, [line], shape.color);
+      running(shape.id, [line], shape.color, lineCover(line));
       continue;
     }
     const cls = classifyShape(shape.polygon, shape.id);
@@ -302,7 +346,7 @@ function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]
         tatami(shape.id, shape.polygon, shape.color, "no axis for a running stitch");
         continue;
       }
-      running(shape.id, lines, shape.color);
+      running(shape.id, lines, shape.color, shape.polygon);
       continue;
     }
     const id = xmlId(shape.id);
@@ -321,7 +365,7 @@ function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]
             id,
           ),
         );
-        running(shape.id, lines, shape.color, plan.reason);
+        running(shape.id, lines, shape.color, shape.polygon, plan.reason);
         continue;
       }
     }
@@ -335,6 +379,7 @@ function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]
       id,
       shapeId: shape.id,
       color: shape.color,
+      cover: shape.polygon,
       columns: plan.columns,
       coverage: plan.coverage,
       smoothedMm: plan.smoothedMm,
@@ -345,6 +390,17 @@ function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]
 
 const tatamiArea = (planned: Planned[]): number =>
   planned.reduce((sum, p) => (p.kind === "tatami" ? sum + polygonArea(p.polygon) : sum), 0);
+
+/** Stage within a colour (spec §10.1): areas, then satin, then lines. */
+const stageOf = (p: Planned): number => (p.kind === "tatami" ? 0 : p.kind === "satin" ? 1 : 3);
+
+/** The objects grouped by colour where the overlaps allow it (`sequence.ts`). */
+function orderByColour(planned: Planned[]): { planned: Planned[]; lowerBound: number } {
+  const result = sequenceByColour(
+    planned.map((p) => ({ colour: p.color, rank: stageOf(p), cover: p.cover })),
+  );
+  return { planned: result.order.map((i) => planned[i]!), lowerBound: result.lowerBound };
+}
 
 /**
  * Cuts the tatami areas, later out of earlier (spec §4.1, `knockdown.ts`). An
@@ -482,6 +538,12 @@ export function buildInkstitchTemplate(
 ): TemplateResult {
   const warnings: Warning[] = [];
   let planned = planShapes(shapes, preset, warnings);
+  let lowerBound: number | undefined;
+  if (opts.order === "colour") {
+    const ordered = orderByColour(planned);
+    planned = ordered.planned;
+    lowerBound = ordered.lowerBound;
+  }
   let knockdown: KnockdownReport | undefined;
   if (opts.knockdown) {
     const cut = applyKnockdown(planned, warnings);
@@ -497,5 +559,13 @@ export function buildInkstitchTemplate(
     `viewBox="0 0 ${num(opts.widthMm)} ${num(opts.heightMm)}">` +
     body +
     `</svg>\n`;
-  return { svg, objects, satinRuns, warnings, ...(knockdown ? { knockdown } : {}) };
+  return {
+    svg,
+    objects,
+    satinRuns,
+    warnings,
+    colourBlocks: colourBlockCount(objects.map((o) => o.color)),
+    ...(lowerBound === undefined ? {} : { colourBlocksLowerBound: lowerBound }),
+    ...(knockdown ? { knockdown } : {}),
+  };
 }
