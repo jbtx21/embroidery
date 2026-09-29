@@ -125,6 +125,8 @@ export type MinimumSizeIgnored = {
 export type MinimumSizeResult = {
   /** The ordered logo width the check ran at, mm. */
   widthMm: number;
+  /** The limits it ran with, mm — the options, or their defaults. */
+  limits: { satinMinMm: number; gapMinMm: number };
   /** Largest `holdsFromWidthMm` first. */
   findings: MinimumSizeFinding[];
   /** Logo width from which every finding holds, mm: the largest `holdsFromWidthMm`. Absent without findings. */
@@ -385,6 +387,7 @@ export function checkMinimumSize(
   const decisive = findings[0];
   return {
     widthMm,
+    limits: { satinMinMm, gapMinMm },
     findings,
     ...(decisive ? { minimumWidthMm: decisive.holdsFromWidthMm, decisive } : {}),
     gapPieces: gapResult.pieces,

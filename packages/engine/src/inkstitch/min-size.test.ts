@@ -327,6 +327,12 @@ describe("checkMinimumSize — options, input, accounting", () => {
     expect(stroke.findings[0]!.runningAlternative).toBe(false);
   });
 
+  it("says which limits it ran with", () => {
+    expect(checkMinimumSize([], { widthMm: B }).limits).toEqual({ satinMinMm: 1.3, gapMinMm: 0.8 });
+    const custom = checkMinimumSize([], { widthMm: B, satinMinMm: 1.5, gapMinMm: 0.6 });
+    expect(custom.limits).toEqual({ satinMinMm: 1.5, gapMinMm: 0.6 });
+  });
+
   it("refuses an ordered width it cannot divide by", () => {
     for (const widthMm of [0, -80, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(() => checkMinimumSize([], { widthMm })).toThrow(RangeError);
