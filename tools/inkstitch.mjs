@@ -697,7 +697,9 @@ if (stderrLines.length === 0) {
 // --tatami, whose document is the source as drawn and not the template.
 console.log("");
 if (tatamiOnly) {
-  console.log("Nacharbeit   bei --tatami nicht: dort wird die Quelle wie gezeichnet gestickt, ohne Vorlage");
+  console.log(
+    "Nacharbeit   bei --tatami nicht: dort wird die Quelle wie gezeichnet gestickt, ohne Vorlage",
+  );
 } else {
   const { reportLines, writeRework } = await import("./nacharbeit.mjs");
   const rework = await writeRework({
