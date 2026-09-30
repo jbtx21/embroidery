@@ -30,6 +30,11 @@ geprüft; der Zugausgleich lässt Stoffspalte unter 1,0 mm offen, Säulen unter 
 solchen Spalt ohne Ausgleich (am selben Tag eingeschränkt: zuerst galt das für alle Säulen unter
 1,0 mm).
 
+**Änderung 30.09.2026** — §5.2: Mindestgröße als **Tor** (unter der Mindestgröße wird in der
+Mindestgröße erzeugt, nicht erzwungen), gesucht über die Größe statt hochgerechnet, Schattenlinien
+ab 0,7 mm. §13.4 neu: Nacharbeit-Datei für Inkscape mit Ink/Stitch (Ebene je Farbe,
+Prüfstellen). §16: Phase 1b Schritte 4 bis 6. Ink/Stitch in der offiziellen Version 3.3.0 (ADR 0001).
+
 ---
 
 ## 1. Zweck und Grundsätze *(28.09.2026 neu gefasst — vorher: die Engine erzeugt die Stiche selbst)*
@@ -357,16 +362,22 @@ Richtungen an jeder Naht, statt parallel zu laufen.
 
 Ein Logo, das als Druck funktioniert, ist gestickt nicht in jeder Größe sauber: zu schmale
 Satinstriche sinken in den Stoff, zu schmale Lücken sticken zu. Diese Prüfung läuft **vor**
-dem Sticken auf der Vorlage in der bestellten Größe (Größe der SVG in mm) und **meldet** — sie
-ändert nichts an der Vorlage (Regel 8). Was geschieht, entscheidet der Nutzer: größer sticken,
-vereinfachen oder so lassen.
+dem Sticken auf der Vorlage in der bestellten Größe (Größe der SVG in mm oder die bestellte
+Breite). Sie ändert nichts an den Formen (Regel 8); was sie entscheidet, ist die Größe: unter der
+Mindestgröße wird nicht gestickt (**Tor**, unten). *(30.09.2026 — vorher meldete sie nur, und der
+Nutzer entschied: größer sticken, vereinfachen oder so lassen.)*
 
-**Grenzen** (Entscheidung 29.09.2026):
+**Grenzen** (Entscheidung 29.09.2026, Schattenlinien 30.09.2026):
 
 | Prüfung | Grenze | Herkunft |
 |---|---|---|
 | Satinstrich (Formen, die §7.8.1 als Satin einteilt), mittlere Breite | mindestens **1,3 mm** | TEXMA-Archiv: mittlere Satinbreite je Datei in 192 Produktionsdateien, p5 1,29 mm (Minimum 1,05, Median 1,98) |
+| Schattenlinie: Satinstrich, von dem mindestens eine Rail an einem Stoffspalt unter 1,0 mm liegt (Messung wie §7.8.3 Regel 1) | mindestens **0,7 mm** — als Satin hält er also immer | Profi-Mütze „Stuttgarter Hofbräu": goldene Schattenlinien von 0,75 mm in 110 mm sauber gestickt |
 | Lücke innerhalb einer Farbe — Punze, Kerbe, Abstand zwischen Buchstaben | mindestens **0,8 mm** | **Schätzwert**: 2 × Zugausgleich (§7.2, 0,2 mm je Seite) plus eine Fadenstärke. Wird an Profi-Dateien und am Probestick nachgemessen |
+
+Die Schattenlinie hängt nicht an der Breite der Säule (anders als §7.8.3 Regel 2, die nur Säulen
+unter 1,0 mm meint): sonst hätte sie wieder einen Größenbereich, in dem sie zu schmal ist — eine
+Schattenlinie von 1,1 mm wäre durchgefallen, eine von 0,9 mm nicht.
 
 **Lücken** werden je Farbe gesucht: die Formen einer Farbe werden vereinigt und um die halbe
 Grenze geschlossen (nach außen und zurück, wie §7.8.4); was dabei dazukommt, ist eine Lücke
@@ -401,15 +412,45 @@ von 0,013 mm Breite im Köln-Logo ergab als „Mindestgröße" 5.538 mm. Deshalb
 **Ergebnis** je zu feinem Element: Art (Satinstrich oder Lücke), gemessene Breite, Grenze, und
 die **Logobreite, ab der es hält** (bestellte Breite × Grenze ÷ gemessene Breite).
 
-- Die **Mindestgröße** des Logos kommt aus den **Satinstrichen** allein: ab dieser Breite sind
-  alle Satinstriche mindestens 1,3 mm. Das Element, das sie bestimmt, wird genannt.
-  *(29.09.2026, zweite Fassung — vorher das größte Maß aller Befunde, Lücken eingeschlossen.)*
+- Die **Mindestgröße** des Logos kommt aus den **Satinstrichen** allein: ab dieser Breite hält
+  jeder Satinstrich seine Grenze (1,3 mm, Schattenlinien 0,7 mm). Das Element, das sie bestimmt,
+  wird genannt. *(29.09.2026, zweite Fassung — vorher das größte Maß aller Befunde, Lücken
+  eingeschlossen. Wie sie gesucht wird: Tor, unten.)*
 - Die Lücken ergeben eine **zweite Zahl**: ab welcher Breite alle Lücken offen bleiben. Feine
   Zierkanäle (STUTTGART: 0,25 mm zwischen Rand und Körper der Buchstaben) treiben sie weit
   über die Mindestgröße; ob sie zusticken dürfen, entscheidet der Nutzer.
 - Die Ausgabe listet die Elemente nach „hält ab" und markiert sie im Vorschaubild. Eine
   Satinform zwischen 0,7 und 1,3 mm kann auch eine dünne Zierlinie sein, die als Laufstich
   besser aufgehoben wäre; die Prüfung nennt es als Möglichkeit.
+
+**Tor** *(30.09.2026, Entscheidung des Nutzers: „Nicht stickbare Größen dürfen nicht erzwungen
+werden, sondern Mindestgröße angeben und daraus das Stickprogramm erstellen.")*
+
+- Liegt die bestellte Größe unter der Mindestgröße, entsteht das Stickprogramm **in der
+  Mindestgröße**, proportional vergrößert. Die Ausgabe sagt es an erster Stelle — bestellte
+  Größe, Mindestgröße, erzeugte Größe, das bestimmende Element — und die Dateien tragen die
+  erzeugte Breite im Namen. Das ist keine stille Reparatur (Regel 8): die Größe ändert sich
+  sichtbar, die Formen nicht.
+- **Gesucht über die Größe, nicht hochgerechnet.** Die zweite Fassung rechnete aus der bestellten
+  Größe hoch und sprang dabei: STUTTGART in 80 mm geprüft ergab 118 mm, dasselbe Logo in 120 mm
+  geprüft 223 mm — ein grauer Strich, in 80 mm 0,47 mm breit und Laufstich, wird ab 120 mm Satin
+  und ist dann zu schmal. Deshalb ist die Mindestgröße die **kleinste Größe ab der bestellten**, in
+  der die Prüfung — mit der Einteilung nach §7.8.1, die in **dieser** Größe gilt — keinen
+  Satinstrich unter seiner Grenze findet. Jeder Strich hat einen Größenbereich, in dem er Satin,
+  aber zu schmal ist (Breite zwischen 0,7 mm und seiner Grenze); gesucht wird die kleinste Größe
+  außerhalb aller Bereiche, und in ihr wird noch einmal geprüft, weil Glätten und Einteilung nicht
+  genau linear mitwachsen.
+- Liegt über der erzeugten Größe noch ein Bereich, in dem ein Strich zu schmal wird, nennt die
+  Ausgabe ihn (sonst landet ein größerer Auftrag unerwartet weiter oben).
+- **Nur nach oben.** Unter der bestellten Größe wird nicht gesucht. Offen bleibt der umgekehrte
+  Fall: in sehr kleiner Größe fallen alle Striche unter 0,7 mm, werden Laufstich und bestehen die
+  Prüfung, obwohl Schrift so nicht lesbar ist. Die Nacharbeit-Datei (§13.4) markiert jede Fläche,
+  die dadurch zur Linie wird; eine Regel dafür braucht die Profi-Vergleiche (§16, Phase 1b
+  Schritt 6).
+- **Vergleichsmessungen** (die sechs Kundenlogos in ihren bisherigen Größen) schalten das Tor mit
+  `--ohne-tor` ab. Eine so erzeugte Datei unter der Mindestgröße trägt `_unter-mindestgroesse` im
+  Namen, und die Ausgabe warnt. Stickprogramme für Aufträge entstehen nie mit diesem Schalter.
+- Die Lücken (zweite Zahl) gehen nicht ins Tor; sie stehen in Liste, Bild und Nacharbeit-Datei.
 
 ---
 
@@ -1220,6 +1261,35 @@ Trim als Kreuz statt als gestrichelte Linie gehört.
 ### 13.3 Stichbericht (PDF, später)
 Vorschau, Größe, Stiche, Farbfolge mit Garnnummern, Trims, Laufzeit, Preset.
 
+### 13.4 Nacharbeit-Datei *(30.09.2026, Entscheidung des Nutzers: „Das Stickprogramm wird automatisch entwickelt, und wir passen es an den Schwachstellen manuell an.")*
+
+Jeder Lauf von `pnpm inkstitch` schreibt neben DST auch das Ink/Stitch-Dokument, aus dem die DST
+entstanden ist (nach Führung der Säulen und Fadenschnitten), als `<name>.nacharbeit.svg` — zum
+Öffnen in Inkscape mit Ink/Stitch in derselben Version wie die Pipeline (ADR 0001):
+
+- **Maße:** Dokumentgröße in mm, Ursprung oben links bei 0; die Formen liegen dort, wo sie in
+  der gelieferten SVG liegen (der Importer rechnet den Ursprung der `viewBox` mit ein).
+- **Eine Ebene je Farbblock** in Stichfolge, benannt mit Nummer, Farbname und Farbwert
+  („01 Gold #D1B35A"). Ink/Stitch stickt Ebenen in Dokumentfolge; die Farbfolge bleibt.
+- **Sprechende Namen** je Objekt (`inkscape:label`): Art (Satin, Tatami, Laufstich), Farbe und
+  die Kennung der Quellform.
+- **Alle Parameter als `inkstitch:`-Attribute**, wie die Vorlage sie setzt — im Ink/Stitch-
+  Parameterdialog sichtbar und änderbar.
+- **Ebene „Prüfstellen", ausgeblendet** (Ink/Stitch stickt ausgeblendete Ebenen nicht): je
+  Schwachstelle ein Kreis und ein kurzer Text — was, gemessen, Grenze, Vorschlag. Schwachstellen
+  sind: Satinstriche unter ihrer Grenze (nur mit `--ohne-tor`), Säulen unter 1,0 mm, Formen, die
+  als Satin nicht hielten (Rückfall Tatami oder Laufstich, §7.8.5), Satin auf geglätteter Kontur
+  (§7.8.4), Flächen, die unter 0,7 mm zur Linie werden, Tatami ohne Gitterunterlage (§8.8),
+  Lücken und Stofflücken unter 0,8 mm (§5.2), Nadelhäufung ab 6 Einstichen je 0,2 mm und Zellen
+  über 18 Stichen je mm² aus der DST, Sprünge über 5 mm ohne Fadenschnitt.
+
+Daneben: DST **und PES** (Ink/Stitchs `output`), die Vorschau in Garnfarben mit den markierten
+Prüfstellen und die Nadelbelegung je Stopp (`<name>.farbfolge.txt`).
+
+**Nachweis:** Die Nacharbeit-Datei unverändert durch Ink/Stitchs `output` gibt dieselbe DST,
+Byte für Byte, wie der Lauf (Rauchtest). Für einen externen Puncher ist dieselbe Datei eine
+saubere Vektorvorlage mit einer Ebene je Farbe.
+
 ---
 
 ## 14. Presets
@@ -1328,6 +1398,9 @@ Abnahme Phase 1: drei Phase-0-Motive stickbar ohne manuelle Nachbearbeitung der 
 | 1 | Einbau: Starter, Einrichtung, `pnpm inkstitch <svg> [preset]`, Rauchtest | die sechs Kundenlogos reproduzieren den Probelauf vom 28.09.2026 |
 | 2 | Schrift und schmale Formen als Satin: Einteilung nach Breite, Sprossen aus der Mittelachse, Ink/Stitch „Füllung zu Satin" → „Satinsäulen automatisch führen" | jeder Buchstabe von „STUTTGART", „CYS SPORTS", „Berufsfeuerwehr Köln", „NotSan 01/24", „SEGEN SEIN" als Satin, Deckung ≥ 0,85, im Player lesbar |
 | 3 | Verdeckte Flächen ausschneiden, gleiche Farben zusammenziehen, Fadenschnitte, Preset-Werte als Attribute | STUTTGART 80 mm: höchstens 4 Farbblöcke, Dichtespitze ≤ 24, Nadelhäufung ≤ 8, Trims/1000 ≤ 5,6 |
+| 4 *(30.09.2026)* | Mindestgröße als Tor (§5.2): Suche über die Größe, Schattenlinien ab 0,7 mm, erzeugt in der Mindestgröße | STUTTGART bestellt in 80 mm → erzeugt in der Mindestgröße, mit Meldung; Hofbräu 110 mm bleibt 110 mm; die gefundene Größe besteht die Prüfung in dieser Größe |
+| 5 *(30.09.2026)* | Nacharbeit-Datei (§13.4) und Ink/Stitch in der offiziellen Version 3.3.0 (ADR 0001) | Nacharbeit-Datei unverändert → dieselbe DST, Byte für Byte; Prüfstellen-Ebene ausgeblendet und nicht gestickt; die sechs Kundenlogos gegen den Stand vor dem Versionswechsel gemessen |
+| 6 *(30.09.2026)* | Parameter gegen Puncher-Dateien: 10–20 Paare aus Original-Logo und Puncher-DST aus dem TEXMA-Archiv (nicht im Repo) | je Paar Stichzahl je Farbe, Satin- und Füllabstand, Unterlage, Trims gegenübergestellt; Presets so eingestellt, dass die Stichzahl die des Punchers auf ±15 % trifft |
 
 Abnahme Phase 1b: Probestick STUTTGART 80 mm und Köln 90 mm auf Piqué, Bewertung durch den Stickverantwortlichen.
 

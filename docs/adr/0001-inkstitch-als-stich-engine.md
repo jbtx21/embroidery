@@ -35,9 +35,12 @@ Fadenschnitte.
 **Ink/Stitch erzeugt die Stiche. TEXMA Stitch bereitet die Vorlage vor und prüft das
 Ergebnis.**
 
-- Ink/Stitch läuft als **eigener Prozess** in fester Version (Commit `d59c9ab`,
-  17.09.2026) aus einem Klon außerhalb des Repos. Starter und wx-Platzhalter liegen unter
-  `inkstitch/`, die Einrichtung macht `inkstitch/setup.sh`.
+- Ink/Stitch läuft als **eigener Prozess** in fester Version aus einem Klon außerhalb des
+  Repos. Starter und wx-Platzhalter liegen unter `inkstitch/`, die Einrichtung macht
+  `inkstitch/setup.sh`. Version: die **offizielle Version 3.3.0** (31.07.2026) _(30.09.2026,
+  Entscheidung des Nutzers — vorher der Entwicklungsstand `d59c9ab` vom 17.09.2026)_. Grund: am
+  Arbeitsplatz wird die veröffentlichte Version installiert, und eine Nacharbeit in Inkscape
+  (Spec §13.4) muss genauso rechnen wie die Pipeline.
 - TEXMA Stitch **bereitet vor**: Einteilung der Formen nach Breite (Satin, Laufstich,
   Tatami), Sprossen für Ink/Stitchs „Füllung zu Satin", verdeckte Flächen ausschneiden,
   Farbfolge, Fadenschnitte, Preset-Werte als `inkstitch:`-Attribute.

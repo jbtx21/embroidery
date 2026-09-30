@@ -14,7 +14,7 @@ Kommunikation und Commit-Messages auf Deutsch. Code, Bezeichner, Kommentare im C
 - Tests: Vitest. Lint: ESLint + Prettier (Standardkonfig)
 - Polygon-Ops: `clipper2-wasm`. Keine weiteren Abhängigkeiten in `packages/engine` ohne Rückfrage.
 - Editor später: React + Canvas. Backend später: Python FastAPI + pyembroidery.
-- **Stiche erzeugt Ink/Stitch** (seit 28.09.2026, `docs/adr/0001-inkstitch-als-stich-engine.md`): eigener Python-Prozess in festem Commit, außerhalb des Repos. Dieses Repo bereitet die Vorlage vor und prüft das Ergebnis; die eigene Stichgenerierung ist eingefroren.
+- **Stiche erzeugt Ink/Stitch** (seit 28.09.2026, `docs/adr/0001-inkstitch-als-stich-engine.md`): eigener Python-Prozess in fester Version (offizielle 3.3.0 seit 30.09.2026, dieselbe wie am Arbeitsplatz), außerhalb des Repos. Dieses Repo bereitet die Vorlage vor und prüft das Ergebnis; die eigene Stichgenerierung ist eingefroren. Unter der Mindestgröße wird nicht gestickt, sondern in der Mindestgröße (Spec §5.2, Tor); jeder Lauf schreibt eine Nacharbeit-Datei für Inkscape mit Ink/Stitch (Spec §13.4).
 
 ## Struktur
 
