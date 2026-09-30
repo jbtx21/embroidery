@@ -209,13 +209,33 @@ export function torDetails(tor, { alle = false } = {}) {
   const s = tor.search;
   const lines = [];
   const l = s.limits;
+  // Wo mit --ohne-tor unter der Mindestgröße erzeugt wird, sagt es auch dieser Abschnitt: er steht
+  // weit unter der ersten Zeile, und die Warnung dort ist beim Lesen des Endes nicht zu sehen.
+  if (tor.unterMindestgroesse && s.found) {
+    lines.push(
+      `${spalte("Mindestgröße")}${breite(s.widthMm)} mm — diese Dateien (${breite(tor.bestelltMm)} mm) ` +
+        `liegen darunter`,
+    );
+  }
   const regel = `Grenze ${l.shadowMinMm} mm statt ${l.satinMinMm} mm, Rail an einem Stoffspalt unter 1.0 mm`;
 
+  // Wie viele in der bestellten Größe, wie viele in der gefundenen: eine Schattenlinie hält bei der
+  // einen und ist bei der anderen, wo ihr Spalt offen ist, keine mehr.
+  const inBestellt = s.steps[0].shadowLines;
+  const inGefunden = s.shadowLines.length;
+  const zwei = s.found && s.steps.length > 1;
+  const zahl = zwei
+    ? `${inBestellt} in ${breite(s.steps[0].widthMm)} mm, ${inGefunden} in ${breite(s.widthMm)} mm`
+    : s.found
+      ? `${inGefunden}`
+      : `${inBestellt} in ${breite(s.steps[0].widthMm)} mm`;
   lines.push(
-    s.shadowLines.length === 0
+    !zwei && s.found && inGefunden === 0
       ? `${spalte("Schattenlinien")}keine (${regel})`
-      : `${spalte("Schattenlinien")}${s.shadowLines.length} (${regel}): ` +
-          elemente(s.shadowLines, alle ? Infinity : SCHATTEN_MAX),
+      : `${spalte("Schattenlinien")}${zahl} (${regel})` +
+          (s.found && inGefunden > 0
+            ? `: ${elemente(s.shadowLines, alle ? Infinity : SCHATTEN_MAX)}`
+            : ""),
   );
 
   lines.push(

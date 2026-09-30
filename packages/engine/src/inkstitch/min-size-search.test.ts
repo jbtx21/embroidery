@@ -305,7 +305,7 @@ describe("findMinimumSize (the smallest size from the ordered one at which the c
     expect(r.enlarged).toBe(false);
     expect(r.belowMinimum).toBe(false);
     expect(r.decisive).toBeUndefined();
-    expect(r.steps).toEqual([{ widthMm: R, under: 0 }]);
+    expect(r.steps).toEqual([{ widthMm: R, under: 0, shadowLines: 0 }]);
     // An ordered size that is no whole number stays as it is.
     const odd = findMinimumSize(scaledAt(shapes, 80.4), { orderedWidthMm: 80.4 });
     expect(odd.widthMm).toBe(80.4);
@@ -322,8 +322,12 @@ describe("findMinimumSize (the smallest size from the ordered one at which the c
     expect(passesAt(shapes, r.widthMm)).toBe(true);
     expect(passesAt(shapes, r.widthMm - 1)).toBe(false);
     // The first step is the ordered size, with its one stroke under the limit; the last is the found size.
-    expect(r.steps[0]).toEqual({ widthMm: R, under: 1 });
-    expect(r.steps[r.steps.length - 1]).toEqual({ widthMm: r.widthMm, under: 0 });
+    expect(r.steps[0]).toEqual({ widthMm: R, under: 1, shadowLines: 0 });
+    expect(r.steps[r.steps.length - 1]).toEqual({
+      widthMm: r.widthMm,
+      under: 0,
+      shadowLines: 0,
+    });
     // Round numbers only above the ordered size.
     expect(r.steps.slice(1).every((s) => Number.isInteger(s.widthMm))).toBe(true);
   });
@@ -388,6 +392,20 @@ describe("findMinimumSize (the smallest size from the ordered one at which the c
     expect(r.widthMm).toBe(R);
     expect(r.shadowLines).toEqual(["schatten"]);
     expect(findMinimumSize(scaledAt(aloneScene()), opts).widthMm).toBeGreaterThan(100);
+  });
+
+  it("counts the shadow lines in every check: a stroke that is one at the ordered size and none at the size found", () => {
+    // The fading stroke (0.8 mm, gap 0.9 mm) holds at 80 mm as a shadow line. A free stroke of 0.9 mm
+    // asks for more; by the size that holds it the gap is over 1.0 mm — and the stroke 1.1 mm wide.
+    const shapes = [...fadingScene(), areaShape("frei", barAt(0, 30, 40, 0.9), "#000000")];
+    const r = findMinimumSize(scaledAt(shapes), opts);
+    expect(r.found).toBe(true);
+    expect(r.steps[0]!.shadowLines).toBe(1);
+    expect(r.steps[r.steps.length - 1]!.shadowLines).toBe(r.shadowLines.length);
+    expect(r.shadowLines).toEqual([]);
+    // The range of the shadow line that loses its gap is in the jump: one check at the ordered size, one at the end.
+    expect(r.steps).toHaveLength(2);
+    expect(r.widthMm).toBeGreaterThan(125);
   });
 
   it("does not round what passes and does not search below the ordered size", () => {

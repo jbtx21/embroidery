@@ -48,9 +48,9 @@ const suche = (over: Record<string, unknown> = {}) => ({
     kind: "too-narrow",
   },
   steps: [
-    { widthMm: 80, under: 12 },
-    { widthMm: 118, under: 6 },
-    { widthMm: 252, under: 0 },
+    { widthMm: 80, under: 12, shadowLines: 0 },
+    { widthMm: 118, under: 6, shadowLines: 0 },
+    { widthMm: 252, under: 0, shadowLines: 1 },
   ],
   shadowLines: ["z13-bebebe-018"],
   above: [],
@@ -247,8 +247,8 @@ describe("torKopf (die erste Zeile der Ausgabe)", () => {
       reason: "steps",
       decisive: undefined,
       steps: [
-        { widthMm: 80, under: 12 },
-        { widthMm: 1035, under: 3 },
+        { widthMm: 80, under: 12, shadowLines: 0 },
+        { widthMm: 1035, under: 3, shadowLines: 0 },
       ],
     });
     const [line] = torKopf(tor(steps, { erzeugtMm: undefined, fehler: "x" }));
@@ -309,23 +309,78 @@ describe("torKurz (für den Kopf des Vorschaubilds)", () => {
 
 describe("torDetails (was unter der ersten Zeile steht)", () => {
   it("zählt die Schattenlinien und nennt ihre Grenze", () => {
-    const lines = torDetails(tor(suche({ shadowLines: ["a", "b", "c"] })));
-    expect(lines[0]).toBe(
+    const hier = (shadowLines: string[]) =>
+      tor(
+        suche({
+          widthMm: 80,
+          enlarged: false,
+          belowMinimum: false,
+          decisive: undefined,
+          steps: [{ widthMm: 80, under: 0, shadowLines: shadowLines.length }],
+          shadowLines,
+        }),
+      );
+    expect(torDetails(hier(["a", "b", "c"]))[0]).toBe(
       "Schattenlinien   3 (Grenze 0.7 mm statt 1.3 mm, Rail an einem Stoffspalt unter 1.0 mm): a, b, c",
     );
-    expect(torDetails(tor(suche({ shadowLines: [] })))[0]).toBe(
+    expect(torDetails(hier([]))[0]).toBe(
       "Schattenlinien   keine (Grenze 0.7 mm statt 1.3 mm, Rail an einem Stoffspalt unter 1.0 mm)",
+    );
+  });
+
+  it("zählt sie in der bestellten und in der gefundenen Größe, wo beide verschieden sind", () => {
+    // Die goldenen Schattenlinien halten bei 80 mm; bei 548 mm ist ihr Spalt offen, und sie sind breit.
+    const s = suche({
+      widthMm: 548,
+      steps: [
+        { widthMm: 80, under: 11, shadowLines: 30 },
+        { widthMm: 548, under: 0, shadowLines: 0 },
+      ],
+      shadowLines: [],
+    });
+    expect(torDetails(tor(s))[0]).toBe(
+      "Schattenlinien   30 in 80 mm, 0 in 548 mm (Grenze 0.7 mm statt 1.3 mm, Rail an einem Stoffspalt unter 1.0 mm)",
+    );
+    // Die Namen sind die der gefundenen Größe.
+    expect(torDetails(tor(suche()))[0]).toBe(
+      "Schattenlinien   0 in 80 mm, 1 in 252 mm (Grenze 0.7 mm statt 1.3 mm, Rail an einem Stoffspalt unter 1.0 mm): z13-bebebe-018",
+    );
+  });
+
+  it("zählt, wo die Suche aufgegeben hat, nur die der bestellten Größe", () => {
+    const s = suche({
+      found: false,
+      enlarged: false,
+      reason: "steps",
+      decisive: undefined,
+      shadowLines: [],
+      steps: [
+        { widthMm: 80, under: 12, shadowLines: 4 },
+        { widthMm: 1035, under: 3, shadowLines: 0 },
+      ],
+    });
+    expect(torDetails(tor(s))[0]).toBe(
+      "Schattenlinien   4 in 80 mm (Grenze 0.7 mm statt 1.3 mm, Rail an einem Stoffspalt unter 1.0 mm)",
     );
   });
 
   it("kürzt eine lange Liste der Schattenlinien und sagt, wie viele fehlen", () => {
     const ids = Array.from({ length: 44 }, (_, i) => `path${i}`);
     const line = torDetails(tor(suche({ shadowLines: ids })))[0]!;
-    expect(line).toContain("44 (Grenze");
+    expect(line).toContain("44 in 252 mm (Grenze");
     expect(line).toContain("path0, path1, path2, path3, path4");
     expect(line).toContain("und 39 weitere");
     expect(line).not.toContain("path5");
     expect(torDetails(tor(suche({ shadowLines: ids })), { alle: true })[0]).toContain("path43");
+  });
+
+  it("sagt mit --ohne-tor unter der Mindestgröße als erste Zeile, dass die Dateien darunter liegen", () => {
+    const t = tor(suche(), { ohneTor: true, unterMindestgroesse: true, vergroessert: false });
+    const lines = torDetails(t);
+    expect(lines[0]).toBe("Mindestgröße     252 mm — diese Dateien (80 mm) liegen darunter");
+    expect(lines[1]).toContain("Schattenlinien");
+    // Sonst steht sie nicht da.
+    expect(torDetails(tor(suche()))[0]).toContain("Schattenlinien");
   });
 
   it("sagt „1 Prüfung“, wo eine genügte", () => {
@@ -334,7 +389,7 @@ describe("torDetails (was unter der ersten Zeile steht)", () => {
       enlarged: false,
       belowMinimum: false,
       decisive: undefined,
-      steps: [{ widthMm: 80, under: 0 }],
+      steps: [{ widthMm: 80, under: 0, shadowLines: 0 }],
     });
     expect(torDetails(tor(eine))[1]).toBe(
       "Suche            80 mm (1 Prüfung), Striche unter der Grenze: 0",

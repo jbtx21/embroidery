@@ -222,8 +222,11 @@ export type MinimumSizeSearchOptions = {
   maxFactor?: number;
 };
 
-/** One check of the search: a logo width, and how many satin strokes were under their limit in it. */
-export type SearchStep = { widthMm: number; under: number };
+/**
+ * One check of the search: a logo width, how many satin strokes were under their limit in it, and
+ * how many were held to the lower limit of a shadow line (`MinimumSizeResult.shadowLines`).
+ */
+export type SearchStep = { widthMm: number; under: number; shadowLines: number };
 
 export type MinimumSizeSearch = {
   /** The ordered logo width the search started from, mm. */
@@ -259,6 +262,12 @@ export type MinimumSizeSearch = {
   /** The limits it ran with, mm. */
   limits: SizeLimits;
 };
+
+/** The satin strokes held to the lower limit: a rail at a fabric gap, and narrower than the ordinary one. */
+const shadowLinesOf = (measures: ShapeMeasure[], limits: SizeLimits): string[] =>
+  measures
+    .filter((m) => m.shapeClass === "satin" && m.shadowLine && m.widthMm < limits.satinMinMm)
+    .map((m) => m.id);
 
 function requirePositive(name: string, value: number): void {
   if (!Number.isFinite(value) || value <= 0) {
@@ -305,7 +314,7 @@ export function findMinimumSize(
 
   for (;;) {
     const under = measures.filter((m) => isTooNarrow(m, limits)).length;
-    steps.push({ widthMm: width, under });
+    steps.push({ widthMm: width, under, shadowLines: shadowLinesOf(measures, limits).length });
     if (under === 0) {
       found = true;
       break;
@@ -334,11 +343,7 @@ export function findMinimumSize(
     measures = measureShapes(shapes, measureOpts);
   }
 
-  const shadowLines = found
-    ? measures
-        .filter((m) => m.shapeClass === "satin" && m.shadowLine && m.widthMm < limits.satinMinMm)
-        .map((m) => m.id)
-    : [];
+  const shadowLines = found ? shadowLinesOf(measures, limits) : [];
   const above = found
     ? forbiddenRanges(addRunningRails(measures, shapes, preset), width, limits).filter(
         (r) => r.fromMm > width,
