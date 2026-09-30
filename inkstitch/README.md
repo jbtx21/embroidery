@@ -294,8 +294,9 @@ Für einen externen Puncher ist dieselbe SVG eine saubere Vektorvorlage mit eine
 `--tatami` gibt es die Dateien nicht: dort wird die Quelle wie gezeichnet gestickt, ohne Vorlage.
 
 **Voraussetzung am Arbeitsplatz:** Inkscape mit Ink/Stitch **in derselben Version wie die Pipeline**
-(ADR 0001, künftig die offizielle 3.3.0). Dieselben Parameter ergeben nur dann dieselben Stiche; bei
-einer neueren Ink/Stitch-Version meldet Ink/Stitch beim Öffnen, die Datei stamme aus einer neueren.
+(ADR 0001: die offizielle 3.3.0, Dokumentformat 4). Dieselben Parameter ergeben nur dann dieselben
+Stiche. Ein Ink/Stitch mit niedrigerem Dokumentformat meldet beim Öffnen, die Datei stamme aus einer
+neueren Version; eines mit höherem aktualisiert sie beim Öffnen (`lib/update.py`).
 
 1. **Datei öffnen.** `out/<name>.nacharbeit.svg` in Inkscape öffnen. Es kommt keine Rückfrage: die Datei
    trägt die `inkstitch_svg_version` (4) des Dokumentformats und ist schon aktualisiert, Ink/Stitch ändert
