@@ -379,6 +379,18 @@ describe("measureShapes (what the check reads of every area shape at the size it
     expect(m.find((x) => x.id === "buchstabe")!.shadowLine).toBe(true);
   });
 
+  it("asks the rails only of strokes narrower than `railsBelowMm`: a wider one is under no limit whatever they are", () => {
+    const m = measureShapes(shadowScene(0.5), { railsBelowMm: 1.3 });
+    expect(m.find((x) => x.id === "schatten")!.shadowLine).toBe(true);
+    const wide = m.find((x) => x.id === "buchstabe")!;
+    expect(wide.shadowLine).toBe(false);
+    expect(wide.railGapsMm).toEqual([]);
+    // The check gives the same either way: the stroke of 3 mm is held to 1.3 mm with or without its rails.
+    const r = checkMinimumSize(shadowScene(0.5), { widthMm: B });
+    expect(r.findings.filter((f) => f.kind === "satin-stroke")).toEqual([]);
+    expect(r.shadowLines).toEqual(["schatten"]);
+  });
+
   it("has no rail gap for a stroke alone, and does not look for columns of a wide shape", () => {
     const m = measureShapes([...aloneScene(), areaShape("platte", barAt(0, 20, 8, 8))], {});
     expect(m.every((x) => !x.shadowLine && x.railGapsMm.length === 0)).toBe(true);

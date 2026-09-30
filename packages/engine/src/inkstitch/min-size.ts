@@ -384,8 +384,8 @@ export type ShapeMeasure = {
   /**
    * The gaps of the rails that lie at a fabric gap (spec §7.8.3 rule 1, `railGaps`), mm: one per
    * such rail, over all columns of the shape — each the median over its column. Empty where no rail
-   * lies at one, where the shape has no columns that hold, or where it is no satin stroke (unless
-   * `hypothetical`).
+   * lies at one, where the shape has no columns that hold, where it is no satin stroke (unless
+   * `hypothetical`), or where the stroke is not narrow enough to be asked (`MeasureOptions.railsBelowMm`).
    */
   railGapsMm: number[];
   /**
@@ -406,6 +406,14 @@ export type MeasureOptions = {
   preset?: Preset;
   /** Also set the columns of running stitches, as a hypothesis (`ShapeMeasure.hypothetical`). Default off. */
   running?: boolean;
+  /**
+   * The rails — and with them `railGapsMm` and `shadowLine` — are only asked of satin strokes narrower
+   * than this, mm. A stroke at or above the larger of the two limits is under none of them whatever
+   * its rails are, and the columns are the dearest part of the measurement (a search over the size
+   * makes it again at every size): `checkMinimumSize` and `findMinimumSize` pass that limit.
+   * Default: every satin stroke.
+   */
+  railsBelowMm?: number;
 };
 
 /**
@@ -455,6 +463,7 @@ function railForms(shapes: ImportedShape[]): { index: FormIndex; own: Map<string
  */
 export function measureShapes(shapes: ImportedShape[], opts: MeasureOptions = {}): ShapeMeasure[] {
   const preset = opts.preset ?? PRESETS.pique;
+  const railsBelow = opts.railsBelowMm ?? Infinity;
   const { index, own } = railForms(shapes);
   const out: ShapeMeasure[] = [];
   for (const shape of shapes) {
@@ -463,7 +472,7 @@ export function measureShapes(shapes: ImportedShape[], opts: MeasureOptions = {}
     const box = polygonBbox(shape.polygon);
     const satin = cls.shapeClass === "satin";
     const railGapsMm =
-      satin && hasNeighbour(shape.id, box, index)
+      satin && cls.widthMm < railsBelow && hasNeighbour(shape.id, box, index)
         ? railGapsOf(shape.polygon, shape.id, own.get(shape.id), index, preset)
         : [];
     out.push({
@@ -892,7 +901,10 @@ export function checkMinimumSize(
   );
 
   const satin = satinStrokes(
-    measureShapes(shapes, opts.preset === undefined ? {} : { preset: opts.preset }),
+    measureShapes(shapes, {
+      railsBelowMm: Math.max(satinMinMm, shadowMinMm),
+      ...(opts.preset === undefined ? {} : { preset: opts.preset }),
+    }),
     widthMm,
     { satinMinMm, shadowMinMm },
   );

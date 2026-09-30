@@ -277,7 +277,7 @@ export function findMinimumSize(
     throw new RangeError(`maxFactor must be a number from 1, got ${maxFactor}`);
   }
   const preset = opts.preset ?? PRESETS.pique;
-  const measureOpts = { preset };
+  const measureOpts = { preset, railsBelowMm: Math.max(limits.satinMinMm, limits.shadowMinMm) };
   const cap = ordered * maxFactor;
 
   const steps: SearchStep[] = [];
