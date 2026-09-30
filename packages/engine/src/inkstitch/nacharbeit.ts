@@ -36,6 +36,7 @@ import type { XmlElement, XmlNode } from "./xml.js";
 import {
   childElements,
   createElement,
+  decodeXml,
   encodeXml,
   ensureNamespace,
   getAttr,
@@ -376,12 +377,15 @@ function leafBounds(leaf: Leaf, page: { mmPerUnit: number; origin: Point }): Rec
       const t = applyMatrix(leaf.matrix, p);
       const x = (t.x - page.origin.x) * page.mmPerUnit;
       const y = (t.y - page.origin.y) * page.mmPerUnit;
-      box = unionRect(box ?? { minX: x, minY: y, maxX: x, maxY: y }, {
-        minX: x,
-        minY: y,
-        maxX: x,
-        maxY: y,
-      });
+      box =
+        box === undefined
+          ? { minX: x, minY: y, maxX: x, maxY: y }
+          : {
+              minX: Math.min(box.minX, x),
+              minY: Math.min(box.minY, y),
+              maxX: Math.max(box.maxX, x),
+              maxY: Math.max(box.maxY, y),
+            };
     }
   }
   return box;
@@ -415,6 +419,60 @@ export function elementCentres(svg: string): Map<string, Point> {
   }
   const out = new Map<string, Point>();
   for (const [id, b] of boxes) out.set(id, { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
+  return out;
+}
+
+/** The page a document names in its `width` and `height`, mm; `undefined` where either is missing or not a length. */
+export function pageSizeMm(svg: string): { widthMm: number; heightMm: number } | undefined {
+  const root = parseXml(svg).root;
+  const widthMm = lengthToMm(getAttr(root, "width"));
+  const heightMm = lengthToMm(getAttr(root, "height"));
+  return widthMm === undefined || heightMm === undefined ? undefined : { widthMm, heightMm };
+}
+
+/**
+ * The version of the document format Ink/Stitch writes into the metadata (`lib/update.py`,
+ * `INKSTITCH_SVG_VERSION`): 4 in the development state of 17.09.2026 (`d59c9ab`) and, read in its
+ * source, in 3.3.0. A document below it is a legacy document to Ink/Stitch: it updates it on opening
+ * (attributes of fills and strokes change, for an unversioned one Inkscape asks first) and stitches
+ * something else than the file said.
+ */
+export const INKSTITCH_SVG_VERSION = 4;
+
+/**
+ * The version a document names, found as Ink/Stitch finds it (an element `inkstitch_svg_version`,
+ * whatever its namespace, and the number in it); `undefined` where there is none or it is no number.
+ */
+export function inkstitchSvgVersion(svg: string): number | undefined {
+  return versionOf(parseXml(svg).root);
+}
+
+function versionOf(root: XmlElement): number | undefined {
+  const find = (el: XmlElement): XmlElement | undefined => {
+    if (localName(el) === "inkstitch_svg_version") return el;
+    for (const c of childElements(el)) {
+      const hit = find(c);
+      if (hit !== undefined) return hit;
+    }
+    return undefined;
+  };
+  const el = find(root);
+  if (el === undefined) return undefined;
+  const text = el.children
+    .filter((c) => c.kind === "text")
+    .map((c) => decodeXml(c.raw))
+    .join("")
+    .trim();
+  return /^-?\d+$/.test(text) ? Number(text) : undefined;
+}
+
+/** What each stitched object is ("Satin", "Tatami", "Laufstich" …), by `id`; one without an id is left out. */
+export function elementKinds(svg: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const leaf of leavesOf(parseXml(svg).root)) {
+    const id = getAttr(leaf.el, "id");
+    if (id !== undefined) out.set(id, leaf.art);
+  }
   return out;
 }
 
@@ -459,13 +517,15 @@ export type ReworkLayer = {
   units: string[];
   /** Stitched objects in it. */
   elements: number;
+  /** The box of the stitched paths in it, mm on the page; `undefined` where it has none. */
+  bounds: Rect | undefined;
 };
 
 /** One colour of the stitch order: a run of neighbouring stitched objects of one colour. */
 export type ReworkStop = { hex: string | undefined; name: string };
 
 export type ReworkNote = {
-  kind: "mixed-colours" | "unreadable-colour" | "no-stitches" | "page-size";
+  kind: "mixed-colours" | "unreadable-colour" | "no-stitches" | "page-size" | "svg-version";
   message: string;
   /** The group or object it is about. */
   id?: string;
@@ -482,6 +542,8 @@ export type ReworkResult = {
   stops: ReworkStop[];
   /** Places in the layer "Prüfstellen". */
   spots: number;
+  /** The `inkstitch_svg_version` the document carries (`undefined` for none), kept as it was. */
+  inkstitchSvgVersion: number | undefined;
   notes: ReworkNote[];
 };
 
@@ -713,12 +775,26 @@ export function buildReworkSvg(svg: string, opts: ReworkOptions): ReworkResult {
   const notes: ReworkNote[] = [];
   setPage(root, opts.widthMm, opts.heightMm, notes);
 
+  // The page as the file now says it: the boxes of the layers are in its millimetres.
+  const page = pageOf(root);
   const { head, units } = unitsOf(root);
   const before = units.flatMap((u) => u.leaves.map((l) => l.el));
   const blocks = blocksOf(units, head);
   const stops = stopsOf(units.flatMap((u) => u.leaves));
   const unique = idMaker(root);
 
+  const version = versionOf(root);
+  if (version !== INKSTITCH_SVG_VERSION) {
+    notes.push({
+      kind: "svg-version",
+      message:
+        version === undefined
+          ? `Die Datei trägt keine inkstitch_svg_version: Ink/Stitch behandelt sie als Altdokument, ` +
+            `aktualisiert sie beim Öffnen (Inkscape fragt vorher) und stickt dann anders als der Lauf.`
+          : `Die Datei trägt Version ${version} des Ink/Stitch-Dokumentformats, geprüft ist ` +
+            `${INKSTITCH_SVG_VERSION}: Ink/Stitch kann sie beim Öffnen ändern.`,
+    });
+  }
   if (before.length === 0) {
     notes.push({
       kind: "no-stitches",
@@ -789,6 +865,13 @@ export function buildReworkSvg(svg: string, opts: ReworkOptions): ReworkResult {
     setNsAttr(layer, XML_NS.inkscape, "label", label);
     for (const unit of block.units) layer.children.push(unit.node, NEWLINE);
     layerElements.push(layer);
+    let bounds: Rect | undefined;
+    for (const unit of block.units) {
+      for (const leaf of unit.leaves) {
+        const box = leafBounds(leaf, page);
+        if (box !== undefined) bounds = bounds === undefined ? box : unionRect(bounds, box);
+      }
+    }
     layers.push({
       number,
       label,
@@ -796,6 +879,7 @@ export function buildReworkSvg(svg: string, opts: ReworkOptions): ReworkResult {
       name,
       units: block.units.filter((u) => u.leaves.length > 0).map((u) => u.id ?? ""),
       elements: block.units.reduce((n, u) => n + u.leaves.length, 0),
+      bounds,
     });
   });
 
@@ -819,6 +903,7 @@ export function buildReworkSvg(svg: string, opts: ReworkOptions): ReworkResult {
     layers,
     stops,
     spots: spots.length,
+    inkstitchSvgVersion: version,
     notes,
   };
 }

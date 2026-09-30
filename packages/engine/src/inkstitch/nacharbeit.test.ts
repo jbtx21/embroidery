@@ -12,8 +12,12 @@ import {
   colourName,
   documentBounds,
   elementCentres,
+  elementKinds,
   farbfolge,
+  INKSTITCH_SVG_VERSION,
+  inkstitchSvgVersion,
   PALETTE,
+  pageSizeMm,
   parseColour,
   SAME_NEEDLE_RGB,
 } from "./nacharbeit.js";
@@ -39,7 +43,8 @@ const SIZE = `width="40mm" height="20mm" viewBox="0 0 40 20"`;
 const HEAD =
   `<defs><symbol xmlns:inkscape="${XML_NS.inkscape}" id="inkstitch_trim"><title id="t">Trim</title></symbol></defs>` +
   `<ns0:namedview xmlns:ns0="${XML_NS.sodipodi}"/>` +
-  `<metadata><inkstitch:collapse_len_mm>3</inkstitch:collapse_len_mm></metadata>`;
+  `<metadata><inkstitch:collapse_len_mm>3</inkstitch:collapse_len_mm>` +
+  `<inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata>`;
 
 const page = (body: string, size = SIZE): string => `<svg ${NS} ${size}>${HEAD}${body}</svg>`;
 
@@ -259,6 +264,21 @@ describe("buildReworkSvg — layers", () => {
     expect(r.layers[8]!.label).toBe("09 Gold #D1B35A");
     expect(r.layers[99]!.label).toBe("100 Rot #D2060D");
     expect(r.layers).toHaveLength(101);
+  });
+
+  it("names the box of each layer on the page, for what is stitched in it", () => {
+    const doc = page(
+      `<path id="a" d="M 2 4 L 10 4 L 10 8 Z" style="fill:#d1b35a;stroke:none"/>` +
+        group(
+          "g1",
+          `<path id="c1" d="M 20 0 L 24 0" style="fill:none;stroke:#d2060d"/>` + trim("c1"),
+        ),
+    );
+    const r = buildReworkSvg(doc, { widthMm: 40, heightMm: 20 });
+    expect(r.layers.map((l) => l.bounds)).toEqual([
+      { minX: 2, minY: 4, maxX: 10, maxY: 8 },
+      { minX: 20, minY: 0, maxX: 24, maxY: 0 },
+    ]);
   });
 
   it("keeps a group whole and its trim command with its column", () => {
@@ -789,5 +809,107 @@ describe("elementCentres / documentBounds", () => {
     );
     expect(documentBounds(doc)).toEqual({ minX: 0, minY: 0, maxX: 4, maxY: 4 });
     expect(elementCentres(doc).has("b")).toBe(false);
+  });
+});
+
+describe("elementKinds", () => {
+  it("names what each stitched object is, by id", () => {
+    const kinds = elementKinds(SAMPLE);
+    expect([...kinds]).toEqual([
+      ["z01-black", "Tatami"],
+      ["autosatin1", "Satin"],
+      ["autosatinrun1", "Laufstich"],
+      ["z03-gold", "Laufstich"],
+      ["autosatin2", "Satin"],
+    ]);
+  });
+
+  it("leaves out objects without an id, hidden ones and the connector of a command", () => {
+    const doc = page(
+      `<path d="M 0 0 L 4 4" style="fill:none;stroke:#000000"/>` +
+        `<path id="h" d="M 0 0 L 4 4" style="fill:none;stroke:#000000;display:none"/>` +
+        group("g", trim("x")),
+    );
+    expect(elementKinds(doc).size).toBe(0);
+  });
+});
+
+describe("pageSizeMm", () => {
+  it("reads the size of the page in millimetres, whatever unit the file says", () => {
+    expect(
+      pageSizeMm(page("", `width="110.828mm" height="51.409mm" viewBox="0 0 110.828 51.409"`)),
+    ).toEqual({
+      widthMm: 110.828,
+      heightMm: 51.409,
+    });
+    const px = pageSizeMm(page("", `width="96" height="192" viewBox="0 0 96 192"`))!;
+    expect(px.widthMm).toBeCloseTo(25.4, 9);
+    expect(px.heightMm).toBeCloseTo(50.8, 9);
+  });
+
+  it("has none where the file names none", () => {
+    expect(pageSizeMm(`<svg ${NS}/>`)).toBeUndefined();
+    expect(pageSizeMm(`<svg ${NS} width="50%" height="10mm"/>`)).toBeUndefined();
+  });
+});
+
+describe("the version of the document (inkstitch_svg_version)", () => {
+  const withMetadata = (metadata: string): string =>
+    `<svg ${NS} ${SIZE}><metadata>${metadata}</metadata>${fill("a", GOLD)}</svg>`;
+
+  it("names the version the repo has been checked against", () => {
+    expect(INKSTITCH_SVG_VERSION).toBe(4);
+  });
+
+  it("reads the version Ink/Stitch wrote into the metadata", () => {
+    expect(inkstitchSvgVersion(SAMPLE)).toBe(4);
+    expect(
+      inkstitchSvgVersion(
+        withMetadata(`<inkstitch:inkstitch_svg_version>3</inkstitch:inkstitch_svg_version>`),
+      ),
+    ).toBe(3);
+  });
+
+  it("finds it as Ink/Stitch does, by the local name, whatever the prefix", () => {
+    const doc = `<svg ${NS} ${SIZE}><metadata><x:inkstitch_svg_version xmlns:x="urn:other">4</x:inkstitch_svg_version></metadata></svg>`;
+    expect(inkstitchSvgVersion(doc)).toBe(4);
+  });
+
+  it("has none where the document names none, or none that is a number", () => {
+    expect(inkstitchSvgVersion(`<svg ${NS} ${SIZE}/>`)).toBeUndefined();
+    expect(inkstitchSvgVersion(withMetadata(""))).toBeUndefined();
+    expect(
+      inkstitchSvgVersion(
+        withMetadata(`<inkstitch:inkstitch_svg_version>vier</inkstitch:inkstitch_svg_version>`),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("says nothing where the document has the version, and reports it in the result", () => {
+    const r = buildReworkSvg(SAMPLE, { widthMm: 40, heightMm: 20 });
+    expect(r.inkstitchSvgVersion).toBe(4);
+    expect(r.notes.filter((n) => n.kind === "svg-version")).toEqual([]);
+  });
+
+  it("keeps the version in the file it writes, unchanged", () => {
+    const r = buildReworkSvg(SAMPLE, { widthMm: 40, heightMm: 20 });
+    expect(inkstitchSvgVersion(r.svg)).toBe(4);
+  });
+
+  it("reports a document without a version and does not make one up — Ink/Stitch would update it on opening", () => {
+    const bare = `<svg ${NS} ${SIZE}>${fill("a", GOLD)}</svg>`;
+    const r = buildReworkSvg(bare, { widthMm: 40, heightMm: 20 });
+    expect(r.inkstitchSvgVersion).toBeUndefined();
+    expect(r.notes.map((n) => n.kind)).toEqual(["svg-version"]);
+    expect(r.notes[0]!.message).toContain("keine inkstitch_svg_version");
+    expect(inkstitchSvgVersion(r.svg)).toBeUndefined();
+  });
+
+  it("reports a version other than the one it was checked against", () => {
+    const older = `<svg ${NS} ${SIZE}><metadata><inkstitch:inkstitch_svg_version>3</inkstitch:inkstitch_svg_version></metadata>${fill("a", GOLD)}</svg>`;
+    const r = buildReworkSvg(older, { widthMm: 40, heightMm: 20 });
+    expect(r.inkstitchSvgVersion).toBe(3);
+    expect(r.notes.map((n) => n.kind)).toEqual(["svg-version"]);
+    expect(r.notes[0]!.message).toContain("Version 3");
   });
 });
