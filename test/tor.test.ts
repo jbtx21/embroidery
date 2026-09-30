@@ -13,6 +13,7 @@ import {
   fadingScene,
   ORDERED_MM,
   scaledAt,
+  SVG_NO_VIEWBOX,
   shadowScene,
   svgOf,
 } from "../packages/engine/test/fixtures/gate.js";
@@ -157,9 +158,7 @@ describe("sucheTor (das Tor für eine SVG-Datei)", () => {
   it("nennt, wo die Datei sich nicht in einer anderen Größe lesen lässt, den Fehler und erzeugt nichts", () => {
     // Ohne viewBox sind die Koordinaten Pixel: der Strich von 0,9 mm (3,4 px) ist zu schmal, die
     // Suche müsste die Datei größer lesen — und kann es nicht.
-    const ohne =
-      `<svg xmlns="http://www.w3.org/2000/svg" width="80mm" height="30mm">` +
-      `<path id="strich" d="M 0,0 L 151.18,0 L 151.18,3.4016 L 0,3.4016 Z" style="fill:#d1b35a;stroke:none"/></svg>`;
+    const ohne = SVG_NO_VIEWBOX;
     const t = sucheTor(ohne, importShapes(ohne), { bestelltMm: 80 });
     expect(t.fehler).toMatch(/viewBox/);
     expect(t.erzeugtMm).toBeUndefined();

@@ -130,3 +130,12 @@ export function svgOf(shapes: ImportedShape[], widthMm = ORDERED_MM, heightMm = 
     `viewBox="0 0 ${widthMm} ${heightMm}">${paths.join("")}</svg>`
   );
 }
+
+/**
+ * A strip of 0.9 mm as an SVG without a viewBox: the coordinates are pixels (3.4016 px = 0.9 mm), and
+ * the file cannot be read at another size — `tools/breite.mjs` needs the viewBox to rewrite the width.
+ */
+export const SVG_NO_VIEWBOX =
+  `<svg xmlns="http://www.w3.org/2000/svg" width="80mm" height="30mm">` +
+  `<path id="strich" d="M 0,0 L 151.18,0 L 151.18,3.4016 L 0,3.4016 Z" ` +
+  `style="fill:#d1b35a;stroke:none"/></svg>`;
