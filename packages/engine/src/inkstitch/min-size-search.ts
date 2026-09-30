@@ -4,9 +4,9 @@
  *
  * Extrapolating from the ordered size does not hold. A stroke that is a running stitch at 80 mm
  * turns into satin as the logo grows — at 0.7 mm — and is too narrow from there until it is 1.3 mm
- * wide; the gray stroke of the STUTTGART logo is 0.47 mm at 80 mm, 0.70 mm at 120 mm, and the size
- * the extrapolation gives from 80 mm (118 mm) lies inside its range. Every stroke has a range of
- * logo widths in which it is satin and too narrow (`ForbiddenRange`), and the minimum size is the
+ * wide: a gray stroke of the STUTTGART logo is 0.47 mm at 80 mm and 0.70 mm at 120 mm, and the
+ * minimum size read at 80 mm (118 mm) became 223 mm when read at 120 mm. Every stroke has a range
+ * of logo widths in which it is satin and too narrow (`ForbiddenRange`), and the minimum size is the
  * smallest size outside all of them.
  *
  * - **Ranges** (`forbiddenRanges`): a stroke of median width `w` at logo width `c` is `k·w` wide at
@@ -36,6 +36,21 @@
  *   problem until its gap reaches 1.0 mm. The widths scale linearly in these ranges, which they do
  *   not exactly (the measurement of a thin strip reads a few per cent higher at small sizes): the
  *   ranges are where to look, and the check in that size is what decides.
+ *
+ * Known limits (measured 30.09.2026 on the customer logos):
+ *
+ * - The median width of a thin shape is not linear in the size: the outline is sampled every
+ *   perimeter / 300, between 0.3 and 2 mm, so the measure of a bar of 0.9 mm reads 0.95 mm at
+ *   80 mm and 0.92 times the growth factor above. The ranges are predictions; a size inside one can
+ *   hold, and the search does not look for it. STUTTGART from 80 mm: the real check (every
+ *   millimetre from 241 to 252 mm) holds from 243 mm, the search finds 252 mm — a small shape
+ *   measures about 1.24 mm from 216 to 242 mm, and each range reads 5 % further on than the last.
+ *   The size found is one that holds, not always the smallest.
+ * - Every shape the classification calls satin counts, however small: the two black specks of about
+ *   1 mm² in the STUTTGART logo (z04-000000-001, -002) are satin strokes of 1.2 mm to the check, and
+ *   set the minimum size from 185 mm to 252 mm on their own. Shapes that grow into
+ *   satin (the hairlines of a vectorisation) push the size up a range at a time: Köln 90 mm is found
+ *   at 567 mm, Eislingen 200 mm at 1266 mm, each about 6 times the ordered width.
  */
 import type { ImportedShape } from "../import/svg.js";
 import type { Preset } from "../presets.js";
@@ -52,7 +67,7 @@ import {
 import { FABRIC_GAP_MAX_MM } from "./rail-pull.js";
 
 /** The search stops after this many checks, each in a size of its own. */
-export const SEARCH_MAX_STEPS = 12;
+export const SEARCH_MAX_STEPS = 16;
 /** The search gives up at sizes above this many times the ordered one. */
 export const SEARCH_MAX_FACTOR = 10;
 /**

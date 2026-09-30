@@ -25,6 +25,8 @@ import {
   findMinimumSize,
   forbiddenRanges,
   mergeRanges,
+  SEARCH_MAX_FACTOR,
+  SEARCH_MAX_STEPS,
   smallestWidthOutside,
 } from "./min-size-search.js";
 import type { ForbiddenRange } from "./min-size-search.js";
@@ -67,6 +69,14 @@ const range = (id: string, fromMm: number, toMm: number): ForbiddenRange => ({
  */
 const passesAt = (shapes: ImportedShape[], widthMm: number): boolean =>
   measureShapes(scaledAt(shapes)(widthMm)).every((m) => !isTooNarrow(m, LIMITS));
+
+describe("constants of the search", () => {
+  it("stops after 16 checks and above 10 times the ordered size", () => {
+    // Measured 30.09.2026: the customer logos need 2 to 7 checks; Eislingen 200 mm ends at 6.3 times.
+    expect(SEARCH_MAX_STEPS).toBe(16);
+    expect(SEARCH_MAX_FACTOR).toBe(10);
+  });
+});
 
 describe("forbiddenRanges (logo widths at which a stroke is satin and too narrow)", () => {
   it("gives a satin stroke under its limit the range from now to where it is 1.3 mm wide", () => {

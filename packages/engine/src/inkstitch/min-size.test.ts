@@ -38,7 +38,7 @@ import {
   SATIN_STROKE_MIN_MM,
   SHADOW_LINE_MIN_MM,
 } from "./min-size.js";
-import { buildInkstitchTemplate } from "./template.js";
+import { buildInkstitchTemplate, designForms, lineCover, LINE_COVER_HALF_MM } from "./template.js";
 
 beforeAll(async () => {
   await initGeometry();
@@ -346,6 +346,42 @@ describe("checkMinimumSize — shadow lines: limit 0.7 mm instead of 1.3 mm (spe
     expect(checkMinimumSize(shapes, { widthMm: B })).toEqual(
       checkMinimumSize(shapes, { widthMm: B }),
     );
+  });
+});
+
+describe("designForms (the forms the rail gaps are measured against, from the shapes alone)", () => {
+  it("takes the outline of every area and the strip of every stroked line that has a colour", () => {
+    const area = areaShape("flaeche", barAt(0, 0, 10, 2));
+    const line = lineShape("linie", [pt(0, 10), pt(10, 10)], "#c8102e");
+    const forms = designForms([area, line]);
+    expect(forms.map((f) => f.shapeId)).toEqual(["flaeche", "linie"]);
+    expect(forms[0]!.polygon).toBe(area.polygon);
+    // The strip of a line is 0.5 mm wide along it: what the template's order takes the line to cover.
+    expect(LINE_COVER_HALF_MM).toBe(0.25);
+    expect(polygonArea(forms[1]!.polygon)).toBeCloseTo(10 * 0.5, 2);
+  });
+
+  it("leaves out a line without a colour or with a single point: the template plans no object for it", () => {
+    const none = { ...lineShape("ohne", [pt(0, 0), pt(5, 0)]), color: undefined };
+    const point = lineShape("punkt", [pt(0, 0)], "#c8102e");
+    expect(designForms([none, point])).toEqual([]);
+  });
+
+  it("closes a closed line: its strip runs round the whole outline", () => {
+    const square = [pt(0, 0), pt(4, 0), pt(4, 4), pt(0, 4)];
+    const open = designForms([lineShape("offen", square, "#c8102e")])[0]!.polygon;
+    const closed = designForms([{ ...lineShape("zu", square, "#c8102e"), closed: true }])[0]!
+      .polygon;
+    expect(polygonArea(closed)).toBeGreaterThan(polygonArea(open));
+    expect(lineCover([...square, square[0]!])).toBeDefined();
+  });
+
+  it("keeps the first of shapes with the same id, as the template does", () => {
+    const first = areaShape("x", barAt(0, 0, 10, 2));
+    const second = areaShape("x", barAt(0, 20, 10, 2));
+    const forms = designForms([first, second]);
+    expect(forms).toHaveLength(1);
+    expect(forms[0]!.polygon).toBe(first.polygon);
   });
 });
 
