@@ -322,7 +322,7 @@ function collectLeaves(
   const name = localName(el);
   if (NOT_DRAWN.has(name)) return;
   const style = styleOf(el);
-  if (presentation(el, style, "display") === "none") return;
+  if (presentation(el, style, "display")?.toLowerCase() === "none") return;
   if (isTrue(getNsAttr(el, XML_NS.inkstitch, "ignore_object"))) return;
   if (isCommand(el)) return;
 
