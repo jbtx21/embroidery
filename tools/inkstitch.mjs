@@ -3,11 +3,23 @@
  * check (docs/adr/0001-inkstitch-als-stich-engine.md, decision 28.09.2026).
  *
  *   pnpm inkstitch <svg> [preset] [--tatami] [--breite <mm>] [--ueberlappung <mm2>]
- *                        [--aussparen] [--naht <mm>] [--zug-symmetrisch]
+ *                        [--aussparen] [--naht <mm>] [--zug-symmetrisch] [--ohne-tor]
  *
  * --breite <mm> scales the motif proportionally to that width before anything is
  * imported (tools/breite.mjs); the output names the factor and the new size, and
  * the files get the width in their name (<name>-120mm.dst).
+ *
+ * The gate (spec §5.2, "Tor", tools/tor.mjs): the ordered size is the width of the
+ * SVG or --breite. Before anything is stitched, the smallest size from there at which
+ * no satin stroke is under its limit is searched over the size (packages/engine/src/
+ * inkstitch/min-size-search.ts). Where that is larger, the program is made in it —
+ * rounded up to whole millimetres, scaled proportionally like --breite — and the
+ * FIRST line of the output says so ("Bestellt 80 mm · stickbar ab 119 mm · erzeugt in
+ * 119 mm — bestimmt von …"); the files carry the produced width in their name. Where
+ * the search finds no size, nothing is made. --ohne-tor switches the gate off for
+ * comparison runs: no enlarging; below the minimum size the files carry
+ * "_unter-mindestgroesse" in their name and the output warns. A program for an order
+ * is never made with it. Not for --tatami, which stitches the source as drawn.
  *
  * --ueberlappung <mm2> lets overlaps under that area go in the colour order — the
  * standard is spec §10.1: any overlap binds. It is a variant for a look at the
@@ -62,8 +74,9 @@
  * output. It is the baseline the satin run is measured against.
  *
  * Either way -- before any stitch is made -- the template is checked for fineness
- * (spec §5.2, packages/engine/src/inkstitch/min-size.ts): the minimum logo width, the
- * findings per kind and the five largest are printed under "Feinheit". It only reports;
+ * (spec §5.2, packages/engine/src/inkstitch/min-size.ts), in the size it is made in:
+ * under "Feinheit" the gate's lines (shadow lines, the path of the search, the ranges above
+ * the size), the findings per kind and the five largest are printed. It only reports;
  * `pnpm mindestgroesse <svg>` lists every finding and draws them.
  *
  * Either way the DST is read back with @texma-stitch/formats, rendered to
@@ -92,6 +105,7 @@ import { zeile } from "./archiv.mjs";
 import { scaleSvgToWidth } from "./breite.mjs";
 import { befundZeilen, zusammenfassung } from "./feinheit.mjs";
 import { isInkstitchReady, runInkstitch, SETUP_HINT } from "./inkstitch-lauf.mjs";
+import { dateiname, sucheTor, torDetails, torKopf } from "./tor.mjs";
 
 const INKSTITCH_NS = "http://inkstitch.org/namespace";
 
@@ -179,9 +193,9 @@ async function inkstitch(args) {
 }
 
 /** Spec §5.2 on the shapes of the SVG; without a size in the SVG there is no ordered width to hold from. */
-const pruefeFeinheit = (imported) =>
+const pruefeFeinheit = (imported, preset) =>
   imported.widthMm > 0
-    ? checkMinimumSize(imported.shapes, { widthMm: imported.widthMm })
+    ? checkMinimumSize(imported.shapes, { widthMm: imported.widthMm, preset })
     : undefined;
 
 const VALUE_FLAGS = ["--breite", "--ueberlappung", "--naht"];
@@ -189,6 +203,7 @@ const args = process.argv.slice(2);
 const tatamiOnly = args.includes("--tatami");
 const satinCutout = args.includes("--aussparen");
 const railPullSymmetric = args.includes("--zug-symmetrisch");
+const ohneTor = args.includes("--ohne-tor");
 const [svgArg, presetArg = "pique"] = args.filter(
   (a, i) => !a.startsWith("--") && !VALUE_FLAGS.includes(args[i - 1]),
 );
@@ -213,7 +228,7 @@ const touchUnderlapMm = numberFlag("--naht", { min: 0 });
 if (!svgArg) {
   console.error(
     "Aufruf: pnpm inkstitch <svg> [preset] [--tatami] [--breite <mm>] [--ueberlappung <mm2>] " +
-      "[--aussparen] [--naht <mm>] [--zug-symmetrisch]",
+      "[--aussparen] [--naht <mm>] [--zug-symmetrisch] [--ohne-tor]",
   );
   console.error(`Presets: ${Object.keys(PRESETS).join(", ")}`);
   process.exit(1);
@@ -224,10 +239,15 @@ if (!(presetArg in PRESETS)) {
 }
 if (
   tatamiOnly &&
-  (minOverlapMm2 !== undefined || satinCutout || touchUnderlapMm !== undefined || railPullSymmetric)
+  (minOverlapMm2 !== undefined ||
+    satinCutout ||
+    touchUnderlapMm !== undefined ||
+    railPullSymmetric ||
+    ohneTor)
 ) {
   console.error(
-    "--ueberlappung, --aussparen, --naht und --zug-symmetrisch gelten für die Vorlage und nicht mit --tatami",
+    "--ueberlappung, --aussparen, --naht, --zug-symmetrisch und --ohne-tor gelten für die Vorlage " +
+      "und nicht mit --tatami",
   );
   process.exit(1);
 }
@@ -237,22 +257,52 @@ if (!isInkstitchReady()) {
 }
 
 const svgPath = resolve(svgArg);
-let sourceSvg = readFileSync(svgPath, "utf8");
-/** What --breite did: the factor and the size before and after. */
+const originalSvg = readFileSync(svgPath, "utf8");
+let sourceSvg = originalSvg;
+/** What --breite and the gate did: the factor and the size before and after. */
 let scaled;
+/** The gate (module doc; tools/tor.mjs) — not with --tatami, which stitches the source as drawn. */
+let tor;
+await initEngine();
+const original = importShapes(originalSvg);
 if (breiteMm !== undefined) {
-  await initEngine();
-  const original = importShapes(sourceSvg);
   try {
-    scaled = scaleSvgToWidth(sourceSvg, breiteMm, original);
+    scaled = scaleSvgToWidth(originalSvg, breiteMm, original);
   } catch (err) {
     console.error(`FEHLER: ${err.message}`);
     process.exit(1);
   }
   sourceSvg = scaled.text;
 }
-const name =
-  basename(svgPath, extname(svgPath)) + (scaled === undefined ? "" : `-${scaled.to.widthMm}mm`);
+if (tatamiOnly) {
+  console.log("Tor aus (--tatami: die Quelle wie gezeichnet, in der bestellten Größe)");
+} else if (breiteMm === undefined && !(original.widthMm > 0)) {
+  console.log(
+    "Tor aus: die SVG nennt keine Größe in mm — --breite <mm> gibt die bestellte Breite vor",
+  );
+} else {
+  tor = sucheTor(originalSvg, original, {
+    bestelltMm: breiteMm ?? original.widthMm,
+    preset: PRESETS[presetArg],
+    ohneTor,
+  });
+  // The first line of the output; the run goes on only where it may make a program.
+  if (tor.search !== undefined) for (const line of torKopf(tor)) console.log(line);
+  if (tor.fehler !== undefined && tor.erzeugtMm === undefined) {
+    console.error(`FEHLER: ${tor.fehler}`);
+    process.exit(1);
+  }
+  if (tor.vergroessert) {
+    try {
+      scaled = scaleSvgToWidth(originalSvg, tor.erzeugtMm, original);
+    } catch (err) {
+      console.error(`FEHLER: ${err.message}`);
+      process.exit(1);
+    }
+    sourceSvg = scaled.text;
+  }
+}
+const name = dateiname(basename(svgPath, extname(svgPath)), scaled, tor);
 const outDir = resolve("out");
 mkdirSync(outDir, { recursive: true });
 
@@ -281,7 +331,7 @@ if (tatamiOnly) {
   writeFileSync(templatePath, text);
   summary = [`Tatami-Lauf (--tatami): ${pathCount} Pfade wie gezeichnet`];
   await initEngine();
-  feinheit = pruefeFeinheit(importShapes(sourceSvg));
+  feinheit = pruefeFeinheit(importShapes(sourceSvg), preset);
 } else {
   await initEngine();
   const started = performance.now();
@@ -298,7 +348,7 @@ if (tatamiOnly) {
   });
   templateMs = performance.now() - started;
   writeFileSync(templatePath, template.svg);
-  feinheit = pruefeFeinheit(imported);
+  feinheit = pruefeFeinheit(imported, preset);
 
   const count = (kind) => template.objects.filter((o) => o.kind === kind).length;
   const columns = template.objects.reduce(
@@ -441,8 +491,12 @@ console.log(
 );
 if (scaled) {
   const size = (d) => `${Number(d.widthMm.toFixed(3))} × ${Number(d.heightMm.toFixed(3))} mm`;
+  // What scaled the source: --breite, the gate, or the gate after --breite (the factor is from the file).
+  const was = [breiteMm !== undefined ? `--breite ${breiteMm}` : "", tor?.vergroessert ? "Tor" : ""]
+    .filter((w) => w !== "")
+    .join(" + ");
   console.log(
-    `Breite      --breite ${breiteMm}: Faktor ${scaled.factor.toFixed(4)}, ` +
+    `Breite      ${was}: Faktor ${scaled.factor.toFixed(4)}, ` +
       `${size(scaled.from)} → ${size(scaled.to)}`,
   );
 }
@@ -455,11 +509,18 @@ console.log(`DST         out/${name}.dst`);
 console.log(`Vorschau    out/${name}.png`);
 for (const line of summary) console.log(`            ${line}`);
 
-console.log("\nFeinheit (Spec §5.2)");
+console.log(
+  `\nFeinheit (Spec §5.2${feinheit ? `, in ${Number(feinheit.widthMm.toFixed(1))} mm` : ""})`,
+);
 if (!feinheit) {
   console.log("  Die SVG nennt keine Größe in mm — ohne die bestellte Breite kein „hält ab“.");
 } else {
-  for (const line of zusammenfassung(feinheit)) console.log(`  ${line}`);
+  // The gate says the minimum size (first line of the output, and here its details); the reading
+  // of this one size (`zusammenfassung`) would put a second number next to it.
+  if (tor?.search !== undefined) for (const line of torDetails(tor)) console.log(`  ${line}`);
+  for (const line of zusammenfassung(feinheit, { ohneMindestgroesse: tor?.search !== undefined })) {
+    console.log(`  ${line}`);
+  }
   if (feinheit.findings.length > 0) {
     console.log("\n  Die fünf größten Befunde (alle: pnpm mindestgroesse <svg>)");
     for (const line of befundZeilen(feinheit.findings, { max: 5 })) console.log(`  ${line}`);
@@ -628,4 +689,33 @@ if (stderrLines.length === 0) {
 } else {
   console.log("\nInk/Stitch-Hinweise (stderr)");
   for (const line of stderrLines) console.log(`  ${line}`);
+}
+
+// The Nacharbeit file (spec §13.4, tools/nacharbeit.mjs): the document the DST was made from, set up for
+// rework in Inkscape — layers per colour block, names, the hidden layer of check points — plus PES, the
+// colour sequence and a preview with the points marked. Last, because it needs the DST; and not for
+// --tatami, whose document is the source as drawn and not the template.
+console.log("");
+if (tatamiOnly) {
+  console.log("Nacharbeit   bei --tatami nicht: dort wird die Quelle wie gezeichnet gestickt, ohne Vorlage");
+} else {
+  const { reportLines, writeRework } = await import("./nacharbeit.mjs");
+  const rework = await writeRework({
+    name,
+    outDir,
+    svgPath: outputInput,
+    templatePath,
+    sourceSvg,
+    presetName: presetArg,
+    stitches: foreignStitches,
+    blocks,
+    stats,
+    feinheit,
+    fallbacks,
+    narrowLines,
+    smoothed,
+    railPull,
+    underlay,
+  });
+  for (const line of reportLines(rework)) console.log(line);
 }

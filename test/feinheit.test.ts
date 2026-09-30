@@ -128,6 +128,16 @@ describe("zusammenfassung", () => {
     expect(lines[0]).toContain(`bestimmt von Satinstrich ${result.decisive!.id}`);
   });
 
+  it("lässt auf Wunsch die Zeile der Mindestgröße weg: wo das Tor sie sagt, stünde dort eine zweite Zahl", () => {
+    const { result } = szene();
+    const lines = zusammenfassung(result, { ohneMindestgroesse: true });
+    expect(lines.some((l: string) => l.startsWith("Mindestgröße"))).toBe(false);
+    expect(lines[0]).toContain(`Lücken offen ab  ${Math.ceil(result.gapsOpenFromWidthMm!)} mm`);
+    expect(lines).toHaveLength(zusammenfassung(result).length - 1);
+    // Der Rest ist derselbe Text.
+    expect(lines).toEqual(zusammenfassung(result).slice(1));
+  });
+
   it("sagt auch, was der Filter bei den Stofflücken herausgenommen hat", () => {
     // Grau und Grau: die Lücke einer Farbe. Das Schließen aller Formen findet sie wieder und
     // überlässt sie der Farbe — das steht in der Zusammenfassung, nicht still verschwunden.
@@ -293,6 +303,19 @@ describe("feinheitSvg", () => {
     expect(svg).toContain(
       `Lücken offen ab ${Math.ceil(result.gapsOpenFromWidthMm!)} mm (${result.decisiveGap!.id}`,
     );
+  });
+
+  it("schreibt, wo das Tor die Mindestgröße gefunden hat, dessen Text in den Kopf statt der Hochrechnung", () => {
+    const { shapes, result } = szene();
+    const svg = feinheitSvg(shapes, result, {
+      name: "probe",
+      heightMm: 30,
+      mindest: "Mindestgröße 252 mm (bestellt 80 mm)",
+    });
+    expect(svg).toContain("80.0 mm breit · Mindestgröße 252 mm (bestellt 80 mm)");
+    expect(svg).not.toContain(`Mindestgröße ${Math.ceil(result.minimumWidthMm!)} mm (Satinstrich`);
+    // Die Lücken stehen weiter im Kopf.
+    expect(svg).toContain(`Lücken offen ab ${Math.ceil(result.gapsOpenFromWidthMm!)} mm (`);
   });
 
   it("beschriftet höchstens so viele Befunde, wie gesagt — die bestimmenden immer", () => {

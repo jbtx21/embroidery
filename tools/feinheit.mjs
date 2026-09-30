@@ -51,13 +51,19 @@ const spalte = (name) => name.padEnd(17);
  * der sie bestimmt; „Lücken offen ab“ mit der Lücke oder Stofflücke, die es bestimmt; die Zahl
  * der Befunde je Art; und was der Filter für Lücken und für Stofflücken herausgenommen hat
  * (Regel 8: nichts verschwindet still).
+ *
+ * Die Mindestgröße ist hier die **Hochrechnung aus dieser einen Größe** (`result.minimumWidthMm`).
+ * Wo das Tor sie gesucht hat (tools/tor.mjs, Spec §5.2), steht die gesuchte an anderer Stelle —
+ * dann lässt `ohneMindestgroesse` diese Zeile weg, statt eine zweite Zahl daneben zu stellen.
  */
-export function zusammenfassung(result) {
+export function zusammenfassung(result, { ohneMindestgroesse = false } = {}) {
   const { satin, luecke, stoff } = befundeJeArt(result);
   const lines = [];
 
   const d = result.decisive;
-  if (!d) {
+  if (ohneMindestgroesse) {
+    // Das Tor hat die Mindestgröße gesucht und sagt sie selbst.
+  } else if (!d) {
     lines.push(`${spalte("Mindestgröße")}keine Satinstriche im Logo`);
   } else if (d.measuredMm < d.limitMm) {
     lines.push(
@@ -193,12 +199,13 @@ function ausdehnung(shapes, widthMm, heightMm) {
 /**
  * Das Vorschaubild als SVG (Modulkopf). Maße in Millimetern der Vorlage, dargestellt mit
  * `pxBreite` Pixeln in der Breite. `heightMm` ist die Höhe der SVG (0, wenn sie keine nennt —
- * dann gelten die Formen).
+ * dann gelten die Formen). `mindest` ersetzt im Kopf den Text zur Mindestgröße (die Hochrechnung
+ * aus dieser Größe) durch den des Tors (`torKurz`, tools/tor.mjs).
  */
 export function feinheitSvg(
   shapes,
   result,
-  { name, heightMm = 0, pxBreite = 1400, beschriftet = 25 },
+  { name, heightMm = 0, pxBreite = 1400, beschriftet = 25, mindest },
 ) {
   const box = ausdehnung(shapes, result.widthMm, heightMm);
   const w = box.maxX - box.minX;
@@ -233,10 +240,12 @@ export function feinheitSvg(
     [`Feinheit (Spec §5.2) — ${name}`, true],
     [
       `${mm(result.widthMm, 1)} mm breit · ` +
-        (d
-          ? `Mindestgröße ${Math.ceil(result.minimumWidthMm)} mm ` +
-            `(${d.measuredMm < d.limitMm ? "" : "schmalster "}Satinstrich ${d.id}, ${mm(d.measuredMm)} mm)`
-          : `keine Satinstriche`),
+        (mindest !== undefined
+          ? mindest
+          : d
+            ? `Mindestgröße ${Math.ceil(result.minimumWidthMm)} mm ` +
+              `(${d.measuredMm < d.limitMm ? "" : "schmalster "}Satinstrich ${d.id}, ${mm(d.measuredMm)} mm)`
+            : `keine Satinstriche`),
       false,
     ],
     [
