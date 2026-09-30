@@ -427,7 +427,7 @@ die **Logobreite, ab der es hält** (bestellte Breite × Grenze ÷ gemessene Bre
 werden, sondern Mindestgröße angeben und daraus das Stickprogramm erstellen.")*
 
 - Liegt die bestellte Größe unter der Mindestgröße, entsteht das Stickprogramm **in der
-  Mindestgröße**, proportional vergrößert. Die Ausgabe sagt es an erster Stelle — bestellte
+  Mindestgröße**, auf ganze Millimeter aufgerundet und proportional vergrößert. Die Ausgabe sagt es an erster Stelle — bestellte
   Größe, Mindestgröße, erzeugte Größe, das bestimmende Element — und die Dateien tragen die
   erzeugte Breite im Namen. Das ist keine stille Reparatur (Regel 8): die Größe ändert sich
   sichtbar, die Formen nicht.
