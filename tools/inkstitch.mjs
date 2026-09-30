@@ -68,10 +68,17 @@
  *    jump is at least the threshold of spec §10.2 (CONNECT_DEFAULTS.jumpTrimMm,
  *    5 mm). Up to 3 mm (its collapse length) Ink/Stitch does not even jump.
  * 4. output --format=dst -> out/<name>.dst.
+ * 5. The Nacharbeit file (spec §13.4, tools/nacharbeit.mjs), once the DST is written and
+ *    reported: out/<name>.nacharbeit.svg — the document of step 3 with a layer per colour
+ *    block in stitch order, a name per object and a hidden layer "Prüfstellen" — beside
+ *    out/<name>.pes (output --format=pes on that file), out/<name>.farbfolge.txt and
+ *    out/<name>.nacharbeit.png. It stitches as this run did: through `output` it gives the
+ *    same DST, byte for byte (test/inkstitch.smoke.test.ts).
  *
  * --tatami keeps the pure tatami run: the source SVG as drawn, with the
  * preset's row spacing on every path (withPresetAttributes), straight to
- * output. It is the baseline the satin run is measured against.
+ * output. It is the baseline the satin run is measured against, and has no Nacharbeit file
+ * (there is no template to set up for rework).
  *
  * Either way -- before any stitch is made -- the template is checked for fineness
  * (spec §5.2, packages/engine/src/inkstitch/min-size.ts), in the size it is made in:
