@@ -34,7 +34,7 @@
  * the points taken from the DST are left out and the output says so.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import {
   buildReworkSvg,
   colourName,
@@ -559,7 +559,7 @@ export async function writeRework(run) {
 export function reportLines(report) {
   if (report.skipped !== undefined) return [`Nacharbeit   ${report.skipped}`];
   const { rework, mapping, spots, withoutPlace, files } = report;
-  const rel = (p) => `out/${p.split("/").pop()}`;
+  const rel = (p) => `out/${basename(p)}`;
   const lines = [
     "Nacharbeit (Spec §13.4)",
     `  Datei       ${rel(files.svg)} (${rework.layers.length} Ebenen, ${spots.length} Prüfstellen)`,

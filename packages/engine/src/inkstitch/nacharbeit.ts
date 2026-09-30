@@ -187,7 +187,7 @@ export function colourName(text: string, palette: readonly PaletteEntry[] = PALE
 /**
  * Two colours this close in RGB, and not the same, are asked about in the colour sequence: “same needle
  * as stop N?”. Between the noise of one colour and two colours a puncher means apart, measured on the
- * customer logos: the same red from two PDF sources differs by 1.7 (#d2060d in Hofbräu, #d1070d in
+ * customer logos: the same red from two PDF sources differs by 1.4 (#d2060d in Hofbräu, #d1070d in
  * Atzensport), the two closest colours within one file by 15.8 (Atzensport, #e00310 and #d1070d). 8 lies
  * between, about 1.8 % of the diagonal of the RGB cube (441): it asks about what the eye does not
  * separate and stays quiet about what it does. A question, not a rule — nothing in the file changes.

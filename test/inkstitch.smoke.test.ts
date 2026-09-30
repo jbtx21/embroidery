@@ -597,6 +597,24 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
     SUBPROCESS_TIMEOUT_MS,
   );
 
+  it(
+    "fill_to_satin ohne Sprossen: die sonst nur im GUI-Dialog gezeigte Meldung steht auf stderr",
+    async () => {
+      // Same fixture, only the fill selected -- CLAUDE.md "keine stillen
+      // Reparaturen": inkstitch/run.py patches lib.gui.abort_message.AbortMessageApp
+      // (a wx dialog nothing can show headless) to print instead of vanishing.
+      const svg = resolve(fixturesDir, "fill-with-rungs.svg");
+      const { stderr } = await runInkstitch({
+        extension: "fill_to_satin",
+        ids: ["flaeche"],
+        svg,
+      });
+
+      expect(stderr).toContain("Ink/Stitch:");
+      expect(stderr).toContain("No rungs selected");
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
   // -------------------------------------------------------------------------------------------
   // The Nacharbeit file (spec §13.4)
   // -------------------------------------------------------------------------------------------
@@ -819,24 +837,5 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
       }
     },
     SUBPROCESS_TIMEOUT_MS * 4,
-  );
-
-  it(
-    "fill_to_satin ohne Sprossen: die sonst nur im GUI-Dialog gezeigte Meldung steht auf stderr",
-    async () => {
-      // Same fixture, only the fill selected -- CLAUDE.md "keine stillen
-      // Reparaturen": inkstitch/run.py patches lib.gui.abort_message.AbortMessageApp
-      // (a wx dialog nothing can show headless) to print instead of vanishing.
-      const svg = resolve(fixturesDir, "fill-with-rungs.svg");
-      const { stderr } = await runInkstitch({
-        extension: "fill_to_satin",
-        ids: ["flaeche"],
-        svg,
-      });
-
-      expect(stderr).toContain("Ink/Stitch:");
-      expect(stderr).toContain("No rungs selected");
-    },
-    SUBPROCESS_TIMEOUT_MS,
   );
 });

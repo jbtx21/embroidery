@@ -203,7 +203,7 @@ describe("colourName / colourDistance", () => {
   });
 
   it("sets the threshold for “same needle” between the noise of one colour and two that differ", () => {
-    // Measured on the customer logos: the same red from two PDF sources differs by 1.7 (#d2060d,
+    // Measured on the customer logos: the same red from two PDF sources differs by 1.4 (#d2060d,
     // #d1070d), the two closest colours of one file by 15.8 (#e00310 against #d1070d).
     expect(SAME_NEEDLE_RGB).toBeGreaterThan(colourDistance("#d2060d", "#d1070d"));
     expect(SAME_NEEDLE_RGB).toBeLessThan(colourDistance("#e00310", "#d1070d"));
