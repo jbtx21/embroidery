@@ -9,6 +9,14 @@
  *   out/<name>.farbfolge.txt     needle occupancy per stop
  *   out/<name>.nacharbeit.png    the stitches in thread colours, check points as numbered circles
  *
+ * **The file stitches as the run did, also when Inkscape opens it.** Ink/Stitch takes a document older than
+ * its format (`inkstitch_svg_version` in the metadata, `lib/update.py`) for a legacy document and updates it
+ * on opening — attributes of fills and strokes change, for an unversioned one Inkscape asks first — so a
+ * file without the current version would stitch otherwise than the DST beside it. The document of the run
+ * comes out of an Ink/Stitch extension (`jump_to_trim`) and carries the version, updates done; this is
+ * checked at the end with Ink/Stitch itself (`settleUpdate`: `update_svg` saves only what it changed) and
+ * a file that would still change is replaced by the updated one.
+ *
  * The check points are what the run already knows, nothing is measured again: the findings of the
  * fineness check (§5.2) with their place; the shapes that did not hold as satin and went to tatami or
  * a running stitch (§7.8.5); satin on a smoothed outline (§7.8.4); areas that became a line under
@@ -37,6 +45,8 @@ import {
   elementKinds,
   farbfolge,
   importShapes,
+  INKSTITCH_SVG_VERSION,
+  inkstitchSvgVersion,
   NEEDLE_GRID_MM,
   NEEDLE_WARN,
   needleSpots,
@@ -387,6 +397,40 @@ export const spotCounts = (spots) => {
 };
 
 /**
+ * Lets Ink/Stitch open the file the way Inkscape will (`update_svg --update-from=<current version>`: load,
+ * update a legacy document, save — and save only if something changed). Nothing written means nothing
+ * would change on opening, and that is the proof; a document that comes back is the updated file, which
+ * replaces it, and is asked once more.
+ *
+ * @returns {Promise<{checked:boolean, changed?:boolean, settled?:boolean, ms?:number, error?:string}>}
+ */
+export async function settleUpdate(path) {
+  const ask = () =>
+    runInkstitch({
+      extension: "update_svg",
+      options: { "update-from": INKSTITCH_SVG_VERSION },
+      svg: path,
+    });
+  try {
+    const first = await ask();
+    if (first.stdout.length === 0)
+      return { checked: true, changed: false, settled: true, ms: first.ms };
+    writeFileSync(path, first.stdout);
+    const again = await ask();
+    return {
+      checked: true,
+      changed: true,
+      settled:
+        again.stdout.length === 0 &&
+        inkstitchSvgVersion(first.stdout.toString("utf8")) === INKSTITCH_SVG_VERSION,
+      ms: first.ms + again.ms,
+    };
+  } catch (err) {
+    return { checked: false, error: err.message.split("\n")[0] };
+  }
+}
+
+/**
  * Writes the four files of the Nacharbeit (module doc) and says what it did. Does not print; the
  * caller prints `reportLines(report)`.
  *
@@ -458,6 +502,7 @@ export async function writeRework(run) {
     png: resolve(run.outDir, `${run.name}.nacharbeit.png`),
   };
   writeFileSync(files.svg, rework.svg);
+  const update = await settleUpdate(files.svg);
 
   const pes = await runInkstitch({
     extension: "output",
@@ -496,6 +541,7 @@ export async function writeRework(run) {
     mapping,
     spots,
     withoutPlace,
+    update,
     pesStderr: pes.stderr,
     pesMs: pes.ms,
     blocks: run.blocks.length,
@@ -553,6 +599,25 @@ export function reportLines(report) {
       `  Hinweis     Die Abbildung der DST auf die Seite hält nicht (${mapping.why ?? "unbekannt"}): ` +
         `Nadelhäufung, Stichdichte und Sprünge fehlen in den Prüfstellen`,
     );
+  }
+  const u = report.update;
+  if (u !== undefined) {
+    if (!u.checked) {
+      lines.push(
+        `  Hinweis     Ob Ink/Stitch die Datei beim Öffnen ändert, ließ sich nicht prüfen (${u.error ?? "unbekannt"}): ` +
+          `Version ${rework.inkstitchSvgVersion ?? "fehlt"} im Dokument`,
+      );
+    } else if (!u.changed) {
+      lines.push(
+        `  Dokument    inkstitch_svg_version ${rework.inkstitchSvgVersion}: Ink/Stitch ändert die Datei beim Öffnen nicht`,
+      );
+    } else {
+      lines.push(
+        `  Dokument    Ink/Stitch hat die Datei beim Öffnen geändert (Altdokument, Version ` +
+          `${rework.inkstitchSvgVersion ?? "fehlte"}): die aktualisierte Fassung ist die Datei` +
+          `${u.settled ? ", ein weiteres Öffnen ändert nichts mehr" : ", ein weiteres Öffnen ändert noch immer etwas"}`,
+      );
+    }
   }
   if (report.pesStderr.trim()) {
     lines.push("  Ink/Stitch-Hinweise zum PES (stderr)");

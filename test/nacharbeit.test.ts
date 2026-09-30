@@ -418,6 +418,35 @@ describe("reportLines", () => {
     expect(text).toContain("Warnung von Ink/Stitch");
   });
 
+  it("says that Ink/Stitch leaves the file alone on opening, or that it had to change it, or that it could not be asked", () => {
+    const at = (update: object, version: number | undefined) =>
+      reportLines({
+        ...base,
+        rework: { ...base.rework, inkstitchSvgVersion: version },
+        update,
+      }).join("\n");
+    expect(at({ checked: true, changed: false, settled: true }, 4)).toContain(
+      "inkstitch_svg_version 4: Ink/Stitch ändert die Datei beim Öffnen nicht",
+    );
+    const changed = at({ checked: true, changed: true, settled: true }, undefined);
+    expect(changed).toContain(
+      "Ink/Stitch hat die Datei beim Öffnen geändert (Altdokument, Version fehlte)",
+    );
+    expect(changed).toContain("ein weiteres Öffnen ändert nichts mehr");
+    expect(at({ checked: true, changed: true, settled: false })).toContain(
+      "ändert noch immer etwas",
+    );
+    expect(at({ checked: false, error: "kein update_svg" }, 4)).toContain(
+      "ließ sich nicht prüfen (kein update_svg)",
+    );
+  });
+
+  it("says why there is no file where the page has no size", () => {
+    expect(reportLines({ skipped: "Die Vorlage nennt keine Größe in mm." })).toEqual([
+      "Nacharbeit   Die Vorlage nennt keine Größe in mm.",
+    ]);
+  });
+
   it("says so when there are no check points", () => {
     expect(reportLines({ ...base, spots: [] }).join("\n")).toContain("Prüfstellen keine");
   });

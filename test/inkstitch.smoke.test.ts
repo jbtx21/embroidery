@@ -14,15 +14,20 @@
  * a customer logo (customer files stay out of the repo).
  */
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  analyze,
   buildInkstitchTemplate,
+  buildReworkSvg,
   CONNECT_DEFAULTS,
+  importShapes,
   initEngine,
+  INKSTITCH_SVG_VERSION,
+  inkstitchSvgVersion,
   PRESETS,
   tatamiAttributes,
   untrimmedJumps,
@@ -31,6 +36,7 @@ import { polygonOf, rect } from "../packages/engine/test/fixtures/shapes.js";
 import { readDst, unitsToMm } from "@texma-stitch/formats";
 import { GLYPHS } from "../packages/engine/test/fixtures/glyphs.js";
 import { isInkstitchReady, runInkstitch } from "../tools/inkstitch-lauf.mjs";
+import { settleUpdate, writeRework } from "../tools/nacharbeit.mjs";
 import { BBOX_TOLERANCE_MM, referenceBbox } from "./golden.js";
 
 const RUN = process.env.RUN_INKSTITCH_TESTS === "1";
@@ -589,6 +595,230 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
       expect(stdout.toString("utf8")).toContain('inkstitch:satin_column="True"');
     },
     SUBPROCESS_TIMEOUT_MS,
+  );
+
+  // -------------------------------------------------------------------------------------------
+  // The Nacharbeit file (spec §13.4)
+  // -------------------------------------------------------------------------------------------
+
+  /**
+   * A small logo for the Nacharbeit: a black tatami, a gold T (satin) with a second gold block beside its
+   * stem, a red tatami — on a page of 40 x 20 mm whose viewBox starts at (100, 200), the way a PDF export
+   * does (the importer takes the origin off, spec §13.4). Own shapes, not a customer logo.
+   */
+  const NACHARBEIT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="40mm" height="20mm" viewBox="100 200 80 40">
+    <path id="schwarz" d="M 104 204 L 136 204 L 136 224 L 104 224 Z" fill="#101010"/>
+    <path id="T" d="M 150 204 L 178 204 L 178 212 L 168 212 L 168 236 L 160 236 L 160 212 L 150 212 Z" fill="#d1b35a"/>
+    <path id="gold2" d="M 172 224 L 178 224 L 178 234 L 172 234 Z" fill="#d1b35a"/>
+    <path id="rot" d="M 104 228 L 136 228 L 136 238 L 104 238 Z" fill="#d2060d"/>
+  </svg>`;
+
+  /** Runs `fn` with an Ink/Stitch stitch-plan cache of its own: nothing a run left behind can answer for the next. */
+  async function inFreshCache<T>(dir: string, name: string, fn: () => Promise<T>): Promise<T> {
+    const before = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = join(dir, `xdg-${name}`);
+    try {
+      return await fn();
+    } finally {
+      if (before === undefined) delete process.env.XDG_CONFIG_HOME;
+      else process.env.XDG_CONFIG_HOME = before;
+    }
+  }
+
+  const dstOf = async (svg: string): Promise<Buffer> =>
+    (await runInkstitch({ extension: "output", options: { format: "dst" }, svg })).stdout;
+
+  /** One block per colour, split at the colour changes (what tools/inkstitch.mjs does with the DST). */
+  function blocksOf(stitches: ReturnType<typeof unitsToMm>) {
+    const blocks: { objectId: string; threadIndex: number; stitches: typeof stitches }[] = [];
+    let current = { objectId: "ink-0", threadIndex: 0, stitches: [] as typeof stitches };
+    blocks.push(current);
+    for (const s of stitches) {
+      current.stitches.push(s);
+      if (s.cmd === "color") {
+        current = { objectId: `ink-${blocks.length}`, threadIndex: blocks.length, stitches: [] };
+        blocks.push(current);
+      }
+    }
+    return blocks.filter((b) => b.stitches.length > 0);
+  }
+
+  /** The chain `pnpm inkstitch` runs: source, template, auto_satin, jump_to_trim, DST. */
+  async function logoRun(dir: string) {
+    await initEngine();
+    const imported = importShapes(NACHARBEIT_SVG);
+    const template = buildInkstitchTemplate(imported.shapes, PRESETS.pique, {
+      widthMm: imported.widthMm,
+      heightMm: imported.heightMm,
+      order: "colour",
+      knockdown: true,
+    });
+    const templatePath = join(dir, "logo.inkstitch.svg");
+    writeFileSync(templatePath, template.svg);
+    let current = templatePath;
+    for (const ids of template.satinRuns) {
+      const routed = await runInkstitch({
+        extension: "auto_satin",
+        ids,
+        options: { preserve_order: true, trim: true },
+        svg: current,
+      });
+      current = join(dir, "logo.routed.svg");
+      writeFileSync(current, routed.stdout);
+    }
+    const trimmed = await runInkstitch({
+      extension: "jump_to_trim",
+      options: { "minimum-jump-length": CONNECT_DEFAULTS.jumpTrimMm },
+      svg: current,
+    });
+    const trimmedPath = join(dir, "logo.trimmed.svg");
+    writeFileSync(trimmedPath, trimmed.stdout);
+    const dst = await inFreshCache(dir, "lauf", () => dstOf(trimmedPath));
+    const stitches = unitsToMm(readDst(new Uint8Array(dst)).stitches);
+    const blocks = blocksOf(stitches);
+    return { imported, template, templatePath, trimmedPath, dst, stitches, blocks };
+  }
+
+  it(
+    "Nacharbeit-Datei: dieselbe DST Byte für Byte, trägt die Dokumentversion, Ink/Stitch ändert sie beim Öffnen nicht — und eine eingeblendete Prüfstellen-Ebene stickt nichts",
+    async () => {
+      const dir = mkdtempSync(join(tmpdir(), "texma-nacharbeit-"));
+      try {
+        const run = await logoRun(dir);
+        expect(run.template.satinRuns.length).toBeGreaterThan(0); // the T: routed, with its trim command
+        expect(run.blocks).toHaveLength(3);
+
+        const report = await writeRework({
+          name: "logo",
+          outDir: dir,
+          svgPath: run.trimmedPath,
+          templatePath: run.templatePath,
+          sourceSvg: NACHARBEIT_SVG,
+          presetName: "pique",
+          stitches: run.stitches,
+          blocks: run.blocks,
+          stats: analyze(run.blocks).stats,
+          railPull: run.template.railPull,
+          underlay: run.template.underlay,
+          fallbacks: [],
+          narrowLines: [],
+          smoothed: [],
+        });
+        expect(report.skipped).toBeUndefined();
+
+        // The four files, and what each says.
+        for (const file of Object.values(report.files))
+          expect(existsSync(file as string)).toBe(true);
+        const svgPath = report.files.svg as string;
+        const nacharbeit = readFileSync(svgPath, "utf8");
+        expect(report.rework.layers.map((l: { name: string }) => l.name)).toEqual([
+          "Schwarz",
+          "Gold",
+          "Rot",
+        ]);
+        expect(readFileSync(report.files.farbfolge as string, "utf8")).toMatch(
+          /^logo {3}\d+,\d x \d+,\d mm {3}[\d.]+ Stiche {3}Preset pique\n {2}1 Schwarz {2}#101010\n {2}2 Gold {5}#D1B35A\n {2}3 Rot {6}#D2060D\n$/,
+        );
+        expect(
+          readFileSync(report.files.pes as string)
+            .subarray(0, 4)
+            .toString("latin1"),
+        ).toBe("#PES");
+        expect([...readFileSync(report.files.png as string).subarray(1, 4)]).toEqual([
+          0x50, 0x4e, 0x47,
+        ]);
+
+        // (a) The document names its version, and (c) Ink/Stitch has nothing to update on opening it.
+        expect(inkstitchSvgVersion(nacharbeit)).toBe(INKSTITCH_SVG_VERSION);
+        expect(report.update).toMatchObject({ checked: true, changed: false, settled: true });
+        // Asked on its own, with the extension that loads, updates and saves only what it changed.
+        const again = await runInkstitch({
+          extension: "update_svg",
+          options: { "update-from": INKSTITCH_SVG_VERSION },
+          svg: svgPath,
+        });
+        expect(again.stdout.length).toBe(0);
+
+        // (b) The same DST, byte for byte — each from a cache of its own.
+        const fromFile = await inFreshCache(dir, "nacharbeit", () => dstOf(svgPath));
+        expect(fromFile.equals(run.dst)).toBe(true);
+
+        // The layer of check points is hidden and ignored: shown, it still stitches nothing. Without the
+        // parameter that ignores it, shown, its circle would be stitched (the control). The logo is clean
+        // and has no check points of its own, so the layer gets one here.
+        const hidden = 'style="display:none" inkstitch:ignore_object="true"';
+        expect(nacharbeit).toContain(hidden);
+        const withSpot = buildReworkSvg(readFileSync(run.trimmedPath, "utf8"), {
+          widthMm: 40,
+          heightMm: 20,
+          spots: [{ xMm: 20, yMm: 10, art: "Test", text: "ein Kreis" }],
+        }).svg;
+        expect(withSpot).toContain(hidden);
+        writeFileSync(join(dir, "hidden.svg"), withSpot);
+        const shown = join(dir, "shown.svg");
+        writeFileSync(
+          shown,
+          withSpot.replace(hidden, 'style="display:inline" inkstitch:ignore_object="true"'),
+        );
+        const control = join(dir, "control.svg");
+        writeFileSync(control, withSpot.replace(hidden, 'style="display:inline"'));
+        const [hiddenDst, shownDst, controlDst] = await Promise.all([
+          inFreshCache(dir, "hidden", () => dstOf(join(dir, "hidden.svg"))),
+          inFreshCache(dir, "shown", () => dstOf(shown)),
+          inFreshCache(dir, "control", () => dstOf(control)),
+        ]);
+        expect(hiddenDst.equals(run.dst)).toBe(true);
+        expect(shownDst.equals(run.dst)).toBe(true);
+        expect(controlDst.equals(run.dst)).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 6,
+  );
+
+  it(
+    "Nacharbeit-Datei aus einem Dokument ohne Version (keine Effekt-Erweiterung lief): Ink/Stitch aktualisiert es einmal, die Datei trägt Version 4 und gibt dieselbe DST wie die Vorlage",
+    async () => {
+      // The template itself has no inkstitch_svg_version: Ink/Stitch takes it for a legacy document and
+      // updates it on opening (lib/update.py) — headless the wx stub answers the question, Inkscape asks.
+      const dir = mkdtempSync(join(tmpdir(), "texma-nacharbeit-v0-"));
+      try {
+        await initEngine();
+        const imported = importShapes(NACHARBEIT_SVG);
+        const template = buildInkstitchTemplate(imported.shapes, PRESETS.pique, {
+          widthMm: imported.widthMm,
+          heightMm: imported.heightMm,
+          order: "colour",
+          knockdown: true,
+        });
+        const templatePath = join(dir, "v0.svg");
+        writeFileSync(templatePath, template.svg);
+        expect(inkstitchSvgVersion(template.svg)).toBeUndefined();
+        const direct = await inFreshCache(dir, "direkt", () => dstOf(templatePath));
+
+        // The module reports it and does not make a version up.
+        const built = buildReworkSvg(template.svg, {
+          widthMm: imported.widthMm,
+          heightMm: imported.heightMm,
+        });
+        expect(built.notes.map((n) => n.kind)).toContain("svg-version");
+        expect(inkstitchSvgVersion(built.svg)).toBeUndefined();
+
+        // The tool lets Ink/Stitch open it: the updated document replaces the file.
+        const file = join(dir, "v0.nacharbeit.svg");
+        writeFileSync(file, built.svg);
+        const settled = await settleUpdate(file);
+        expect(settled).toMatchObject({ checked: true, changed: true, settled: true });
+        expect(inkstitchSvgVersion(readFileSync(file, "utf8"))).toBe(INKSTITCH_SVG_VERSION);
+
+        const fromFile = await inFreshCache(dir, "datei", () => dstOf(file));
+        expect(fromFile.equals(direct)).toBe(true);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 4,
   );
 
   it(
