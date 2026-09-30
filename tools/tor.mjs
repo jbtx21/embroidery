@@ -242,8 +242,8 @@ export function torDetails(tor, { alle = false } = {}) {
   if (!s.found) return lines;
   if (s.above.length === 0) {
     lines.push(
-      `${spalte("Bereich darüber")}keiner: ab ${breite(s.widthMm)} mm wird in keiner größeren Größe ` +
-        `ein Strich zu schmal`,
+      `${spalte("Bereich darüber")}keiner erwartet: nach den Breiten wird ab ${breite(s.widthMm)} mm ` +
+        `in keiner größeren Größe ein Strich zu schmal`,
     );
     return lines;
   }
@@ -251,8 +251,9 @@ export function torDetails(tor, { alle = false } = {}) {
   lines.push(
     `${spalte("Bereich darüber")}` +
       (spans.length === 1
-        ? `1 Bereich, in dem ein Strich zu schmal wird (von … bis unter …):`
-        : `${spans.length} Bereiche, in denen ein Strich zu schmal wird (von … bis unter …):`),
+        ? `1 Bereich, in dem ein Strich nach den Breiten zu schmal wird`
+        : `${spans.length} Bereiche, in denen ein Strich nach den Breiten zu schmal wird`) +
+      ` (von … bis unter …; die Prüfung in der Größe entscheidet):`,
   );
   const shown = alle ? spans : spans.slice(0, BEREICHE_MAX);
   for (const span of shown) {

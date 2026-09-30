@@ -416,7 +416,7 @@ describe("torDetails (was unter der ersten Zeile steht)", () => {
   it("sagt, wo nichts über der gefundenen Größe liegt, dass es nichts gibt", () => {
     const lines = torDetails(tor(suche()));
     expect(lines[2]).toBe(
-      "Bereich darüber  keiner: ab 252 mm wird in keiner größeren Größe ein Strich zu schmal",
+      "Bereich darüber  keiner erwartet: nach den Breiten wird ab 252 mm in keiner größeren Größe ein Strich zu schmal",
     );
   });
 
@@ -444,7 +444,10 @@ describe("torDetails (was unter der ersten Zeile steht)", () => {
       },
     ];
     const lines = torDetails(tor(suche({ above })));
-    expect(lines[2]).toContain("Bereich darüber  2 Bereiche, in denen ein Strich zu schmal wird");
+    expect(lines[2]).toContain(
+      "Bereich darüber  2 Bereiche, in denen ein Strich nach den Breiten zu schmal wird",
+    );
+    expect(lines[2]).toContain("die Prüfung in der Größe entscheidet");
     expect(lines[3]).toContain("141–262 mm");
     expect(lines[3]).toContain("path22");
     expect(lines[3]).toContain("Laufstich");
@@ -478,7 +481,7 @@ describe("torDetails (was unter der ersten Zeile steht)", () => {
     const lines = torDetails(tor(suche({ above })));
     expect(lines[2]).toContain("2 Bereiche");
     expect(torDetails(tor(suche({ above: above.slice(0, 1) })))[2]).toContain(
-      "1 Bereich, in dem ein Strich zu schmal wird",
+      "1 Bereich, in dem ein Strich nach den Breiten zu schmal wird",
     );
     expect(lines[3]).toContain("150–310 mm");
     expect(lines[3]).toContain("a, b, c");
