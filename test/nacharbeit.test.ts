@@ -133,22 +133,22 @@ describe("collectSpots — what the run knows becomes check points", () => {
       xMm: 20,
       yMm: 6,
       art: "Rückfall Tatami",
-      text: "Satin hielt nicht: rails wind",
+      text: "path2: Satin hielt nicht: rails wind",
     });
     expect(by["Satin auf geglätteter Kontur"]).toMatchObject({
       xMm: 10,
       yMm: 5,
-      text: "um 0,2 mm geglättet, Deckung 89 %",
+      text: "path1-0: um 0,2 mm geglättet, Deckung 89 %",
     });
     expect(by["Säule unter 1,0 mm"]).toMatchObject({
       xMm: 10,
       yMm: 5,
-      text: "Stoffspalt 0,17 mm, ohne Zugausgleich · so schmal gestickt wie gezeichnet",
+      text: "path1-0: Stoffspalt 0,17 mm, ohne Zugausgleich · so schmal gestickt wie gezeichnet",
     });
     const under = r.spots.filter((s) => s.art === "Tatami ohne Gitterunterlage");
     expect(under.map((s) => s.text)).toEqual([
-      "zu schmal für einen Einzug · Deckstich allein",
-      "Einzug zerfällt in 3 Stücke · Deckstich allein",
+      "z-tatami_p0: zu schmal für einen Einzug · Deckstich allein",
+      "z-tatami_p1: Einzug zerfällt in 3 Stücke · Deckstich allein",
     ]);
   });
 

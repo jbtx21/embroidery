@@ -118,6 +118,10 @@ const underlayWhy = (pieces) =>
  * @param {{without:{id:string,pieces:number}[]}} [known.underlay] §8.6
  * @param {{needle:object[], density:object[], jumps:object[]}} [known.dst] from the DST, already on the page
  * @returns {{ spots: {xMm:number,yMm:number,art:string,text:string}[], withoutPlace: {art:string,id:string}[] }}
+ *
+ * The texts of what the template decided start with the id of the object (Inkscape: Bearbeiten → Suchen, or
+ * the XML editor) — the place is the middle of the box of the object, which for a letter or a ring is not
+ * always on it.
  */
 export function collectSpots(known) {
   const { centres, kinds, areaIds } = known;
@@ -195,32 +199,32 @@ export function collectSpots(known) {
     at(
       "Säule unter 1,0 mm",
       id,
-      `${gap === undefined ? "" : `Stoffspalt ${komma(gap, 2)} mm, `}ohne Zugausgleich · so schmal gestickt wie gezeichnet`,
+      `${id}: ${gap === undefined ? "" : `Stoffspalt ${komma(gap, 2)} mm, `}ohne Zugausgleich · so schmal gestickt wie gezeichnet`,
     );
   }
   for (const o of known.fallbacks ?? [])
-    at("Rückfall Tatami", o.id, `Satin hielt nicht: ${o.reason}`);
+    at("Rückfall Tatami", o.id, `${o.id}: Satin hielt nicht: ${o.reason}`);
   const reasoned = new Set();
   for (const o of known.narrowLines ?? []) {
     reasoned.add(o.id);
-    at("Rückfall Laufstich", o.id, `Satin hielt nicht, unter 1 mm: ${o.reason}`);
+    at("Rückfall Laufstich", o.id, `${o.id}: Satin hielt nicht, unter 1 mm: ${o.reason}`);
   }
   // A line that comes from an area without a reason: the area was under 0.7 mm wide and is stitched as a line.
   for (const [id, art] of kinds) {
     if (art !== "Laufstich") continue;
     const base = id.replace(/_l\d+$/, "");
     if (base !== id || !areaIds.has(base) || reasoned.has(base)) continue;
-    at("Fläche als Laufstich", id, "unter 0,7 mm breit · als Linie gestickt");
+    at("Fläche als Laufstich", id, `${id}: unter 0,7 mm breit · als Linie gestickt`);
   }
   for (const s of known.smoothed ?? []) {
     at(
       "Satin auf geglätteter Kontur",
       s.id,
-      `um ${komma(s.smoothedMm)} mm geglättet, Deckung ${Math.round(s.coverage * 100)} %`,
+      `${s.id}: um ${komma(s.smoothedMm)} mm geglättet, Deckung ${Math.round(s.coverage * 100)} %`,
     );
   }
   for (const w of known.underlay?.without ?? []) {
-    at("Tatami ohne Gitterunterlage", w.id, `${underlayWhy(w.pieces)} · Deckstich allein`);
+    at("Tatami ohne Gitterunterlage", w.id, `${w.id}: ${underlayWhy(w.pieces)} · Deckstich allein`);
   }
 
   // Stable: within a kind the order stays as found (by importance for the DST and the fineness check,
