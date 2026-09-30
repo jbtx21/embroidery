@@ -277,3 +277,55 @@ sind an 3.3.0 nicht wiederholt worden — es ist derselbe Code.
   `start_at_nearest_point` und `end_at_nearest_point` an, `reverse_rails` automatisch, Lauflänge
   2,5 mm): ein Dokument, das von Anfang an Version 4 trüge, würde also anders sticken. Wie viel
   anders, ist nicht gemessen.
+
+## Nacharbeit in Inkscape
+
+Jeder Lauf von `pnpm inkstitch` schreibt neben der DST eine Datei zum Nacharbeiten (Spec §13.4) — das
+Stickprogramm entsteht automatisch, an den Schwachstellen wird von Hand nachgearbeitet:
+
+| Datei                       | Inhalt                                                                               |
+| --------------------------- | ------------------------------------------------------------------------------------ |
+| `out/<name>.nacharbeit.svg` | das Ink/Stitch-Dokument, aus dem die DST entstand, mit Ebenen, Namen und Prüfstellen |
+| `out/<name>.pes`            | Ink/Stitchs `output --format=pes` auf genau diese Datei                              |
+| `out/<name>.farbfolge.txt`  | Nadelbelegung je Stopp: Nummer, Farbname, Farbwert (Wiederholung nur mit Nummer)     |
+| `out/<name>.nacharbeit.png` | Vorschau in Garnfarben, die Prüfstellen als nummerierte Kreise                       |
+
+Für einen externen Puncher ist dieselbe SVG eine saubere Vektorvorlage mit einer Ebene je Farbe. Bei
+`--tatami` gibt es die Dateien nicht: dort wird die Quelle wie gezeichnet gestickt, ohne Vorlage.
+
+**Voraussetzung am Arbeitsplatz:** Inkscape mit Ink/Stitch **in derselben Version wie die Pipeline**
+(ADR 0001, künftig die offizielle 3.3.0). Dieselben Parameter ergeben nur dann dieselben Stiche; bei
+einer neueren Ink/Stitch-Version meldet Ink/Stitch beim Öffnen, die Datei stamme aus einer neueren.
+
+1. **Datei öffnen.** `out/<name>.nacharbeit.svg` in Inkscape öffnen. Es kommt keine Rückfrage: die Datei
+   trägt die `inkstitch_svg_version` (4) des Dokumentformats und ist schon aktualisiert, Ink/Stitch ändert
+   beim Öffnen nichts (`pnpm inkstitch` prüft das mit Ink/Stitch selbst und schreibt es in die Ausgabe). Die
+   Seite ist in mm, der Ursprung oben links; die Formen liegen, wo sie in der gelieferten SVG liegen.
+2. **Ebenen ansehen.** Objekt → Ebenen und Objekte (Strg+Umschalt+L): je Farbblock eine Ebene in Stichfolge
+   („01 Gold #D1B35A“), darin die Objekte mit Namen „Art · Farbe · Quell-Kennung“ („Satin · Gold · path33“,
+   „Tatami · Schwarz · z04-000000-003_p0“, „Laufstich · …“). **Reihenfolge der Ebenen und Objekte nicht
+   ändern:** Ink/Stitch stickt in Dokumentfolge, Farbfolge und Überdeckung hängen daran. Die Ebene
+   „Prüfstellen“ bleibt die letzte.
+3. **Prüfstellen einblenden.** Auge der Ebene „Prüfstellen“ anklicken: je Schwachstelle ein roter Kreis mit
+   kurzem Text — was, gemessen, Grenze, Vorschlag. Die Nummern sind die der Vorschau
+   (`….nacharbeit.png`). Schwachstellen sind Satinstriche und Lücken unter ihrer Grenze, Formen, die als
+   Satin nicht hielten, Satin auf geglätteter Kontur, Flächen, die zur Linie wurden, Tatami ohne
+   Gitterunterlage, Säulen unter 1,0 mm, Nadelhäufung, zu dichte Zellen und Sprünge über 5 mm ohne
+   Fadenschnitt. Die Ebene ist ausgeblendet und trägt `inkstitch:ignore_object`: auch eingeblendet wird
+   nichts davon gestickt (gemessen: ohne diese Eigenschaft würden die Kreise gestickt und die DST wäre eine
+   andere). Nach dem Ansehen wieder ausblenden oder löschen; nötig ist beides nicht.
+4. **Nacharbeiten.** Objekt wählen, Erweiterungen → Ink/Stitch → Parameter: alle Werte der Vorlage stehen als
+   `inkstitch:`-Attribute und sind dort sichtbar und änderbar (Zickzackabstand, Zugausgleich je Rail,
+   Unterlage, Reihenabstand, Stichwinkel, Fadenschnitt …; im XML-Editor, Strg+Umschalt+X, als
+   `inkstitch:…`). Mit dem Simulator prüfen.
+5. **Exportieren.** Datei → Speichern unter … als DST oder PES (Ink/Stitch-Stickdateiformate), oder
+   Erweiterungen → Ink/Stitch → Stickdatei exportieren. Die Datei vorher unter **anderem Namen** speichern:
+   der nächste Lauf von `pnpm inkstitch` schreibt `<name>.nacharbeit.svg` neu.
+
+**Was sich nicht ändert:** die Nacharbeit-Datei unverändert durch Ink/Stitchs `output` ergibt dieselbe DST
+wie der Lauf, Byte für Byte (Rauchtest, `RUN_INKSTITCH_TESTS=1`). Eine Stelle, die nicht von der Datei
+abhängt: Inkscape trägt beim Speichern den Dateinamen als `sodipodi:docname` ein, und Ink/Stitch schreibt
+ihn in den Kopf der DST (`LA:`, `lib/output.py`); ohne Namen, so wie aus der Pipeline, bleibt das Feld leer.
+Die Farbnamen der Ebenen („Gold“, „Rot“ …) sind eine Lesehilfe aus einer kleinen festen Palette, der
+Farbwert daneben zählt. In der Farbfolge steht bei zwei fast gleichen, aber nicht gleichen Farben „dieselbe
+Nadel wie Stopp N?“, wenn der RGB-Abstand höchstens 8 beträgt.
