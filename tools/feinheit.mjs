@@ -165,9 +165,10 @@ const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, 
 
 /**
  * Alle Formen samt Seite, damit nichts abgeschnitten wird, was außerhalb der Seite liegt. Die Seite
- * zählt nur, wo sie die Formen berührt: der Import zieht den Ursprung eines viewBox nicht ab
- * (Hofbräu: `viewBox="29.9 367.2 …"`), die Formen liegen dann weit neben der Seite, und das
- * Bild bestünde zu zwei Dritteln aus Leere.
+ * zählt nur, wo sie die Formen berührt: liegt die Zeichnung ganz neben der Seite, bestünde das
+ * Bild zu großen Teilen aus Leere. (Bis 30.09.2026 zog der Import den Ursprung der viewBox nicht
+ * ab, und eine SVG aus einem PDF — Hofbräu, `viewBox="29.9 367.2 …"` — lag so weit neben der
+ * Seite; seit Spec §13.4 rechnet er ihn ein, die Formen liegen auf der Seite.)
  */
 function ausdehnung(shapes, widthMm, heightMm) {
   const seite = { minX: 0, minY: 0, maxX: widthMm, maxY: heightMm };

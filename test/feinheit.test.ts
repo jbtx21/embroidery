@@ -279,9 +279,10 @@ describe("feinheitSvg", () => {
     expect(Number(viewBox[2]) + Number(viewBox[4])).toBeCloseTo(30, 2);
   });
 
-  it("lässt die Seite weg, wo keine Form sie berührt — der viewBox-Ursprung, den der Import nicht abzieht", () => {
-    // Hofbräu: viewBox="29.9 367.2 …", die Formen liegen rund 76 mm unter der Seite. Das Bild
-    // zeigt die Formen, nicht zwei Drittel Leere.
+  it("lässt die Seite weg, wo keine Form sie berührt — eine Zeichnung ganz neben der Seite", () => {
+    // Die Formen liegen rund 76 mm unter der Seite (so lag Hofbräu, viewBox="29.9 367.2 …", bis der
+    // Import den Ursprung der viewBox einrechnete, Spec §13.4). Das Bild zeigt die Formen, nicht
+    // zwei Drittel Leere.
     const shapes = [
       areaShape("a", polygonOf(rect(0, 100, 10, 5)), GRAY),
       areaShape("b", polygonOf(rect(10.5, 100, 10, 5)), GRAY),
