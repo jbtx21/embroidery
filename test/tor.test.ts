@@ -36,6 +36,7 @@ const suche = (over: Record<string, unknown> = {}) => ({
   orderedWidthMm: 80,
   widthMm: 252,
   found: true,
+  maxWidthMm: 800,
   enlarged: true,
   belowMinimum: true,
   decisive: {
@@ -257,6 +258,16 @@ describe("torKopf (die erste Zeile der Ausgabe)", () => {
     const factor = suche({ found: false, enlarged: false, reason: "factor", decisive: undefined });
     expect(torKopf(tor(factor, { erzeugtMm: undefined, fehler: "x" }))[0]).toContain(
       "über dem 10-fachen der bestellten Größe (800 mm)",
+    );
+    const eng = suche({
+      found: false,
+      enlarged: false,
+      reason: "factor",
+      decisive: undefined,
+      maxWidthMm: 96,
+    });
+    expect(torKopf(tor(eng, { erzeugtMm: undefined, fehler: "x" }))[0]).toContain(
+      "über dem 1.2-fachen der bestellten Größe (96 mm)",
     );
   });
 });

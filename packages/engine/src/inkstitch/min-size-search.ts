@@ -239,8 +239,10 @@ export type MinimumSizeSearch = {
   widthMm: number;
   /** False where the search gave up (`reason`). */
   found: boolean;
-  /** Why it gave up: `steps` (`maxSteps` checks made) or `factor` (the next size was above `maxFactor`). */
+  /** Why it gave up: `steps` (`maxSteps` checks made) or `factor` (the next size was above `maxWidthMm`). */
   reason?: "steps" | "factor";
+  /** The size above which the search gives up: the ordered size times `maxFactor`, mm. */
+  maxWidthMm: number;
   /** The minimum size is above the ordered one: the program is made in `widthMm`. */
   enlarged: boolean;
   /** The ordered size is under the minimum size — or, where none was found, has strokes under their limit. */
@@ -354,6 +356,7 @@ export function findMinimumSize(
     widthMm: width,
     found,
     ...(reason === undefined ? {} : { reason }),
+    maxWidthMm: cap,
     enlarged: found && width > ordered,
     belowMinimum: steps[0]!.under > 0,
     ...(found && decisive !== undefined ? { decisive } : {}),

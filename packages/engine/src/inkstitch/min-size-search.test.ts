@@ -302,6 +302,7 @@ describe("findMinimumSize (the smallest size from the ordered one at which the c
     const r = findMinimumSize(scaledAt(shapes), opts);
     expect(r.found).toBe(true);
     expect(r.widthMm).toBe(R);
+    expect(r.maxWidthMm).toBe(R * SEARCH_MAX_FACTOR);
     expect(r.enlarged).toBe(false);
     expect(r.belowMinimum).toBe(false);
     expect(r.decisive).toBeUndefined();
@@ -487,6 +488,7 @@ describe("findMinimumSize (the smallest size from the ordered one at which the c
     const r = findMinimumSize(scaledAt(aloneScene(0.9)), { ...opts, maxFactor: 1.2 });
     expect(r.found).toBe(false);
     expect(r.reason).toBe("factor");
+    expect(r.maxWidthMm).toBeCloseTo(96, 9); // 1.2 times the ordered 80 mm
     expect(r.enlarged).toBe(false);
     expect(r.belowMinimum).toBe(true);
   });

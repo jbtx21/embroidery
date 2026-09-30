@@ -13,12 +13,7 @@
  * die Dateien `_unter-mindestgroesse` im Namen, und die Ausgabe warnt. Zahlen mit Punkt, wie in den
  * übrigen Werkzeugen.
  */
-import {
-  findMinimumSize,
-  importShapes,
-  mergeRanges,
-  SEARCH_MAX_FACTOR,
-} from "@texma-stitch/engine";
+import { findMinimumSize, importShapes, mergeRanges } from "@texma-stitch/engine";
 import { scaleSvgToWidth } from "./breite.mjs";
 
 /** Was hinter den Namen einer Datei kommt, die unter der Mindestgröße erzeugt wurde (`--ohne-tor`). */
@@ -53,8 +48,8 @@ export function formenBei(svgText, original) {
 /** Warum die Suche aufgegeben hat, als Text. */
 function aufgabeGrund(search) {
   if (search.reason === "factor") {
-    const grenze = search.orderedWidthMm * SEARCH_MAX_FACTOR;
-    return `über dem ${SEARCH_MAX_FACTOR}-fachen der bestellten Größe (${breite(grenze)} mm)`;
+    const faktor = Number((search.maxWidthMm / search.orderedWidthMm).toFixed(2));
+    return `über dem ${faktor}-fachen der bestellten Größe (${breite(search.maxWidthMm)} mm)`;
   }
   return (
     `nach ${search.steps.length} Prüfungen (${search.steps.map((s) => breite(s.widthMm)).join(" → ")} mm) ` +
