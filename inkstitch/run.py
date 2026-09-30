@@ -6,9 +6,10 @@ Generic headless starter for Ink/Stitch extensions.
 
 Runs a single Ink/Stitch extension (one class in inkstitch-src/lib/extensions/)
 outside of Inkscape, the way Inkscape itself would invoke it: as a subprocess
-whose argv Ink/Stitch parses itself (inkstitch.py's own main()). This script
-only wires up the three things Inkscape normally provides and a plain
-"python inkstitch.py ..." does not:
+whose argv Ink/Stitch parses itself (inkstitch.py's own argument handling:
+module-level code up to Ink/Stitch 3.3.0, a main() in later development
+versions -- runpy runs either). This script only wires up the three things
+Inkscape normally provides and a plain "python inkstitch.py ..." does not:
 
 - A stub for `wx` (see wx_stub.py) -- lib/extensions/__init__.py imports all
   ~80 extensions, and eight of them import wx at module level even though
@@ -161,10 +162,10 @@ def main() -> None:
 
     # Everything the caller passed except the svg path, in the order given,
     # plus the resolved absolute svg path at the end. inkstitch.py's own
-    # ArgumentParser pulls out --extension itself (main() in inkstitch.py);
-    # each extension's own arg_parser pulls out --id (repeatable) and its
-    # --<option>s from what remains (lib/extensions/base.py, inkex's
-    # EffectExtension/SvgInputMixin).
+    # ArgumentParser pulls out --extension itself (module level in 3.3.0, main() in
+    # later development versions); each extension's own arg_parser pulls out --id
+    # (repeatable) and its --<option>s from what remains (lib/extensions/base.py,
+    # inkex's EffectExtension/SvgInputMixin).
     forwarded = [a for a in args if a.startswith("-")]
     sys.argv = ["inkstitch.py", *forwarded, svg_abs]
 

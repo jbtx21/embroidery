@@ -5,7 +5,7 @@
  *
  * Ink/Stitch reads a parameter by its attribute name and ignores one it does
  * not know — a misspelt name changes nothing and says nothing. Every name here
- * is one of `lib/elements/fill_stitch.py` (Ink/Stitch commit d59c9ab), and
+ * is one of `lib/elements/fill_stitch.py` (Ink/Stitch 3.3.0), and
  * `test/inkstitch.smoke.test.ts` shows for each that it changes the stitches.
  *
  * Three things stay out, or are set only where they hold, and are said so:

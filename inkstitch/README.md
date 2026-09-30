@@ -29,16 +29,39 @@ Ink/Stitch steht unter **GPL-3.0**. Deshalb:
 bash inkstitch/setup.sh
 ```
 
-Holt Ink/Stitch in einem festen Commit, legt eine eigene venv an und installiert die in
-`requirements.txt` gepinnten Pakete. Idempotent: ein zweiter Aufruf mit unveränderter
-`requirements.txt` und demselben Commit ist ein No-op in deutlich unter einer Sekunde (Marker
-in `$INKSTITCH_HOME/.setup-ok`). Läuft außerdem automatisch bei Sessionstart
-(`.claude/settings.json`, `.claude/hooks/session-start.sh`) — ein Fehler dort blockiert die
-Sitzung nicht, sondern gibt nur einen Hinweis aus.
+Holt Ink/Stitch in der **offiziellen Version 3.3.0** (Tag `v3.3.0`, Commit
+`b0edd96311ece82ee48816dc93466274b12c2a9c`, 31.07.2026 — die Version vom Arbeitsplatz; bis zum
+30.09.2026 war es der Entwicklungsstand `d59c9ab` vom 17.09.2026), legt eine eigene venv an und
+installiert die in `requirements.txt` gepinnten Pakete. Idempotent: ein zweiter Aufruf mit
+unveränderter `requirements.txt` und demselben Commit ist ein No-op in deutlich unter einer
+Sekunde (Marker in `$INKSTITCH_HOME/.setup-ok`). Steht ein vorhandener Klon auf einem anderen
+Commit, ersetzt das Skript ihn und zieht die venv nach (siehe „Versionswechsel“). Läuft
+außerdem automatisch bei Sessionstart (`.claude/settings.json`,
+`.claude/hooks/session-start.sh`) — ein Fehler dort blockiert die Sitzung nicht, sondern gibt
+nur einen Hinweis aus.
 
 Bei fehlenden System-Paketen (PyGObject/pycairo brauchen Header zum Bauen) installiert das
 Skript sie selbst, wenn `apt-get` und Root-Rechte vorhanden sind — sonst nennt es die genaue
 `apt-get install`-Zeile, die von Hand auszuführen ist.
+
+### Versionswechsel
+
+Ein anderer Stand von Ink/Stitch ist eine bewusste Änderung (ADR 0001): `INKSTITCH_TAG` und
+`INKSTITCH_COMMIT` in `setup.sh` setzen. Gemeint ist der Commit hinter dem Tag
+(`git rev-parse 'v3.3.0^{commit}'`); `git rev-parse v3.3.0` liefert bei einem annotierten Tag
+den Hash des Tag-Objekts. Ink/Stitchs `requirements.txt` und `pyproject.toml` am neuen Stand
+gegen `inkstitch/requirements.txt` halten, die Motive neu rechnen und die Kennzahlen gegen die
+vorige Version halten. Zum Ausprobieren neben der Standard-Installation, ohne sie anzufassen:
+`INKSTITCH_HOME=$HOME/.cache/texma-stitch-<version> bash inkstitch/setup.sh`.
+
+**Der Stichplan-Cache kennt die Version nicht.** Ink/Stitch legt jeden Stichplan unter
+`$XDG_CONFIG_HOME/inkstitch/cache` ab (Vorgabe `~/.config/inkstitch/cache`), und der Schlüssel
+(`EmbroideryElement.get_cache_key`) besteht aus Klasse, Parametern, Pfad, Stil, Nachbarn und
+Befehlen des Elements — nicht aus der Version und nicht aus dem Code. Nach einem Wechsel kann ein
+Plan der alten Version als frisch berechneter der neuen wiederkommen. Für eine Messung zwischen
+zwei Versionen deshalb je Lauf ein eigenes, leeres `XDG_CONFIG_HOME` setzen; nach einem Wechsel
+der Standard-Installation den Cache leeren: `rm -rf ~/.config/inkstitch/cache`. `setup.sh`
+weist beim Umstieg darauf hin, löscht aber nichts außerhalb von `INKSTITCH_HOME`.
 
 ## Aufruf
 
@@ -114,6 +137,12 @@ immer auf `0`, auch gegen einen vorher gesetzten Wert.
 
 ## Eigenheiten im Kopflos-Betrieb (Stand 28.09.2026)
 
+Am Commit d59c9ab gefunden, am 30.09.2026 an Version 3.3.0 gegengeprüft: die Quelldateien hinter
+den Punkten (`lib/extensions/fill_to_satin.py`, `auto_satin.py`, `output.py`, `base.py`,
+`lib/elements/utils/nodes.py`, `lib/utils/io.py`, `lib/gui/abort_message.py`) sind in beiden
+Ständen byte-gleich. Was gemessen war (Startkosten, Hash-Seed), ist an 3.3.0 neu gemessen und
+steht unten.
+
 - **`fill_to_satin` vergibt der neuen Satin-Spalte keine `id`.** Nur ein `inkscape:label`
   (`Satin 0`, `Satin 1`, …). Für eine Kette `fill_to_satin -> auto_satin` muss die
   aufrufende Seite dem Ergebnis-SVG selbst eine `id` geben, bevor sie es an `auto_satin`
@@ -134,28 +163,39 @@ immer auf `0`, auch gegen einen vorher gesetzten Wert.
   während `extension.run()` in einem `StringIO` auf (GTK-Spam unterdrücken,
   `lib/utils/io.py`) und schreibt es erst danach in einem Stück heraus — für einen
   Batch-/Subprozess-Aufruf ohne Belang, für interaktives Live-Mitlesen schon.
-- **Fixer Overhead von rund 9 s je Prozessaufruf**, unabhängig von der SVG-Größe (Import von
-  numpy/shapely/networkx/PyGObject/…). Für ein einzelnes kleines Test-SVG genauso lang wie für
-  ein winziges Detail eines großen Motivs — erst die eigentliche Stichberechnung skaliert mit
-  der Vorlage.
+- **Fixer Overhead je Prozessaufruf: rund 1 s, bei `output` rund 12 s**, unabhängig von der
+  SVG-Größe (gemessen 30.09.2026 an einem winzigen SVG, warme Bytecode-Caches: `output` 11,7–12,8 s
+  an beiden Ständen, an 3.3.0 außerdem `fill_to_satin` 1,0 s und `jump_to_trim` 1,1 s). Der Import von
+  numpy/shapely/networkx/… ist es nicht: `output` lädt über `ThreadCatalog()` alle 150 mitgelieferten
+  Farbpaletten und rechnet dabei mit colormath2 rund 40.000 Farben um (`lib/threads/catalog.py`),
+  nur um den Fäden Namen zu geben. In eine DST kommt davon nichts: probeweise ohne den Katalog
+  (ein Eingriff in `run.py`, nicht eingebaut) lief `output` auf der Hofbräu-Vorlage in 9,0
+  statt 19,7 s und schrieb dieselbe DST, Byte für Byte. Erst die eigentliche Stichberechnung
+  skaliert mit der Vorlage. (Die frühere Angabe „rund 9 s je Aufruf“ und „Import“ traf nur den
+  `output`-Aufruf.)
 - **`output` parst seine eigenen `--<key>=<wert>`-Optionen von Hand** (`Output.parse_arguments`)
   und nimmt dabei jede Option kommentarlos an — ein Tippfehler im Optionsnamen wird nicht
   gemeldet. Effekt-Erweiterungen wie `fill_to_satin`/`auto_satin` nutzen dagegen den normalen
   `argparse`-Weg und melden eine unbekannte Option als Fehler.
-- **Ohne festen Hash-Seed nicht deterministisch** (gemessen 29.09.2026). Python würfelt den
-  Hash von Zeichenketten je Prozess neu und damit die Reihenfolge von Mengen, die Ink/Stitch
-  durchläuft. Hofbräu-Motiv, byte-gleiche Vorlage, kalter Cache: drei Läufe ohne Seed gaben
-  9.424, 9.425 und 9.426 Stiche, drei mit `PYTHONHASHSEED=0` dieselbe DST. Ink/Stitch legt
-  außerdem jeden Stichplan im Cache ab (`~/.config/inkstitch/cache/stitch_plan`, Schlüssel aus
-  Element und Nachbarn, nicht aus dem Seed): Pläne aus Läufen ohne festen Seed können dort
-  liegen und wiederkommen. Einmal leeren, danach ist der Cache ohne Folgen:
-  `rm -rf ~/.config/inkstitch/cache/stitch_plan`.
+- **Ohne festen Hash-Seed nicht deterministisch** (gemessen 29.09.2026 am Commit d59c9ab, am
+  30.09.2026 an Version 3.3.0 wiederholt). Python würfelt den Hash von Zeichenketten je Prozess
+  neu und damit die Reihenfolge von Mengen, die Ink/Stitch durchläuft. Hofbräu-Motiv, byte-gleiche
+  Vorlage, kalter Cache: drei Läufe ohne Seed gaben 9.424, 9.425 und 9.426 Stiche (an 3.3.0:
+  9.424, 9.426 und 9.427), drei mit `PYTHONHASHSEED=0` dieselbe DST (9.425 Stiche, an beiden
+  Ständen byte-gleich). Ink/Stitch legt außerdem jeden Stichplan im Cache ab
+  (`~/.config/inkstitch/cache/stitch_plan`, Schlüssel aus Element und Nachbarn, nicht aus dem Seed
+  und nicht aus der Version): Pläne aus Läufen ohne festen Seed — und aus einer anderen Version
+  (siehe „Versionswechsel“) — können dort liegen und wiederkommen. Einmal leeren, danach ist der
+  Cache ohne Folgen: `rm -rf ~/.config/inkstitch/cache/stitch_plan`.
 
-## Fadenschnitte, Sprünge und die DST (gelesen am Commit d59c9ab, 29.09.2026)
+## Fadenschnitte, Sprünge und die DST (gelesen an Version 3.3.0, 30.09.2026)
 
 Wie `trim_after`, Sprünge und die Ausgabe zusammenhängen — vorher in der Quelle nachgesehen
 (`lib/stitch_plan/stitch_plan.py`, `lib/output.py`, `lib/extensions/jump_to_trim.py`,
-`pystitch/DstWriter.py`):
+`pystitch/DstWriter.py`). Zuerst am Commit d59c9ab gelesen (29.09.2026), am 30.09.2026 am Tag
+`v3.3.0` gegengeprüft: die drei Dateien aus `lib/` sind in beiden Ständen byte-gleich
+(`git diff v3.3.0 d59c9ab`), und `pystitch` ist das PyPI-Paket aus `requirements.txt` (1.0.1;
+sein `DstWriter` schreibt wie der von 1.0.0, neu sind nur Typannotationen):
 
 - **Ohne `inkstitch:trim_after` gibt es keinen Fadenschnitt.** Zwischen zwei Objekten
   _derselben Farbe_ prüft `stitch_groups_to_stitch_plan` nur den Abstand vom letzten zum ersten
@@ -183,9 +223,14 @@ Wie `trim_after`, Sprünge und die Ausgabe zusammenhängen — vorher in der Que
   Teilpolygonen eines Pfads) sieht sie nicht, und ein Objekt, das schon `trim_after` oder einen
   Trim-Befehl trägt, bleibt unverändert.
 
-## Tatami-Flächen der Vorlage: Attribute, Unterlage, Zugausgleich (gelesen am Commit d59c9ab, 29.09.2026)
+## Tatami-Flächen der Vorlage: Attribute, Unterlage, Zugausgleich (gelesen an Version 3.3.0, 30.09.2026)
 
-Code und Begründung: `packages/engine/src/inkstitch/tatami.ts`, `template.ts`.
+Code und Begründung: `packages/engine/src/inkstitch/tatami.ts`, `template.ts`. Zuerst am Commit
+d59c9ab gelesen (29.09.2026), am 30.09.2026 am Tag `v3.3.0` gegengeprüft: `lib/elements/fill_stitch.py`,
+`lib/stitches/tatami_fill.py` und `lib/update.py` sind in beiden Ständen byte-gleich
+(`git diff v3.3.0 d59c9ab`), die neun Attributnamen stehen in 3.3.0 in `fill_stitch.py`. Die
+gemessenen Zahlen unten (Fäden über 5 mm, Nadelhäufung, Laufzeiten) stammen vom Commit d59c9ab und
+sind an 3.3.0 nicht wiederholt worden — es ist derselbe Code.
 
 - **Gesetzte Attribute** je Tatami-Fläche: `row_spacing_mm`, `max_stitch_length_mm`, `staggers`,
   `angle`, `fill_underlay` und — wo die Unterlage hält — `fill_underlay_angle`,
@@ -222,6 +267,13 @@ Code und Begründung: `packages/engine/src/inkstitch/tatami.ts`, `template.ts`.
 - **Altdokument-Modus.** Die Vorlage trägt keine `inkstitch_svg_version`; beim ersten Lauf
   (`auto_satin`, sonst `jump_to_trim`) wendet Ink/Stitch deshalb die Updates für alte Dokumente an
   (`lib/update.py`): Satin `start_at_nearest_point` und `end_at_nearest_point` aus, `reverse_rails`
-  auf `none`, Füllung `max_stitch_length_mm` 3, wenn keiner gesetzt ist. Danach steht die Version 4 im
-  Ergebnis, und die folgenden Läufe lassen es. Ob die Version von Anfang an zu setzen etwas ändert,
-  ist nicht gemessen.
+  auf `none`, Füllung `max_stitch_length_mm` 3, wenn keiner gesetzt ist, und an allen
+  Nicht-Satin-Elementen `running_stitch_length_mm` 1,5, wo keiner steht (die Vorgabe der Füllung ist
+  2,5 mm; im Ergebnis für Köln 90 mm stehen 35 Tatami-Flächen auf 1,5). Danach steht die Version 4 im
+  Ergebnis, und die folgenden Läufe lassen es. In Inkscape fragt Ink/Stitch bei einem Dokument ohne
+  Version in einem Dialog („Unversioned Ink/Stitch SVG file detected“), ob es aktualisieren soll;
+  kopflos antwortet der wx-Platzhalter stillschweigend mit „Update“ (`RequestUpdate.cancelled`
+  bleibt `False`). Die Vorgaben, die das Update überschreibt, sind andere (Satin
+  `start_at_nearest_point` und `end_at_nearest_point` an, `reverse_rails` automatisch, Lauflänge
+  2,5 mm): ein Dokument, das von Anfang an Version 4 trüge, würde also anders sticken. Wie viel
+  anders, ist nicht gemessen.

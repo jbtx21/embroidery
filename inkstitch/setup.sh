@@ -21,7 +21,14 @@
 #                      python instead of creating $INKSTITCH_HOME/venv.
 set -euo pipefail
 
-INKSTITCH_COMMIT="d59c9ab1e390285a6c67822436ffd9ba9843d8b4"
+# Ink/Stitch 3.3.0, the official release of 31.07.2026 (ADR 0001, decision 30.09.2026):
+# the version the workstation installs, so a rework in Inkscape computes like the
+# pipeline. INKSTITCH_COMMIT is the COMMIT the tag points at. v3.3.0 is an annotated
+# tag: `git rev-parse v3.3.0` (edcd8a4d...) names the tag object, the commit is
+# `git rev-parse 'v3.3.0^{commit}'`. A version change means: new commit here, re-run
+# the six motifs, hold the metrics against the previous version.
+INKSTITCH_TAG="v3.3.0"
+INKSTITCH_COMMIT="b0edd96311ece82ee48816dc93466274b12c2a9c"
 INKSTITCH_REPO_URL="https://github.com/inkstitch/inkstitch"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -107,13 +114,22 @@ else
   ACTUAL_COMMIT=""
   [ -d "$SRC_DIR/.git" ] && ACTUAL_COMMIT="$(git -C "$SRC_DIR" rev-parse HEAD 2>/dev/null || true)"
   if [ "$ACTUAL_COMMIT" != "$INKSTITCH_COMMIT" ]; then
-    echo "Hole Ink/Stitch ($INKSTITCH_COMMIT) nach $SRC_DIR"
+    # A clone that stood on another commit: the switch is reported at the end (the
+    # stitch-plan cache outlives the clone and does not know the version).
+    SWITCHED_FROM="$ACTUAL_COMMIT"
+    echo "Hole Ink/Stitch $INKSTITCH_TAG ($INKSTITCH_COMMIT) nach $SRC_DIR"
     rm -rf "$SRC_DIR"
     mkdir -p "$SRC_DIR"
     git -C "$SRC_DIR" init -q
     git -C "$SRC_DIR" remote add origin "$INKSTITCH_REPO_URL"
-    git -C "$SRC_DIR" fetch --depth 1 origin "$INKSTITCH_COMMIT" \
-      || fail "git fetch fehlgeschlagen ($INKSTITCH_REPO_URL @ $INKSTITCH_COMMIT). Netzwerk pruefen."
+    # By commit first (GitHub serves any commit a ref still reaches, and the release
+    # tag keeps this one reachable); if the commit is refused, the tag. Either way the
+    # commit is checked below, so a tag that was moved cannot pass.
+    if ! git -C "$SRC_DIR" fetch --depth 1 origin "$INKSTITCH_COMMIT" 2>/dev/null; then
+      echo "Commit nicht direkt abrufbar -- hole den Tag $INKSTITCH_TAG"
+      git -C "$SRC_DIR" fetch --depth 1 origin "refs/tags/$INKSTITCH_TAG" \
+        || fail "git fetch fehlgeschlagen ($INKSTITCH_REPO_URL @ $INKSTITCH_COMMIT bzw. Tag $INKSTITCH_TAG). Netzwerk pruefen."
+    fi
     git -C "$SRC_DIR" checkout -q FETCH_HEAD
     ACTUAL_COMMIT="$(git -C "$SRC_DIR" rev-parse HEAD)"
     [ "$ACTUAL_COMMIT" = "$INKSTITCH_COMMIT" ] \
@@ -140,4 +156,12 @@ echo "Installiere Python-Pakete ($REQUIREMENTS_FILE)"
   || fail "Smoke-Test fehlgeschlagen: Kernpakete lassen sich mit $PYTHON_BIN nicht importieren."
 
 echo "$EXPECTED_MARKER" > "$MARKER_FILE"
-echo "Ink/Stitch eingerichtet: SRC=$SRC_DIR PYTHON=$PYTHON_BIN"
+# Ink/Stitch keeps every stitch plan it computes in $XDG_CONFIG_HOME/inkstitch/cache
+# (default ~/.config/inkstitch/cache), under a key that names the element and its
+# neighbours but not the version: after a switch an old plan can come back as if the
+# new version had computed it. Nothing outside INKSTITCH_HOME is touched here.
+SWITCH_NOTE=""
+if [ -n "${SWITCHED_FROM:-}" ]; then
+  SWITCH_NOTE=" -- Umstieg von ${SWITCHED_FROM:0:7} auf ${INKSTITCH_COMMIT:0:7} ($INKSTITCH_TAG): Stichplan-Cache leeren: rm -rf \"\${XDG_CONFIG_HOME:-\$HOME/.config}/inkstitch/cache\""
+fi
+echo "Ink/Stitch eingerichtet: SRC=$SRC_DIR PYTHON=$PYTHON_BIN$SWITCH_NOTE"
