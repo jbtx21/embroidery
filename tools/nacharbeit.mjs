@@ -463,6 +463,7 @@ export async function settleUpdate(path) {
  * @param {object} [run.underlay]
  */
 export async function writeRework(run) {
+  const started = performance.now();
   const svgText = readFileSync(run.svgPath, "utf8");
   const templateText = readFileSync(run.templatePath, "utf8");
   // The page the run stitched on is the page of its template: whatever size the gate and --breite made.
@@ -555,6 +556,7 @@ export async function writeRework(run) {
     update,
     pesStderr: pes.stderr,
     pesMs: pes.ms,
+    totalMs: performance.now() - started,
     blocks: run.blocks.length,
   };
 }
@@ -634,6 +636,8 @@ export function reportLines(report) {
     lines.push("  Ink/Stitch-Hinweise zum PES (stderr)");
     for (const l of report.pesStderr.trim().split("\n")) lines.push(`    ${l}`);
   }
-  lines.push(`  Laufzeit PES ${(report.pesMs / 1000).toFixed(1)} s`);
+  lines.push(
+    `  Laufzeit    ${(report.totalMs / 1000).toFixed(1)} s, davon PES ${(report.pesMs / 1000).toFixed(1)} s`,
+  );
   return lines;
 }

@@ -390,6 +390,7 @@ describe("reportLines", () => {
     withoutPlace: [],
     pesStderr: "",
     pesMs: 12345,
+    totalMs: 23456,
     blocks: 2,
   };
 
@@ -403,7 +404,7 @@ describe("reportLines", () => {
     expect(text).toContain("Nadelhäufung 1 · Stofflücke 2");
     expect(text).toContain("Hinweis     Gruppe g enthält mehrere Farben");
     expect(text).toContain("DST → Seite um 55,39 / 25,67 mm verschoben, je Farbblock geprüft");
-    expect(text).toContain("Laufzeit PES 12.3 s");
+    expect(text).toContain("Laufzeit    23.5 s, davon PES 12.3 s");
   });
 
   it("says what it could not do: a mapping that does not hold, points without a place, blocks that do not match", () => {
