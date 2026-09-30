@@ -360,12 +360,34 @@ function runningLines(shape: Polygon, id: string): Polyline[] {
 export const LINE_COVER_HALF_MM = 0.25;
 
 /** The strip a stroked line lies on, for the order — the largest piece if it folds back on itself. */
-function lineCover(line: Polyline): Polygon | undefined {
+export function lineCover(line: Polyline): Polygon | undefined {
   const strip = normalizeRing([
     ...offsetPolyline(line, LINE_COVER_HALF_MM),
     ...offsetPolyline(line, -LINE_COVER_HALF_MM).reverse(),
   ]);
   return strip.sort((a, b) => polygonArea(b) - polygonArea(a))[0];
+}
+
+/**
+ * The forms of a design as the pull compensation per rail sees them (`railPulls`, spec §7.8.3), from
+ * the shapes alone: the outline of every area, and the strip of every stroked line that has a colour
+ * (`lineCover`), by the id of the shape — the first of equal ids counts. The fineness check of spec
+ * §5.2 asks the same question of a satin stroke as the template does of a rail, and must ask it
+ * of the same forms.
+ */
+export function designForms(shapes: ImportedShape[]): Form[] {
+  const forms = new Map<string, Form>();
+  for (const shape of shapes) {
+    let polygon: Polygon | undefined;
+    if (shape.kind === "area") polygon = shape.polygon;
+    else if (shape.color && shape.polyline.length >= 2) {
+      polygon = lineCover(shape.closed ? [...shape.polyline, shape.polyline[0]!] : shape.polyline);
+    }
+    if (polygon !== undefined && !forms.has(shape.id)) {
+      forms.set(shape.id, { shapeId: shape.id, polygon });
+    }
+  }
+  return [...forms.values()];
 }
 
 /** A shape planned as an object, before anything is cut, ordered or written. */

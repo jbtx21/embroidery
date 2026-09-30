@@ -10,7 +10,14 @@
  * stacking order), at the size of the SVG.
  *
  * - **Satin stroke**: a shape the template classifies as satin (`classifyShape`,
- *   spec §7.8.1) whose median width is under `SATIN_STROKE_MIN_MM`.
+ *   spec §7.8.1) whose median width is under `SATIN_STROKE_MIN_MM` — or, for a **shadow line**
+ *   (spec §5.2, 30.09.2026), under `SHADOW_LINE_MIN_MM`: a stroke of which at least one rail lies at
+ *   a fabric gap under 1.0 mm, measured as the pull compensation per rail measures it (spec §7.8.3
+ *   rule 1, `railGaps`: along the rungs, outwards, median over the column; a form that touches or
+ *   lies under 0.1 mm away is no gap). A shape with several columns needs one column with such a
+ *   rail. The limit does not hang on the width of the stroke: as satin it always holds, since
+ *   satin starts at that width. `measureShapes` reads this once per shape and size; the search
+ *   over the size (`min-size-search.ts`) reads the same.
  * - **Gap**: the shapes of one colour are united and closed by half the limit
  *   (out and back, as `smoothOutline` does, spec §7.8.4). What the closing adds
  *   is a gap narrower than `GAP_MIN_MM`, unless a later shape covers it whole.
@@ -108,7 +115,14 @@ import {
 } from "@texma-stitch/geometry";
 import type { ImportedAreaShape, ImportedShape } from "../import/svg.js";
 import { medianShapeWidthMm } from "../import/svg.js";
-import { classifyShape } from "./classify.js";
+import type { Preset } from "../presets.js";
+import { PRESETS } from "../presets.js";
+import type { ShapeClass } from "./classify.js";
+import { classifyShape, SATIN_FROM_MM } from "./classify.js";
+import { satinColumns } from "./columns.js";
+import type { Form, FormIndex } from "./rail-pull.js";
+import { FABRIC_GAP_MAX_MM, formIndex, isFabricGap, railGaps } from "./rail-pull.js";
+import { designForms } from "./template.js";
 
 /**
  * A satin stroke narrower than this is too fine (spec §5.2, decided 29.09.2026).
@@ -116,6 +130,13 @@ import { classifyShape } from "./classify.js";
  * p5 1.29 mm (minimum 1.05, median 1.98).
  */
 export const SATIN_STROKE_MIN_MM = 1.3;
+/**
+ * A shadow line — a satin stroke with a rail at a fabric gap under 1.0 mm — narrower than this is
+ * too fine (spec §5.2, decided 30.09.2026). It is where satin starts (`SATIN_FROM_MM`, spec §7.8.1):
+ * as satin a shadow line always holds. Origin: the professional cap "Stuttgarter Hofbräu", whose
+ * golden shadow lines of 0.75 mm stitch cleanly at 110 mm.
+ */
+export const SHADOW_LINE_MIN_MM = SATIN_FROM_MM;
 /**
  * A gap within one colour narrower than this sews shut (spec §5.2, decided 29.09.2026).
  * ESTIMATE, not a measurement: twice the pull compensation (0.2 mm per side, spec §7.2)
@@ -192,6 +213,12 @@ export type MinimumSizeFinding = {
    * stitch (spec §5.2). The check names the possibility; the user decides.
    */
   runningAlternative: boolean;
+  /**
+   * A satin stroke with a rail at a fabric gap under 1.0 mm — measured against `shadowMinMm`, not
+   * `satinMinMm`. Always false for a gap. Only a finding where the limit of a shadow line is raised
+   * above satin's start (`MinimumSizeOptions.shadowMinMm`); with the default it never is one.
+   */
+  shadowLine: boolean;
 };
 
 export type MinimumSizeOptions = {
@@ -201,6 +228,13 @@ export type MinimumSizeOptions = {
   satinMinMm?: number;
   /** Default `GAP_MIN_MM`. */
   gapMinMm?: number;
+  /** The limit of a shadow line. Default `SHADOW_LINE_MIN_MM`. */
+  shadowMinMm?: number;
+  /**
+   * The preset the satin columns are set with — only `underlapMm` is read, for the rails of a stroke
+   * whose shadow line status is asked. Default Piqué, as the template's default.
+   */
+  preset?: Preset;
 };
 
 /** What the gap filter took out — every part that was measured is in one of these or a finding. */
@@ -241,20 +275,29 @@ export type MinimumSizeResult = {
   /** The ordered logo width the check ran at, mm. */
   widthMm: number;
   /** The limits it ran with, mm — the options, or their defaults. */
-  limits: { satinMinMm: number; gapMinMm: number };
+  limits: { satinMinMm: number; gapMinMm: number; shadowMinMm: number };
   /** All three kinds, the largest `holdsFromWidthMm` first. */
   findings: MinimumSizeFinding[];
   /**
-   * The minimum size, mm: the logo width from which every satin stroke is at least
-   * `limits.satinMinMm` wide. Above `widthMm` where a stroke is too fine, below it where
-   * every one holds. Absent for a logo without a satin stroke.
+   * The minimum size at this size's measurement, mm: the logo width from which every satin stroke
+   * holds its limit (`limits.satinMinMm`, `limits.shadowMinMm` for a shadow line), as the widths
+   * scale linearly. Above `widthMm` where a stroke is too fine, below it where every one holds.
+   * Absent for a logo without a satin stroke. A reading of this one size: the size the logo must
+   * be stitched at is found by searching over the size (`findMinimumSize`, spec §5.2, Tor).
    */
   minimumWidthMm?: number;
   /**
-   * The narrowest satin stroke, which sets `minimumWidthMm`. It is in `findings` where it is
-   * too fine; otherwise it is the stroke the logo could shrink down to.
+   * The satin stroke that holds from the largest width, which sets `minimumWidthMm` — the
+   * narrowest where all limits are equal. It is in `findings` where it is too fine; otherwise it
+   * is the stroke the logo could shrink down to.
    */
   decisive?: MinimumSizeFinding;
+  /**
+   * The satin strokes the lower limit is applied to: a rail at a fabric gap under 1.0 mm and
+   * narrower than `limits.satinMinMm` — by id, in document order. Without the shadow line they
+   * would be findings.
+   */
+  shadowLines: string[];
   /**
    * The width from which all gaps stay open, mm: the largest `holdsFromWidthMm` of the gap and
    * fabric-gap findings. Absent without one.
@@ -328,33 +371,160 @@ const readingOrder = (p: { box: Rect }, q: { box: Rect }): number =>
   Math.round(p.box.minY * 100) - Math.round(q.box.minY * 100) ||
   Math.round(p.box.minX * 100) - Math.round(q.box.minX * 100);
 
-function satinStrokes(
-  areas: Area[],
-  widthMm: number,
-  limitMm: number,
-): { findings: MinimumSizeFinding[]; narrowest: MinimumSizeFinding | undefined } {
-  const findings: MinimumSizeFinding[] = [];
-  let narrowest: MinimumSizeFinding | undefined;
-  for (const { shape, box } of areas) {
+/** What the check reads of one area shape at the size it runs at (`measureShapes`). */
+export type ShapeMeasure = {
+  id: string;
+  color: string;
+  polygon: Polygon;
+  box: Rect;
+  /** The class of spec §7.8.1 in this size. */
+  shapeClass: ShapeClass;
+  /** Median width (`medianShapeWidthMm`), mm; infinite for a shape without an axis (a disc). */
+  widthMm: number;
+  /**
+   * The gaps of the rails that lie at a fabric gap (spec §7.8.3 rule 1, `railGaps`), mm: one per
+   * such rail, over all columns of the shape — each the median over its column. Empty where no rail
+   * lies at one, where the shape has no columns that hold, or where it is no satin stroke (unless
+   * `hypothetical`).
+   */
+  railGapsMm: number[];
+  /**
+   * A satin stroke with a rail at a fabric gap: its limit is the one of a shadow line. False for a
+   * shape that is no satin stroke, even where `railGapsMm` holds a hypothesis.
+   */
+  shadowLine: boolean;
+  /**
+   * `railGapsMm` is what the rails of a running stitch would have were it set as a satin stroke
+   * (`MeasureOptions.running`): the search over the size reads it to see whether such a shape, as it
+   * grows into satin, is a shadow line at that size or not.
+   */
+  hypothetical: boolean;
+};
+
+export type MeasureOptions = {
+  /** The preset the columns are set with (`underlapMm`). Default Piqué. */
+  preset?: Preset;
+  /** Also set the columns of running stitches, as a hypothesis (`ShapeMeasure.hypothetical`). Default off. */
+  running?: boolean;
+};
+
+/**
+ * A form whose box lies this near the box of a shape can be the other side of a fabric gap of one of
+ * its rails: the gap is under `FABRIC_GAP_MAX_MM`, the ray looks 0.3 mm further, and a rail lies at
+ * most 0.15 mm off the outline. A shape without such a form has no shadow line status to ask for.
+ */
+const NEIGHBOUR_REACH_MM = FABRIC_GAP_MAX_MM + 1;
+
+/** Is there another form near enough to lie at a fabric gap from the shape (`NEIGHBOUR_REACH_MM`)? */
+function hasNeighbour(id: string, box: Rect, forms: FormIndex): boolean {
+  const reach = grow(box, NEIGHBOUR_REACH_MM);
+  return forms.forms.some((e) => e.form.shapeId !== id && boxesOverlap(e.box, reach));
+}
+
+/**
+ * The gaps of the rails of a shape set as satin columns that lie at a fabric gap under 1.0 mm
+ * (`railGaps`): the same columns the template sets, the same forms it measures against.
+ */
+function railGapsOf(
+  polygon: Polygon,
+  id: string,
+  own: Form | undefined,
+  forms: FormIndex,
+  preset: Preset,
+): number[] {
+  const plan = satinColumns(polygon, { underlapMm: preset.underlapMm, idPrefix: id });
+  if (!plan.ok) return [];
+  const gaps: number[] = [];
+  for (const column of plan.columns) {
+    for (const gap of railGaps(column, own, forms)) if (isFabricGap(gap)) gaps.push(gap);
+  }
+  return gaps;
+}
+
+/**
+ * Class, width and rail gaps of every area shape, in document order, at the size the shapes are in
+ * (spec §5.2). Lines are no areas; they are forms for the rail gaps (`designForms`) and nothing else.
+ * The columns are only set where they can matter: for a satin stroke that has another form near
+ * enough, and, asked for, for a running stitch.
+ */
+export function measureShapes(shapes: ImportedShape[], opts: MeasureOptions = {}): ShapeMeasure[] {
+  const preset = opts.preset ?? PRESETS.pique;
+  const forms = designForms(shapes);
+  const index = formIndex(forms);
+  const own = new Map<string, Form>(forms.map((f) => [f.shapeId, f]));
+  const out: ShapeMeasure[] = [];
+  for (const shape of shapes) {
+    if (shape.kind !== "area") continue;
     const cls = classifyShape(shape.polygon, shape.id);
-    if (cls.shapeClass !== "satin") continue;
-    const stroke: MinimumSizeFinding = {
+    const box = polygonBbox(shape.polygon);
+    const satin = cls.shapeClass === "satin";
+    const hypothetical = !satin && cls.shapeClass === "running" && opts.running === true;
+    const railGapsMm =
+      (satin || hypothetical) && hasNeighbour(shape.id, box, index)
+        ? railGapsOf(shape.polygon, shape.id, own.get(shape.id), index, preset)
+        : [];
+    out.push({
       id: shape.id,
-      kind: "satin-stroke",
       color: shape.color,
-      measuredMm: cls.widthMm,
+      polygon: shape.polygon,
+      box,
+      shapeClass: cls.shapeClass,
+      widthMm: cls.widthMm,
+      railGapsMm,
+      shadowLine: satin && railGapsMm.length > 0,
+      hypothetical,
+    });
+  }
+  return out;
+}
+
+/** The limit a measured satin stroke is held to: a shadow line's, or the ordinary one. */
+const limitOf = (m: ShapeMeasure, limits: { satinMinMm: number; shadowMinMm: number }): number =>
+  m.shadowLine ? limits.shadowMinMm : limits.satinMinMm;
+
+/** Is this shape a satin stroke under the limit it is held to? The one test of the check and the search. */
+export const isTooNarrow = (
+  m: ShapeMeasure,
+  limits: { satinMinMm: number; shadowMinMm: number },
+): boolean => m.shapeClass === "satin" && m.widthMm < limitOf(m, limits);
+
+function satinStrokes(
+  measures: ShapeMeasure[],
+  widthMm: number,
+  limits: { satinMinMm: number; shadowMinMm: number },
+): {
+  findings: MinimumSizeFinding[];
+  decisive: MinimumSizeFinding | undefined;
+  shadowLines: string[];
+} {
+  const findings: MinimumSizeFinding[] = [];
+  const shadowLines: string[] = [];
+  let decisive: MinimumSizeFinding | undefined;
+  for (const m of measures) {
+    if (m.shapeClass !== "satin") continue;
+    const limitMm = limitOf(m, limits);
+    const stroke: MinimumSizeFinding = {
+      id: m.id,
+      kind: "satin-stroke",
+      color: m.color,
+      measuredMm: m.widthMm,
       measure: "median",
       limitMm,
-      holdsFromWidthMm: holdsFromWidth(widthMm, limitMm, cls.widthMm),
-      polygon: shape.polygon,
-      at: anchor(shape.polygon, box),
-      runningAlternative: cls.widthMm < SATIN_STROKE_MIN_MM,
+      holdsFromWidthMm: holdsFromWidth(widthMm, limitMm, m.widthMm),
+      polygon: m.polygon,
+      at: anchor(m.polygon, m.box),
+      runningAlternative: m.widthMm < SATIN_STROKE_MIN_MM,
+      shadowLine: m.shadowLine,
     };
-    // The first of equals stays the narrowest: the same input names the same stroke.
-    if (narrowest === undefined || cls.widthMm < narrowest.measuredMm) narrowest = stroke;
-    if (cls.widthMm < limitMm) findings.push(stroke);
+    // The stroke that holds from the largest width decides; the first of equals: the same input
+    // names the same stroke.
+    if (decisive === undefined || stroke.holdsFromWidthMm > decisive.holdsFromWidthMm) {
+      decisive = stroke;
+    }
+    if (isTooNarrow(m, limits)) findings.push(stroke);
+    if (m.shadowLine && m.widthMm < limits.satinMinMm) shadowLines.push(m.id);
   }
-  return { findings, narrowest };
+  return { findings, decisive, shadowLines };
 }
 
 /**
@@ -553,6 +723,7 @@ function gaps(
           polygon: part,
           at: anchor(part, box),
           runningAlternative: false,
+          shadowLine: false,
         });
       });
     });
@@ -661,6 +832,7 @@ function fabricGaps(
         polygon: part,
         at: anchor(part, box),
         runningAlternative: false,
+        shadowLine: false,
       });
     });
   });
@@ -685,15 +857,21 @@ export function checkMinimumSize(
   const { widthMm } = opts;
   const satinMinMm = opts.satinMinMm ?? SATIN_STROKE_MIN_MM;
   const gapMinMm = opts.gapMinMm ?? GAP_MIN_MM;
+  const shadowMinMm = opts.shadowMinMm ?? SHADOW_LINE_MIN_MM;
   requirePositive("widthMm", widthMm);
   requirePositive("satinMinMm", satinMinMm);
   requirePositive("gapMinMm", gapMinMm);
+  requirePositive("shadowMinMm", shadowMinMm);
 
   const areas: Area[] = shapes.flatMap((shape, index) =>
     shape.kind === "area" ? [{ index, shape, box: polygonBbox(shape.polygon) }] : [],
   );
 
-  const satin = satinStrokes(areas, widthMm, satinMinMm);
+  const satin = satinStrokes(
+    measureShapes(shapes, opts.preset === undefined ? {} : { preset: opts.preset }),
+    widthMm,
+    { satinMinMm, shadowMinMm },
+  );
   const gapResult = gaps(areas, widthMm, gapMinMm);
   const fabricResult = fabricGaps(areas, gapResult.findings, widthMm, gapMinMm);
   // Largest first; ties by kind and id, never by the order the geometry happened to come in.
@@ -707,11 +885,12 @@ export function checkMinimumSize(
   const decisiveGap = findings.find((f) => f.kind !== "satin-stroke");
   return {
     widthMm,
-    limits: { satinMinMm, gapMinMm },
+    limits: { satinMinMm, gapMinMm, shadowMinMm },
     findings,
-    ...(satin.narrowest
-      ? { minimumWidthMm: satin.narrowest.holdsFromWidthMm, decisive: satin.narrowest }
+    ...(satin.decisive
+      ? { minimumWidthMm: satin.decisive.holdsFromWidthMm, decisive: satin.decisive }
       : {}),
+    shadowLines: satin.shadowLines,
     ...(decisiveGap ? { gapsOpenFromWidthMm: decisiveGap.holdsFromWidthMm, decisiveGap } : {}),
     gapPieces: gapResult.pieces,
     gapParts: gapResult.parts,
