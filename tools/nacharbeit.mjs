@@ -233,11 +233,16 @@ export function collectSpots(known) {
   return { spots, withoutPlace };
 }
 
-/** The box of the stitches and jumps of a block, undefined for a block without either. */
+/**
+ * The box of the stitches of a block, undefined for a block without any. Jump records do not count: a long
+ * jump is written as several records along the way from one block to the next (and the first one from the
+ * origin of the DST, the middle of the design), so they lie between the blocks and belong to none — counted,
+ * they pulled the box of a block by up to 13 mm towards the block before it.
+ */
 function boxOf(stitches) {
   let box;
   for (const s of stitches) {
-    if (s.cmd !== "stitch" && s.cmd !== "jump") continue;
+    if (s.cmd !== "stitch") continue;
     box =
       box === undefined
         ? { minX: s.x, minY: s.y, maxX: s.x, maxY: s.y }
@@ -271,12 +276,14 @@ const unionOf = (boxes) =>
  */
 export const SIZE_SLACK_MM = 1.0;
 /**
- * The middle of a block's box and of its layer's box differ by half what the box exceeds on one side
- * against the other — 0.2 mm at most — and by the rounding of the DST (0.05 mm); the offset of a block
- * may differ from the offset of the whole by this much before the mapping is not believed. A mirrored
- * or shifted DST differs by the distance between the blocks, several millimetres.
+ * The middle of a block's box and of its layer's box differ by half what the box exceeds on one side against
+ * the other — 0.2 mm at most on a large block, more on a small one (measured, largest deviation of a block on
+ * each motif: Hofbräu 0.21 mm, STUTTGART 0.14, Köln 0.19, Atzensport 0.72 on four small white shapes) — and by
+ * the rounding of the DST (0.05 mm). The offset of a block may differ from the offset of the whole by this
+ * much before the mapping is not believed. A mirrored or shifted DST differs by the distance between the blocks, several millimetres up
+ * to the size of the motif.
  */
-export const OFFSET_SPREAD_MM = 0.6;
+export const OFFSET_SPREAD_MM = 1.5;
 
 /**
  * Where the DST lies on the page: the offset that turns a point of the DST into one on the page, from

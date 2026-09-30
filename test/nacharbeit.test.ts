@@ -335,12 +335,23 @@ describe("mapDst (the DST on the page)", () => {
     expect(m.dx).toBeCloseTo(20, 9);
   });
 
-  it("only counts stitches and jumps for the box", () => {
-    const withColour = [
-      { stitches: [...blocks[0]!.stitches, { cmd: "color", x: 500, y: 500 }] },
-      blocks[1]!,
+  it("counts stitches only for the box: the jump records between the blocks belong to none", () => {
+    // A long jump is written as records along the way; the first one starts at the middle of the design.
+    const withJumps = [
+      {
+        stitches: [
+          { cmd: "jump", x: 0, y: 0 },
+          ...blocks[0]!.stitches,
+          { cmd: "color", x: 500, y: 500 },
+        ],
+      },
+      { stitches: [{ cmd: "jump", x: -18, y: -6 }, ...blocks[1]!.stitches] },
     ];
-    expect(mapDst(withColour, layers).dx).toBeCloseTo(20, 9);
+    const m = mapDst(withJumps, layers);
+    expect(m.dx).toBeCloseTo(20, 9);
+    expect(m.dy).toBeCloseTo(10, 9);
+    expect(m.ok).toBe(true);
+    expect(m.spreadMm).toBeLessThan(0.001);
   });
 
   it("says no when there is nothing to map", () => {
