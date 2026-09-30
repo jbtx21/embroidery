@@ -46,9 +46,7 @@ export function tScene(near: "stem" | "bar" | "none", strokeMm = 0.9): ImportedS
   if (near === "none") return [t];
   // The stem's left edge lies at 5 − stroke/2; the block ends 0.5 mm before it.
   const block =
-    near === "stem"
-      ? barAt(2, 2, 5 - strokeMm / 2 - 0.5 - 2, 10)
-      : barAt(1, -3.5, 8, 3);
+    near === "stem" ? barAt(2, 2, 5 - strokeMm / 2 - 0.5 - 2, 10) : barAt(1, -3.5, 8, 3);
   return [t, areaShape("block", block, RED)];
 }
 

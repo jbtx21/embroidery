@@ -343,7 +343,9 @@ describe("checkMinimumSize — shadow lines: limit 0.7 mm instead of 1.3 mm (spe
 
   it("finds the same again for the same input", () => {
     const shapes = [...tScene("stem"), ...shadowScene(0.5).map((s) => ({ ...s, id: `x${s.id}` }))];
-    expect(checkMinimumSize(shapes, { widthMm: B })).toEqual(checkMinimumSize(shapes, { widthMm: B }));
+    expect(checkMinimumSize(shapes, { widthMm: B })).toEqual(
+      checkMinimumSize(shapes, { widthMm: B }),
+    );
   });
 });
 

@@ -441,26 +441,29 @@ function railGapsOf(
   return gaps;
 }
 
+/** The forms of a design for the rail gaps, and the form of each shape among them (`designForms`). */
+function railForms(shapes: ImportedShape[]): { index: FormIndex; own: Map<string, Form> } {
+  const forms = designForms(shapes);
+  return { index: formIndex(forms), own: new Map(forms.map((f) => [f.shapeId, f])) };
+}
+
 /**
  * Class, width and rail gaps of every area shape, in document order, at the size the shapes are in
  * (spec §5.2). Lines are no areas; they are forms for the rail gaps (`designForms`) and nothing else.
  * The columns are only set where they can matter: for a satin stroke that has another form near
- * enough, and, asked for, for a running stitch.
+ * enough, and, asked for (`running`), for a running stitch (`addRunningRails`).
  */
 export function measureShapes(shapes: ImportedShape[], opts: MeasureOptions = {}): ShapeMeasure[] {
   const preset = opts.preset ?? PRESETS.pique;
-  const forms = designForms(shapes);
-  const index = formIndex(forms);
-  const own = new Map<string, Form>(forms.map((f) => [f.shapeId, f]));
+  const { index, own } = railForms(shapes);
   const out: ShapeMeasure[] = [];
   for (const shape of shapes) {
     if (shape.kind !== "area") continue;
     const cls = classifyShape(shape.polygon, shape.id);
     const box = polygonBbox(shape.polygon);
     const satin = cls.shapeClass === "satin";
-    const hypothetical = !satin && cls.shapeClass === "running" && opts.running === true;
     const railGapsMm =
-      (satin || hypothetical) && hasNeighbour(shape.id, box, index)
+      satin && hasNeighbour(shape.id, box, index)
         ? railGapsOf(shape.polygon, shape.id, own.get(shape.id), index, preset)
         : [];
     out.push({
@@ -472,10 +475,31 @@ export function measureShapes(shapes: ImportedShape[], opts: MeasureOptions = {}
       widthMm: cls.widthMm,
       railGapsMm,
       shadowLine: satin && railGapsMm.length > 0,
-      hypothetical,
+      hypothetical: false,
     });
   }
-  return out;
+  return opts.running === true ? addRunningRails(out, shapes, preset) : out;
+}
+
+/**
+ * The measures with the rails a running stitch would have were it set as a satin stroke: the gaps of
+ * the columns the template would set for it, as a hypothesis (`ShapeMeasure.hypothetical`). Nothing
+ * else changes — a running stitch is still no satin stroke, and no shadow line. `shapes` are the
+ * shapes the measures were made of.
+ */
+export function addRunningRails(
+  measures: ShapeMeasure[],
+  shapes: ImportedShape[],
+  preset: Preset = PRESETS.pique,
+): ShapeMeasure[] {
+  const { index, own } = railForms(shapes);
+  return measures.map((m) => {
+    if (m.shapeClass !== "running") return m;
+    const railGapsMm = hasNeighbour(m.id, m.box, index)
+      ? railGapsOf(m.polygon, m.id, own.get(m.id), index, preset)
+      : [];
+    return { ...m, railGapsMm, hypothetical: true };
+  });
 }
 
 /** The limit a measured satin stroke is held to: a shadow line's, or the ordinary one. */
