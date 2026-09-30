@@ -318,6 +318,8 @@ describe("mapDst (the DST on the page)", () => {
     expect(m.ok).toBe(false);
     expect(m.checked).toBe(true);
     expect(m.why).toContain("Farbblöcke");
+    // The limit is named in the German number format, like the figures beside it.
+    expect(m.why).toContain(`(Grenze ${String(OFFSET_SPREAD_MM).replace(".", ",")} mm)`);
   });
 
   it("does not believe a DST of another size than the paths", () => {
@@ -403,8 +405,11 @@ describe("reportLines", () => {
     expect(text).toContain("01 Gold #D1B35A: 92 Objekte in 2 Gruppen oder Formen");
     expect(text).toContain("Nadelhäufung 1 · Stofflücke 2");
     expect(text).toContain("Hinweis     Gruppe g enthält mehrere Farben");
-    expect(text).toContain("DST → Seite um 55,39 / 25,67 mm verschoben, je Farbblock geprüft");
-    expect(text).toContain("Laufzeit    23.5 s, davon PES 12.3 s");
+    expect(text).toContain(
+      "DST → Seite um 55,39 / 25,67 mm verschoben, je Farbblock geprüft (Abweichung bis 0,12 mm, Grenze 1,5 mm)",
+    );
+    // One number format in the block: decimal commas, as in the lines above.
+    expect(text).toContain("Laufzeit    23,5 s, davon PES 12,3 s");
   });
 
   it("says what it could not do: a mapping that does not hold, points without a place, blocks that do not match", () => {

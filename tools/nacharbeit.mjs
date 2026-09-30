@@ -338,7 +338,7 @@ export function mapDst(blocks, layers) {
   const why = !sizeOk
     ? `die Größe der Stiche (${komma(dst.maxX - dst.minX)} × ${komma(dst.maxY - dst.minY)} mm) passt nicht zu der der Pfade (${komma(page.maxX - page.minX)} × ${komma(page.maxY - page.minY)} mm)`
     : !spreadOk
-      ? `die Farbblöcke liegen je Ebene um bis zu ${komma(spreadMm, 2)} mm verschieden (Grenze ${OFFSET_SPREAD_MM} mm)`
+      ? `die Farbblöcke liegen je Ebene um bis zu ${komma(spreadMm, 2)} mm verschieden (Grenze ${komma(OFFSET_SPREAD_MM)} mm)`
       : undefined;
   return {
     dx,
@@ -604,7 +604,7 @@ export function reportLines(report) {
   lines.push(
     `  DST → Seite um ${komma(mapping.dx, 2)} / ${komma(mapping.dy, 2)} mm verschoben` +
       (mapping.checked
-        ? `, je Farbblock geprüft (Abweichung bis ${komma(mapping.spreadMm, 2)} mm, Grenze ${OFFSET_SPREAD_MM} mm)`
+        ? `, je Farbblock geprüft (Abweichung bis ${komma(mapping.spreadMm, 2)} mm, Grenze ${komma(OFFSET_SPREAD_MM)} mm)`
         : ", nicht je Farbblock prüfbar (Blöcke und Ebenen passen nicht zueinander)"),
   );
   if (!mapping.ok) {
@@ -637,7 +637,7 @@ export function reportLines(report) {
     for (const l of report.pesStderr.trim().split("\n")) lines.push(`    ${l}`);
   }
   lines.push(
-    `  Laufzeit    ${(report.totalMs / 1000).toFixed(1)} s, davon PES ${(report.pesMs / 1000).toFixed(1)} s`,
+    `  Laufzeit    ${komma(report.totalMs / 1000)} s, davon PES ${komma(report.pesMs / 1000)} s`,
   );
   return lines;
 }
