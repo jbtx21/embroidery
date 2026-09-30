@@ -204,17 +204,25 @@ function scan(text: string): { root: Attrs; paths: Element[] } {
   return { root, paths };
 }
 
-/** Millimetres per user unit, from width/height and viewBox. */
-export function unitScale(root: Attrs): number {
+/** The four numbers of the viewBox (x, y, width, height), undefined without a usable one. */
+function viewBoxOf(root: Attrs): [number, number, number, number] | undefined {
+  // Trimmed first: a blank at either end would read as a fifth number (0).
   const vb = root["viewbox"]
-    ?.split(/[\s,]+/)
+    ?.trim()
+    .split(/[\s,]+/)
     .map(Number)
     .filter((n) => Number.isFinite(n));
+  return vb && vb.length === 4 ? [vb[0]!, vb[1]!, vb[2]!, vb[3]!] : undefined;
+}
+
+/** Millimetres per user unit, from width/height and viewBox. */
+export function unitScale(root: Attrs): number {
+  const vb = viewBoxOf(root);
   const widthMm = lengthToMm(root["width"]);
   const heightMm = lengthToMm(root["height"]);
-  if (vb && vb.length === 4) {
-    const vbW = vb[2]!;
-    const vbH = vb[3]!;
+  if (vb) {
+    const vbW = vb[2];
+    const vbH = vb[3];
     if (widthMm !== undefined && vbW > 0) return widthMm / vbW;
     if (heightMm !== undefined && vbH > 0) return heightMm / vbH;
   }
@@ -222,19 +230,37 @@ export function unitScale(root: Attrs): number {
   return MM_PER_PX;
 }
 
+/**
+ * Where the page starts in user units: the origin of the viewBox, (0, 0) without one.
+ *
+ * A PDF export cuts its page out of a larger drawing space (Hofbräu: `viewBox="29.9 367.2 …"`).
+ * The page is what the mm of the document mean, so the origin comes off before the scale is applied
+ * — `unitScale` alone left the shapes 76 mm too low on that file (spec §13.4).
+ */
+export function viewBoxOrigin(root: Attrs): Point {
+  const vb = viewBoxOf(root);
+  return vb ? { x: vb[0], y: vb[1] } : { x: 0, y: 0 };
+}
+
+/** What turns a point in user units into millimetres on the page. */
+type Page = { mmPerUnit: number; origin: Point };
+
+/** User units (after the element's transform) to millimetres on the page: origin off, then scale. */
+const pageToMm = (p: Point, { mmPerUnit, origin }: Page): Point => ({
+  x: (p.x - origin.x) * mmPerUnit,
+  y: (p.y - origin.y) * mmPerUnit,
+});
+
 // ---------------------------------------------------------------------------
 // Import
 // ---------------------------------------------------------------------------
 
 /** A closed ring in millimetres, ready for `ringsToPolygons`. */
-function ringInMm(sub: SubPath, matrix: Matrix, mmPerUnit: number): Point[] {
+function ringInMm(sub: SubPath, matrix: Matrix, page: Page): Point[] {
   // Flatten in user units, then transform and scale to millimetres. The other
   // way round the flattening tolerance would refer to the wrong unit.
   const flat = flattenPath(sub.start, sub.segments);
-  const ring = flat.map((q) => {
-    const t = applyMatrix(matrix, q);
-    return { x: t.x * mmPerUnit, y: t.y * mmPerUnit };
-  });
+  const ring = flat.map((q) => pageToMm(applyMatrix(matrix, q), page));
   // `Z` repeats the start point; a ring closes implicitly.
   const first = ring[0];
   const last = ring[ring.length - 1];
@@ -548,6 +574,7 @@ type PathRead =
 function readPaths(text: string): { root: Attrs; mmPerUnit: number; paths: PathRead[] } {
   const { root, paths } = scan(text);
   const mmPerUnit = unitScale(root);
+  const page: Page = { mmPerUnit, origin: viewBoxOrigin(root) };
   const out: PathRead[] = [];
   for (const [pi, el] of paths.entries()) {
     const id = el.attrs["id"] ?? `path${pi}`;
@@ -571,7 +598,7 @@ function readPaths(text: string): { root: Attrs; mmPerUnit: number; paths: PathR
     if (isPaint(fill)) {
       // Sub-paths of one `d` belong together: the inner ones are the holes.
       const rings = subpaths
-        .map((sub) => ringInMm(sub, el.matrix, mmPerUnit))
+        .map((sub) => ringInMm(sub, el.matrix, page))
         .filter((r) => r.length >= 3);
       const polygons = ringsToPolygons(rings);
       out.push({
@@ -602,10 +629,9 @@ function readPaths(text: string): { root: Attrs; mmPerUnit: number; paths: PathR
       trimAfter,
       color: isPaint(stroke) ? stroke : undefined,
       lines: subpaths.map((sub) => ({
-        polyline: flattenPath(sub.start, sub.segments).map((q) => {
-          const t = applyMatrix(el.matrix, q);
-          return { x: t.x * mmPerUnit, y: t.y * mmPerUnit };
-        }),
+        polyline: flattenPath(sub.start, sub.segments).map((q) =>
+          pageToMm(applyMatrix(el.matrix, q), page),
+        ),
         closed: sub.closed,
       })),
     });

@@ -43,3 +43,25 @@ export const SVG_FILLED = `<svg xmlns="http://www.w3.org/2000/svg"
   <path id="ohne-farbe" d="M 52 12 L 58 12" />
   <path id="stil" d="M 26 14 L 46 14 L 46 22 L 26 22 Z" style="fill:#fedd01" />
 </svg>`;
+
+/**
+ * A page that does not start at 0: the viewBox of a PDF export (Hofbräu: `viewBox="29.9 367.2 …"`,
+ * 76 mm in y before the importer took the origin into account). 80 x 40 user units on a 40 x 20 mm
+ * page, origin (100, 200): the path is the whole page, so it has to land on (0, 0) to (40, 20) mm.
+ */
+export const SVG_VIEWBOX_ORIGIN = `<svg xmlns="http://www.w3.org/2000/svg" width="40mm" height="20mm" viewBox="100 200 80 40">
+  <path id="seite" d="M 100 200 L 180 200 L 180 240 L 100 240 Z" fill="#c8102e" />
+  <path id="linie" d="M 100 200 L 180 240" style="fill:none;stroke:#101010" />
+</svg>`;
+
+/**
+ * The same, the way a PDF converter writes it: the paths in y-up PDF units under a flip
+ * (`matrix(1,0,0,-1,0,841.8898)`), the page cut out by the viewBox. 500 x 250 units on 100 x 50 mm
+ * (0.2 mm per unit), origin (30, 367). The square 100 x 100 units at x 130, y 300 (PDF) is 20 x 20 mm
+ * on the page, 20 mm from the left and (441.8898 − 367) × 0.2 = 14.978 mm from the top.
+ */
+export const SVG_VIEWBOX_PDF = `<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="30 367 500 250">
+  <g id="ebene">
+    <path id="quadrat" transform="matrix(1,0,0,-1,0,841.8898)" d="M130 300L230 300L230 400L130 400Z" fill="#d2060d" />
+  </g>
+</svg>`;

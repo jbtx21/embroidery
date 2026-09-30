@@ -1,6 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { bbox } from "@texma-stitch/geometry";
-import { SVG_ARC, SVG_FILLED, SVG_PIXELS, SVG_TWO_PATHS } from "../../test/fixtures/svg.js";
+import {
+  SVG_ARC,
+  SVG_FILLED,
+  SVG_PIXELS,
+  SVG_TWO_PATHS,
+  SVG_VIEWBOX_ORIGIN,
+  SVG_VIEWBOX_PDF,
+} from "../../test/fixtures/svg.js";
 import { applyMatrix, IDENTITY, multiply, parseTransform } from "./matrix.js";
 
 import {
@@ -20,6 +27,7 @@ import {
   SINGLE_PASS_MAX_MM,
   touchesOrCovers,
   unitScale,
+  viewBoxOrigin,
   worstRailExtent,
 } from "./svg.js";
 import { autoSatin } from "../auto-satin.js";
@@ -135,6 +143,71 @@ describe("lengths", () => {
     expect(unitScale({ width: "200mm", viewbox: "0 0 100 50" })).toBeCloseTo(2, 9);
     expect(unitScale({ height: "50mm", viewbox: "0 0 100 50" })).toBeCloseTo(1, 9);
     expect(unitScale({})).toBeCloseTo(25.4 / 96, 9);
+  });
+});
+
+describe("viewBox origin (spec §13.4)", () => {
+  it("reads the origin of the viewBox, (0, 0) without a usable one", () => {
+    expect(viewBoxOrigin({ viewbox: "29.9 367.2 535.5 248.4" })).toEqual({ x: 29.9, y: 367.2 });
+    expect(viewBoxOrigin({ viewbox: "-5,-10,80,40" })).toEqual({ x: -5, y: -10 });
+    // Blanks round the value do not shift the four numbers.
+    expect(viewBoxOrigin({ viewbox: "  12 34 80 40 " })).toEqual({ x: 12, y: 34 });
+    expect(viewBoxOrigin({ viewbox: "0 0 80 40" })).toEqual({ x: 0, y: 0 });
+    expect(viewBoxOrigin({})).toEqual({ x: 0, y: 0 });
+    expect(viewBoxOrigin({ viewbox: "1 2 3" })).toEqual({ x: 0, y: 0 });
+    expect(viewBoxOrigin({ viewbox: "a b c d" })).toEqual({ x: 0, y: 0 });
+  });
+
+  it("keeps the scale when blanks stand round the viewBox", () => {
+    expect(unitScale({ width: "40mm", viewbox: " 10 20 80 40 " })).toBeCloseTo(0.5, 9);
+  });
+
+  it("puts an area where the page shows it: the origin comes off before the scale is applied", () => {
+    const { shapes, mmPerUnit } = importShapes(SVG_VIEWBOX_ORIGIN);
+    expect(mmPerUnit).toBeCloseTo(0.5, 9);
+    const area = shapes.find((s) => s.id === "seite")!;
+    expect(area.kind).toBe("area");
+    const box = bbox(area.kind === "area" ? area.polygon.outer : []);
+    expect(box.minX).toBeCloseTo(0, 9);
+    expect(box.minY).toBeCloseTo(0, 9);
+    expect(box.maxX).toBeCloseTo(40, 9);
+    expect(box.maxY).toBeCloseTo(20, 9);
+  });
+
+  it("does the same for a line", () => {
+    const line = importShapes(SVG_VIEWBOX_ORIGIN).shapes.find((s) => s.id === "linie")!;
+    expect(line.kind).toBe("line");
+    const pts = line.kind === "line" ? line.polyline : [];
+    expect(pts[0]!.x).toBeCloseTo(0, 9);
+    expect(pts[0]!.y).toBeCloseTo(0, 9);
+    expect(pts[pts.length - 1]!.x).toBeCloseTo(40, 9);
+    expect(pts[pts.length - 1]!.y).toBeCloseTo(20, 9);
+  });
+
+  it("applies the transform of the path first and the origin after it (a PDF export under a flip)", () => {
+    const shape = importShapes(SVG_VIEWBOX_PDF).shapes[0]!;
+    const box = bbox(shape.kind === "area" ? shape.polygon.outer : []);
+    expect(box.minX).toBeCloseTo(20, 6);
+    expect(box.maxX).toBeCloseTo(40, 6);
+    expect(box.minY).toBeCloseTo(14.97796, 4);
+    expect(box.maxY).toBeCloseTo(34.97796, 4);
+  });
+
+  it("reads the page the same in the frozen import", () => {
+    const { design } = importSvg(SVG_VIEWBOX_ORIGIN);
+    const line = design.objects.find((o) => o.type === "running")!;
+    const box = bbox(line.type === "running" ? line.path : []);
+    expect(box.minX).toBeCloseTo(0, 9);
+    expect(box.minY).toBeCloseTo(0, 9);
+    expect(box.maxX).toBeCloseTo(40, 9);
+    expect(box.maxY).toBeCloseTo(20, 9);
+  });
+
+  it("leaves a page that starts at 0 where it was", () => {
+    const p = importShapes(SVG_TWO_PATHS).shapes.find((s) => s.id === "bogen")!;
+    const box = bbox(p.kind === "line" ? p.polyline : []);
+    expect(box.minX).toBeCloseTo(0, 6);
+    expect(box.maxY).toBeCloseTo(40, 6);
   });
 });
 
