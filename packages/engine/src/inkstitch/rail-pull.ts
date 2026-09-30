@@ -175,17 +175,18 @@ const median = (values: number[]): number => {
 };
 
 /**
- * The pull compensation of a column per rail (module doc). `own` is the shape the column
- * belongs to, `forms` all forms of the design. A column without rungs has nothing to
- * measure along and keeps its compensation.
+ * The median fabric gap of each rail of a column (module doc, rule 1): measured along the rungs,
+ * outwards, median over the column — `0` where the other form touches, overlaps or lies under
+ * `FABRIC_GAP_MIN_MM` away, `Infinity` where none lies within `FABRIC_GAP_MAX_MM`. Rail A, then B.
+ * The fineness check (`min-size.ts`, spec §5.2) asks the same question of a satin stroke: a
+ * stroke with a rail at such a gap is a shadow line. A column without rungs has nothing to
+ * measure along: no gap.
  */
-export function railPull(
+export function railGaps(
   column: SatinColumnPlan,
   own: Form | undefined,
   forms: FormIndex,
-  preset: Preset,
-): RailPull {
-  const full = satinPullCompMm(column.widthMm, preset);
+): [number, number] {
   const gapsA: number[] = [];
   const gapsB: number[] = [];
   for (const [ra, rb] of column.rungs) {
@@ -198,7 +199,22 @@ export function railPull(
     gapsA.push(gapAlong(a, { x: -d.x, y: -d.y }, forms, own));
     gapsB.push(gapAlong(b, d, forms, own));
   }
-  const gapMm: [number, number] = [median(gapsA), median(gapsB)];
+  return [median(gapsA), median(gapsB)];
+}
+
+/**
+ * The pull compensation of a column per rail (module doc). `own` is the shape the column
+ * belongs to, `forms` all forms of the design. A column without rungs has nothing to
+ * measure along and keeps its compensation.
+ */
+export function railPull(
+  column: SatinColumnPlan,
+  own: Form | undefined,
+  forms: FormIndex,
+  preset: Preset,
+): RailPull {
+  const full = satinPullCompMm(column.widthMm, preset);
+  const gapMm = railGaps(column, own, forms);
   const atGap: [boolean, boolean] = [isFabricGap(gapMm[0]), isFabricGap(gapMm[1])];
   // Rule 2: a narrow column at a gap goes without on both rails; otherwise rule 1 alone decides.
   if (column.widthMm < SATIN_NARROW_WARN_MM && (atGap[0] || atGap[1])) {

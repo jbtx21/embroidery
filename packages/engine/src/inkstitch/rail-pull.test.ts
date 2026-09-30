@@ -10,6 +10,8 @@ import {
   FABRIC_GAP_MIN_MM,
   formIndex,
   gapAlong,
+  isFabricGap,
+  railGaps,
   railPull,
   satinPullCompMm,
 } from "./rail-pull.js";
@@ -231,5 +233,44 @@ describe("railPull (spec §7.8.3: pull compensation per rail)", () => {
     const r = railPull(c, { shapeId: "red", polygon: red }, forms, cap);
     expect(r.pull[0]).toBeCloseTo(full, 6);
     expect(r.pull[1]).toBeCloseTo(full, 6);
+  });
+});
+
+describe("railGaps (the measurement of rule 1 on its own, for the fineness check of spec §5.2)", () => {
+  it("is the median gap per rail: the gap on the lower rail, none on the free one", () => {
+    const c = columnOf(red);
+    const own = { shapeId: "red", polygon: red };
+    const forms = formIndex([{ shapeId: "gold", polygon: gold(0.53) }]);
+    const gaps = railGaps(c, own, forms);
+    const low = lowerRail(c);
+    expect(gaps[low]).toBeCloseTo(0.53, 2);
+    expect(gaps[low === 0 ? 1 : 0]).toBe(Infinity);
+    expect(isFabricGap(gaps[low])).toBe(true);
+    expect(isFabricGap(gaps[low === 0 ? 1 : 0])).toBe(false);
+  });
+
+  it("is what railPull reports as gapMm — one measurement, not two", () => {
+    const c = columnOf(red);
+    const own = { shapeId: "red", polygon: red };
+    for (const gap of [0, 0.05, 0.35, 0.53, 0.99, 1.5]) {
+      const forms = formIndex([{ shapeId: "gold", polygon: gold(gap) }]);
+      expect(railGaps(c, own, forms), `gap ${gap}`).toEqual(railPull(c, own, forms, cap).gapMm);
+    }
+  });
+
+  it("reads 0 where the other form touches, overlaps or lies under 0.1 mm away — no fabric to keep open", () => {
+    const c = columnOf(red);
+    const own = { shapeId: "red", polygon: red };
+    for (const gap of [0, 0.05]) {
+      const gaps = railGaps(c, own, formIndex([{ shapeId: "gold", polygon: gold(gap) }]));
+      expect(gaps[lowerRail(c)], `gap ${gap}`).toBe(0);
+      expect(isFabricGap(gaps[lowerRail(c)]), `gap ${gap}`).toBe(false);
+    }
+  });
+
+  it("has nothing to measure along for a column without rungs: no gap on either rail", () => {
+    const c: SatinColumnPlan = { ...columnOf(red), rungs: [] };
+    const forms = formIndex([{ shapeId: "gold", polygon: gold(0.53) }]);
+    expect(railGaps(c, { shapeId: "red", polygon: red }, forms)).toEqual([Infinity, Infinity]);
   });
 });
