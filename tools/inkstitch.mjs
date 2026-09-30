@@ -702,22 +702,28 @@ if (tatamiOnly) {
   );
 } else {
   const { reportLines, writeRework } = await import("./nacharbeit.mjs");
-  const rework = await writeRework({
-    name,
-    outDir,
-    svgPath: outputInput,
-    templatePath,
-    sourceSvg,
-    presetName: presetArg,
-    stitches: foreignStitches,
-    blocks,
-    stats,
-    feinheit,
-    fallbacks,
-    narrowLines,
-    smoothed,
-    railPull,
-    underlay,
-  });
-  for (const line of reportLines(rework)) console.log(line);
+  try {
+    const rework = await writeRework({
+      name,
+      outDir,
+      svgPath: outputInput,
+      templatePath,
+      sourceSvg,
+      presetName: presetArg,
+      stitches: foreignStitches,
+      blocks,
+      stats,
+      feinheit,
+      fallbacks,
+      narrowLines,
+      smoothed,
+      railPull,
+      underlay,
+    });
+    for (const line of reportLines(rework)) console.log(line);
+  } catch (err) {
+    // The DST is written and reported above; what failed is the file for the rework.
+    console.error(`FEHLER (Nacharbeit-Datei): ${err.message}`);
+    process.exit(1);
+  }
 }
