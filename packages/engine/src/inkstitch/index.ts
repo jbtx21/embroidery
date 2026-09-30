@@ -17,3 +17,4 @@ export * from "./template.js";
 export * from "./min-size.js";
 export * from "./min-size-search.js";
 export * from "./nacharbeit.js";
+export * from "./dst-spots.js";
