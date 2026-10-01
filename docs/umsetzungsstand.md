@@ -751,3 +751,14 @@ Stand davor; die Nacharbeit-Datei durch `output` gibt in beiden Fällen dieselbe
 1.204, Rauchtest grün, `kennzahlen` STUTTGART 80 mm weiter 11.192 Stiche. Grenzen in
 `docs/backlog.md`: bestimmend sind fast überall Zierteile (nur bei Eislingen Schrift), und dass jede
 größere Größe hält, ist gemessen (bis 40 mm darüber), nicht bewiesen.
+
+**Probestick in Mindestgröße (01.10.2026).** Vier Dateien mit Tor, Nacharbeit-Datei und Ink/Stitch
+3.3.0 (Stand `0795dbb`; DST, PES, Nacharbeit-Datei, Farbfolge und Vorschau an den Nutzer, nicht im
+Repo). Der Probestick soll zeigen, ob die Grenze von 1,0 mm für tragende Satinstriche hält:
+
+| Datei                       | bestellt → erzeugt |            Größe | Stiche | Farbblöcke | Trims/1000 | Dichtespitze | Nadelhäufung | Prüfstellen |
+| --------------------------- | -----------------: | ---------------: | -----: | ---------: | ---------: | -----------: | -----------: | ----------: |
+| STUTTGART                   |         80 → 91 mm |   90,0 × 84,6 mm | 16.639 |          6 |       2,94 |           26 |            7 |          79 |
+| Berufsfeuerwehr Köln        |        90 → 134 mm | 134,2 × 134,2 mm | 34.823 |         15 |       3,45 |           25 |            8 |         331 |
+| Atzensport Hofbräu (PDF)    |        80 → 107 mm | 107,0 × 151,4 mm | 19.283 |          8 |       6,85 |           21 |            6 |         208 |
+| Stuttgarter Hofbräu (`cap`) |   110,8 → 110,8 mm |  110,4 × 51,0 mm |  9.420 |          2 |       9,77 |           20 |            6 |         137 |
