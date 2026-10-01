@@ -377,7 +377,7 @@ Nutzer entschied: größer sticken, vereinfachen oder so lassen.)*
 
 | Prüfung | Grenze | Herkunft |
 |---|---|---|
-| Satinstrich, tragend (Formen, die §7.8.1 in der bestellten Größe als Satin einteilt), mittlere Breite | mindestens **1,0 mm** *(01.10.2026, vorher 1,3 mm)* | Übliche Untergrenze für Satin. Die 1,3 mm aus dem TEXMA-Archiv (p5 der mittleren Satinbreite je Datei in 192 Produktionsdateien, Minimum 1,05, Median 1,98) beschreiben die typische Säule einer Datei, nicht die schmalste, die hält. Am Tor gemessen: mit 1,3 mm STUTTGART 80 → 118 mm, Köln 90 → 169 mm; mit 1,0 mm 91 und 144 mm. Satinstriche zwischen 1,0 und 1,3 mm werden Prüfstellen (§13.4); der Probestick bestätigt oder korrigiert |
+| Satinstrich, tragend (Formen, die §7.8.1 in der bestellten Größe als Satin einteilt), mittlere Breite | mindestens **1,0 mm** *(01.10.2026, vorher 1,3 mm)* | Übliche Untergrenze für Satin. Die 1,3 mm aus dem TEXMA-Archiv (p5 der mittleren Satinbreite je Datei in 192 Produktionsdateien, Minimum 1,05, Median 1,98) beschreiben die typische Säule einer Datei, nicht die schmalste, die hält. Am Tor gemessen: mit 1,3 mm STUTTGART 80 → 118 mm, Köln 90 → 169 mm; mit 1,0 mm 91 und 144 mm. Tragende Satinstriche zwischen 1,0 und 1,3 mm werden Prüfstellen (§13.4; Schattenlinien nicht, ihre Grenze ist 0,7 mm); der Probestick bestätigt oder korrigiert |
 | Schattenlinie: Satinstrich, von dem mindestens eine Rail an einem Stoffspalt unter 1,0 mm liegt (Messung wie §7.8.3 Regel 1) | mindestens **0,7 mm** — als Satin hält er also immer | Profi-Mütze „Stuttgarter Hofbräu": goldene Schattenlinien von 0,75 mm in 110 mm sauber gestickt |
 | Lücke innerhalb einer Farbe — Punze, Kerbe, Abstand zwischen Buchstaben | mindestens **0,8 mm** | **Schätzwert**: 2 × Zugausgleich (§7.2, 0,2 mm je Seite) plus eine Fadenstärke. Wird an Profi-Dateien und am Probestick nachgemessen |
 
@@ -1291,7 +1291,7 @@ entstanden ist (nach Führung der Säulen und Fadenschnitten), als `<name>.nacha
   reicht nicht: blendet jemand die Ebene ein, stickte Ink/Stitch ihre Kreise mit (gemessen
   30.09.2026, DST 30.077 statt 30.005 Byte). Je Schwachstelle ein Kreis und ein kurzer Text — was,
   gemessen, Grenze, Vorschlag. Schwachstellen sind: Satinstriche unter ihrer Grenze (nur mit
-  `--ohne-tor`), Satinstriche zwischen 1,0 und 1,3 mm, Formen, die erst in der erzeugten Größe
+  `--ohne-tor`), tragende Satinstriche zwischen 1,0 und 1,3 mm, Formen, die erst in der erzeugten Größe
   Satin werden und dort unter ihrer Grenze liegen (§5.2, Tor), Säulen unter 1,0 mm, Formen, die
   als Satin nicht hielten (Rückfall Tatami oder Laufstich, §7.8.5), Satin auf geglätteter Kontur
   (§7.8.4), Flächen, die unter 0,7 mm zur Linie werden, Tatami ohne Gitterunterlage (§8.8),
