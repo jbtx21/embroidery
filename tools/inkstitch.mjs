@@ -10,16 +10,21 @@
  * the files get the width in their name (<name>-120mm.dst).
  *
  * The gate (spec §5.2, "Tor", tools/tor.mjs): the ordered size is the width of the
- * SVG or --breite. Before anything is stitched, the smallest size from there at which
- * no satin stroke is under its limit is searched over the size (packages/engine/src/
- * inkstitch/min-size-search.ts). Where that is larger, the program is made in it —
- * rounded up to whole millimetres, scaled proportionally like --breite — and the
- * FIRST line of the output says so ("Bestellt 80 mm · stickbar ab 119 mm · erzeugt in
- * 119 mm — bestimmt von …"); the files carry the produced width in their name. Where
- * the search finds no size, nothing is made. --ohne-tor switches the gate off for
- * comparison runs: no enlarging; below the minimum size the files carry
- * "_unter-mindestgroesse" in their name and the output warns. A program for an order
- * is never made with it. Not for --tatami, which stitches the source as drawn.
+ * SVG or --breite. In it the satin strokes are decided and kept (which shapes are satin,
+ * spec §7.8.1, and which of them are shadow lines); before anything is stitched, the smallest
+ * size from there at which every one of them holds its limit (1.0 mm, shadow lines 0.7 mm)
+ * is searched over the size (packages/engine/src/inkstitch/min-size-search.ts). Where that
+ * is larger, the program is made in it — rounded up to whole millimetres, scaled
+ * proportionally like --breite — and the FIRST line of the output says so ("Bestellt 80 mm
+ * · stickbar ab 91 mm · erzeugt in 91 mm — bestimmt von …"); the files carry the produced
+ * width in their name. Where the motif does not fit the hoop of the preset in the size made,
+ * not even turned by 90°, the line directly under the first one warns — the program is made
+ * all the same. Where the search finds no size, nothing is made. What only turns satin as the
+ * logo grows does not set the size: with the satin strokes between 1.0 and 1.3 mm it is a
+ * check point in the Nacharbeit file. --ohne-tor switches the gate off for comparison runs:
+ * no enlarging; below the minimum size the files carry "_unter-mindestgroesse" in their name
+ * and the output warns. A program for an order is never made with it. Not for --tatami, which
+ * stitches the source as drawn.
  *
  * --ueberlappung <mm2> lets overlaps under that area go in the colour order — the
  * standard is spec §10.1: any overlap binds. It is a variant for a look at the
@@ -82,9 +87,10 @@
  *
  * Either way -- before any stitch is made -- the template is checked for fineness
  * (spec §5.2, packages/engine/src/inkstitch/min-size.ts), in the size it is made in:
- * under "Feinheit" the gate's lines (shadow lines, the path of the search, the ranges above
- * the size), the findings per kind and the five largest are printed. It only reports;
- * `pnpm mindestgroesse <svg>` lists every finding and draws them.
+ * under "Feinheit" the gate's lines (the strokes counted, shadow lines, the path of the
+ * search), the findings per kind, the check points of the gate and the five largest findings
+ * are printed. It only reports; `pnpm mindestgroesse <svg>` lists every finding and the
+ * check points and draws the findings.
  *
  * Either way the DST is read back with @texma-stitch/formats, rendered to
  * out/<name>.png with @texma-stitch/render, and measured: the archive-relative
@@ -199,10 +205,18 @@ async function inkstitch(args) {
   }
 }
 
-/** Spec §5.2 on the shapes of the SVG; without a size in the SVG there is no ordered width to hold from. */
-const pruefeFeinheit = (imported, preset) =>
+/**
+ * Spec §5.2 on the shapes of the SVG; without a size in the SVG there is no ordered width to hold from.
+ * `ordered` is the set of satin strokes of the ordered size the gate kept (`tor.search.ordered`): given
+ * it, the check tells the check points of the gate apart (`satin-late`, `satin-near`).
+ */
+const pruefeFeinheit = (imported, preset, ordered) =>
   imported.widthMm > 0
-    ? checkMinimumSize(imported.shapes, { widthMm: imported.widthMm, preset })
+    ? checkMinimumSize(imported.shapes, {
+        widthMm: imported.widthMm,
+        preset,
+        ...(ordered === undefined ? {} : { ordered }),
+      })
     : undefined;
 
 const VALUE_FLAGS = ["--breite", "--ueberlappung", "--naht"];
@@ -355,7 +369,7 @@ if (tatamiOnly) {
   });
   templateMs = performance.now() - started;
   writeFileSync(templatePath, template.svg);
-  feinheit = pruefeFeinheit(imported, preset);
+  feinheit = pruefeFeinheit(imported, preset, tor?.search?.ordered);
 
   const count = (kind) => template.objects.filter((o) => o.kind === kind).length;
   const columns = template.objects.reduce(

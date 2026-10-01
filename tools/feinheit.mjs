@@ -9,6 +9,13 @@
  * Lücken zählen die Lücken innerhalb einer Farbe (L) und die **Stofflücken** zwischen Farben
  * (F, Spec „Stofflücken zwischen Farben“): Stoff, der zwischen zwei Elementen offen bleibt.
  *
+ * **Prüfstellen des Tors** (Spec §5.2, „Tor“, und §13.4; Stand 01.10.2026): wo die Prüfung die Menge der
+ * Satinstriche der bestellten Größe kennt (`ordered`), unterscheidet sie zwei weitere Arten von Satin-
+ * Befunden — „Erst Satin“ (E): eine Form, die in der bestellten Größe kein Satin war, in der geprüften
+ * Größe Satin ist und unter ihrer Grenze liegt; und „Satin knapp“ (K): ein Satinstrich, der hält, aber
+ * schmaler ist als die übliche Säule (1,3 mm). Beide bestimmen die Größe nicht; sie stehen als
+ * Prüfstellen in der Nacharbeit-Datei, und `pruefstellenZeile` zählt sie.
+ *
  * Das Vorschaubild: alle Formen hellgrau, jeder Befund farbig (ein Satinstrich als Form in Rot,
  * eine Lücke in Rot und eine Stofflücke in Blau als das Stück, das das Schließen ergänzt hat),
  * die größten und die beiden bestimmenden Elemente mit ihrer Nummer aus der Liste beschriftet.
@@ -24,10 +31,25 @@ import { GAP_SLIVER_MM, GAP_THIN_MM } from "@texma-stitch/engine";
 /** Millimeter mit Punkt, wie die übrigen Werkzeuge ihre Zahlen drucken. */
 export const mm = (value, digits = 2) => value.toFixed(digits);
 
-export const ART = { "satin-stroke": "Satinstrich", gap: "Lücke", "fabric-gap": "Stofflücke" };
+export const ART = {
+  "satin-stroke": "Satinstrich",
+  "satin-late": "Erst Satin",
+  "satin-near": "Satin knapp",
+  gap: "Lücke",
+  "fabric-gap": "Stofflücke",
+};
 
-/** Der Buchstabe vor der Nummer im Vorschaubild: S Satinstrich, L Lücke, F Stofflücke. */
-const KENNUNG = { "satin-stroke": "S", gap: "L", "fabric-gap": "F" };
+/** Der Buchstabe vor der Nummer im Vorschaubild: S Satinstrich, E erst Satin, K knapp, L Lücke, F Stofflücke. */
+const KENNUNG = {
+  "satin-stroke": "S",
+  "satin-late": "E",
+  "satin-near": "K",
+  gap: "L",
+  "fabric-gap": "F",
+};
+
+/** Eine Grenze: „1.0“, „0.8“, „0.65“ — ganze Zahlen mit einer Stelle, sonst so, wie sie ist. */
+const grenze = (value) => (Number.isInteger(value) ? value.toFixed(1) : String(value));
 
 /** „hält ab“ wird aufgerundet: „ab 246 mm“ ist dann wahr, „ab 245 mm“ nicht. */
 const haeltAb = (f) => `${Math.ceil(f.holdsFromWidthMm)} mm`;
@@ -37,10 +59,32 @@ const lage = (f) => `(${mm(f.at.x, 1)}, ${mm(f.at.y, 1)})`;
 
 const zahl = (n, eins, viele) => `${n} ${n === 1 ? eins : viele}`;
 
-/** Wie viele Befunde jeder Art es gibt. */
+/** Wie viele Befunde jeder Art es gibt; `spaet` und `knapp` sind die Prüfstellen des Tors. */
 export function befundeJeArt(result) {
   const je = (kind) => result.findings.filter((f) => f.kind === kind).length;
-  return { satin: je("satin-stroke"), luecke: je("gap"), stoff: je("fabric-gap") };
+  return {
+    satin: je("satin-stroke"),
+    luecke: je("gap"),
+    stoff: je("fabric-gap"),
+    spaet: je("satin-late"),
+    knapp: je("satin-near"),
+  };
+}
+
+/**
+ * Die Prüfstellen des Tors an Satinstrichen in einer Größe, als eine Zeile: wie viele Formen erst in
+ * dieser Größe Satin sind und unter ihrer Grenze liegen, und wie viele Satinstriche von der Grenze bis
+ * unter die übliche Säule breit sind. `findings` sind die Befunde dieser Größe (jede Art), `breiteMm`
+ * die Größe, `limits` die Grenzen der Prüfung (`satinMinMm`, `typicalMm`).
+ */
+export function pruefstellenZeile(findings, { breiteMm, limits }) {
+  const je = (kind) => findings.filter((f) => f.kind === kind).length;
+  return (
+    `${spalte("Prüfstellen")}${zahl(je("satin-late"), "Form", "Formen")} erst in ` +
+    `${Number(breiteMm.toFixed(1))} mm Satin, unter ${grenze(limits.satinMinMm)} mm · ` +
+    `${zahl(je("satin-near"), "Satinstrich", "Satinstriche")} von ${grenze(limits.satinMinMm)} ` +
+    `bis unter ${grenze(limits.typicalMm)} mm`
+  );
 }
 
 /** Die Beschriftungen der Zusammenfassung sind gleich breit: die Zahlen stehen untereinander. */
@@ -68,13 +112,13 @@ export function zusammenfassung(result, { ohneMindestgroesse = false } = {}) {
   } else if (d.measuredMm < d.limitMm) {
     lines.push(
       `${spalte("Mindestgröße")}${Math.ceil(result.minimumWidthMm)} mm — bestimmt von ` +
-        `Satinstrich ${d.id} bei ${lage(d)} mm: gemessen ${mm(d.measuredMm)} mm, Grenze ${d.limitMm} mm`,
+        `Satinstrich ${d.id} bei ${lage(d)} mm: gemessen ${mm(d.measuredMm)} mm, Grenze ${grenze(d.limitMm)} mm`,
     );
   } else {
     // Jeder Strich hält: die Zahl sagt, wie weit das Logo schrumpfen könnte.
     lines.push(
       `${spalte("Mindestgröße")}${Math.ceil(result.minimumWidthMm)} mm — schmalster Satinstrich ` +
-        `${d.id} bei ${lage(d)} mm: ${mm(d.measuredMm)} mm, Grenze ${d.limitMm} mm; ` +
+        `${d.id} bei ${lage(d)} mm: ${mm(d.measuredMm)} mm, Grenze ${grenze(d.limitMm)} mm; ` +
         `die bestellten ${mm(result.widthMm, 1)} mm halten`,
     );
   }
@@ -83,7 +127,7 @@ export function zusammenfassung(result, { ohneMindestgroesse = false } = {}) {
   if (g) {
     lines.push(
       `${spalte("Lücken offen ab")}${Math.ceil(result.gapsOpenFromWidthMm)} mm — bestimmt von ` +
-        `${ART[g.kind]} ${g.id} bei ${lage(g)} mm: gemessen ${mm(g.measuredMm)} mm, Grenze ${g.limitMm} mm`,
+        `${ART[g.kind]} ${g.id} bei ${lage(g)} mm: gemessen ${mm(g.measuredMm)} mm, Grenze ${grenze(g.limitMm)} mm`,
     );
   } else {
     lines.push(
@@ -92,10 +136,16 @@ export function zusammenfassung(result, { ohneMindestgroesse = false } = {}) {
   }
 
   lines.push(
-    `${spalte("Befunde")}${zahl(satin, "Satinstrich", "Satinstriche")} unter ${result.limits.satinMinMm} mm, ` +
-      `${zahl(luecke, "Lücke", "Lücken")} unter ${result.limits.gapMinMm} mm, ` +
-      `${zahl(stoff, "Stofflücke", "Stofflücken")} (zwischen Farben) unter ${result.limits.gapMinMm} mm`,
+    `${spalte("Befunde")}${zahl(satin, "Satinstrich", "Satinstriche")} unter ${grenze(result.limits.satinMinMm)} mm, ` +
+      `${zahl(luecke, "Lücke", "Lücken")} unter ${grenze(result.limits.gapMinMm)} mm, ` +
+      `${zahl(stoff, "Stofflücke", "Stofflücken")} (zwischen Farben) unter ${grenze(result.limits.gapMinMm)} mm`,
   );
+  // Kannte die Prüfung die Menge der bestellten Größe, sind die Prüfstellen des Tors Teil des Befunds.
+  if (result.ordered) {
+    lines.push(
+      pruefstellenZeile(result.findings, { breiteMm: result.widthMm, limits: result.limits }),
+    );
+  }
   const i = result.ignored;
   lines.push(
     `${spalte("Nicht gezählt")}${i.slivers} Stücke ganz von Spänen (unter ${GAP_SLIVER_MM} mm) · ` +
@@ -130,6 +180,8 @@ export function befundZeilen(findings, { max = Infinity } = {}) {
       f.kind === "fabric-gap" && f.color !== ""
         ? `zwischen ${f.color.split("+").join(" und ")}`
         : "",
+      f.kind === "satin-late" ? "erst in dieser Größe Satin" : "",
+      f.kind === "satin-near" ? "schmaler als die übliche Säule (Probestick)" : "",
       f.runningAlternative ? "alternativ Laufstich (dünne Zierlinie?)" : "",
       f.measure === "inscribed-circle" ? "Loch: Breite = einbeschriebener Kreis" : "",
     ].filter((h) => h !== "");
@@ -137,7 +189,7 @@ export function befundZeilen(findings, { max = Infinity } = {}) {
     lines.push(
       (
         `${String(i + 1).padStart(4)}  ${ART[f.kind].padEnd(11)} ${f.id.padEnd(idW)} ` +
-        `${`${mm(f.measuredMm)} mm`.padStart(9)} ${`${f.limitMm} mm`.padStart(8)} ` +
+        `${`${mm(f.measuredMm)} mm`.padStart(9)} ${`${grenze(f.limitMm)} mm`.padStart(8)} ` +
         `${haeltAb(f).padStart(9)}  ${lage(f).padEnd(14)} ${hinweis}`
       ).trimEnd(),
     );
@@ -215,7 +267,8 @@ export function feinheitSvg(
   const font = w / 62;
   const kopf = font * 5.8;
   const px = pxBreite / w;
-  const { satin, luecke, stoff } = befundeJeArt(result);
+  const { satin, luecke, stoff, spaet, knapp } = befundeJeArt(result);
+  const pruef = spaet + knapp > 0;
   const rang = new Map(result.findings.map((f, i) => [f, i + 1]));
   // Die größten, und immer die beiden Elemente, die die Zahlen bestimmen.
   const oben = Math.min(beschriftet, result.findings.length);
@@ -254,7 +307,10 @@ export function feinheitSvg(
         ? `Lücken offen ab ${Math.ceil(result.gapsOpenFromWidthMm)} mm (${g.id}, ${mm(g.measuredMm)} mm)`
         : `keine zu feinen Lücken`) +
         ` · ${zahl(satin, "Satinstrich", "Satinstriche")} · ${zahl(luecke, "Lücke", "Lücken")}` +
-        ` · ${zahl(stoff, "Stofflücke", "Stofflücken")}`,
+        ` · ${zahl(stoff, "Stofflücke", "Stofflücken")}` +
+        (pruef
+          ? ` · ${zahl(spaet, "Form", "Formen")} erst Satin · ${zahl(knapp, "Satinstrich", "Satinstriche")} knapp`
+          : ""),
       false,
     ],
     [
@@ -264,7 +320,7 @@ export function feinheitSvg(
     ],
     [
       `beschriftet: die ${oben} mit der größten Mindestbreite und die bestimmenden · ` +
-        `L Lücke, F Stofflücke, S Satinstrich · Nummer wie in der Liste`,
+        `L Lücke, F Stofflücke, S Satinstrich${pruef ? ", E erst Satin, K knapp" : ""} · Nummer wie in der Liste`,
       false,
     ],
   ];

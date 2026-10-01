@@ -74,6 +74,49 @@ describe("collectSpots — what the run knows becomes check points", () => {
     ]);
   });
 
+  it("makes check points of the gate: a form that only turned satin in this size, and a stroke narrower than the typical column", () => {
+    const { spots } = collectSpots({
+      centres,
+      ...QUIET,
+      findings: [
+        {
+          id: "haar",
+          kind: "satin-late",
+          color: "#bebebe",
+          measuredMm: 0.77,
+          limitMm: 1.0,
+          holdsFromWidthMm: 124.7,
+          at: { x: 3, y: 4 },
+          runningAlternative: true,
+        },
+        {
+          id: "strich",
+          kind: "satin-near",
+          color: "#d1b35a",
+          measuredMm: 1.07,
+          limitMm: 1.3,
+          holdsFromWidthMm: 116.2,
+          at: { x: 5, y: 6 },
+          runningAlternative: false,
+        },
+      ],
+    });
+    expect(spots).toEqual([
+      {
+        xMm: 3,
+        yMm: 4,
+        art: "Erst in dieser Größe Satin",
+        text: "haar: 0,77 mm statt 1,0 mm, hält ab 125 mm · als Laufstich lassen oder Probestick",
+      },
+      {
+        xMm: 5,
+        yMm: 6,
+        art: "Satinstrich 1,0 bis 1,3 mm",
+        text: "strich: 1,07 mm, üblich sind 1,3 mm · Probestick bestätigt oder korrigiert",
+      },
+    ]);
+  });
+
   it("names the colours between which a fabric gap lies, and leaves a gap of one colour at that", () => {
     const { spots } = collectSpots({
       centres,
@@ -235,11 +278,31 @@ describe("collectSpots — what the run knows becomes check points", () => {
           id: "b",
           kind: "satin-stroke",
           color: "#000000",
-          measuredMm: 1,
-          limitMm: 1.3,
+          measuredMm: 0.9,
+          limitMm: 1.0,
           holdsFromWidthMm: 10,
           at: { x: 2, y: 2 },
           runningAlternative: false,
+        },
+        {
+          id: "c",
+          kind: "satin-near",
+          color: "#000000",
+          measuredMm: 1.1,
+          limitMm: 1.3,
+          holdsFromWidthMm: 10,
+          at: { x: 3, y: 3 },
+          runningAlternative: false,
+        },
+        {
+          id: "d",
+          kind: "satin-late",
+          color: "#000000",
+          measuredMm: 0.8,
+          limitMm: 1.0,
+          holdsFromWidthMm: 10,
+          at: { x: 4, y: 4 },
+          runningAlternative: true,
         },
       ],
       dst: {
@@ -255,6 +318,8 @@ describe("collectSpots — what the run knows becomes check points", () => {
       "Nadelhäufung",
       "Nadelhäufung",
       "Satinstrich zu schmal",
+      "Erst in dieser Größe Satin",
+      "Satinstrich 1,0 bis 1,3 mm",
       "Rückfall Tatami",
       "Tatami ohne Gitterunterlage",
       "Lücke",
@@ -278,6 +343,22 @@ describe("spotCounts", () => {
     expect(spotCounts(spots)).toEqual([
       ["Nadelhäufung", 1],
       ["Lücke", 2],
+    ]);
+  });
+
+  it("counts the check points of the gate between the strokes under their limit and the template's own", () => {
+    const spots = [
+      { xMm: 0, yMm: 0, art: "Rückfall Tatami", text: "" },
+      { xMm: 0, yMm: 0, art: "Satinstrich 1,0 bis 1,3 mm", text: "" },
+      { xMm: 0, yMm: 0, art: "Satinstrich 1,0 bis 1,3 mm", text: "" },
+      { xMm: 0, yMm: 0, art: "Erst in dieser Größe Satin", text: "" },
+      { xMm: 0, yMm: 0, art: "Satinstrich zu schmal", text: "" },
+    ];
+    expect(spotCounts(spots)).toEqual([
+      ["Satinstrich zu schmal", 1],
+      ["Erst in dieser Größe Satin", 1],
+      ["Satinstrich 1,0 bis 1,3 mm", 2],
+      ["Rückfall Tatami", 1],
     ]);
   });
 });

@@ -1,19 +1,33 @@
 /**
  * Das Tor der Mindestgröße (docs/Engine-Spezifikation.md §5.2, „Tor“): für eine SVG-Datei die
- * kleinste Größe ab der bestellten, in der die Prüfung keinen Satinstrich unter seiner Grenze
- * findet — und wie die Ausgabe es sagt. Gerechnet wird in
- * packages/engine/src/inkstitch/min-size-search.ts; hier steht, wie die Datei in einer anderen Größe
- * gelesen wird (neu importiert, wie `--breite` sie liest, tools/breite.mjs), was der Lauf daraus
- * macht und wie es aussieht.
+ * kleinste Größe ab der bestellten, in der jeder Satinstrich der bestellten Größe seine Grenze hält —
+ * und wie die Ausgabe es sagt. Gerechnet wird in packages/engine/src/inkstitch/min-size-search.ts; hier
+ * steht, wie die Datei in einer anderen Größe gelesen wird (neu importiert, wie `--breite` sie liest,
+ * tools/breite.mjs), was der Lauf daraus macht und wie es aussieht.
  *
- * Die **bestellte Größe** ist die Breite der SVG oder `--breite`. Ist die Mindestgröße größer, wird
- * in ihr erzeugt — auf ganze Millimeter aufgerundet, proportional vergrößert — und die Ausgabe sagt
- * es als erste Zeile; die Dateien tragen die erzeugte Breite im Namen. `--ohne-tor` schaltet die
- * Vergrößerung für Vergleichsmessungen ab: liegt die bestellte Größe unter der Mindestgröße, tragen
- * die Dateien `_unter-mindestgroesse` im Namen, und die Ausgabe warnt. Zahlen mit Punkt, wie in den
- * übrigen Werkzeugen.
+ * Die **bestellte Größe** ist die Breite der SVG oder `--breite`. In ihr wird festgelegt, welche Formen
+ * Satin und welche Schattenlinien sind (Grenze 1,0 mm, Schattenlinien 0,7 mm); die Suche hält jeden
+ * dieser Striche in jeder größeren Größe an seine Grenze (Stand 01.10.2026). Ist die Mindestgröße
+ * größer als die bestellte, wird in ihr erzeugt — auf ganze Millimeter aufgerundet, proportional
+ * vergrößert — und die Ausgabe sagt es als erste Zeile; die Dateien tragen die erzeugte Breite im Namen.
+ * Was erst beim Vergrößern Satin wird, bestimmt die Größe nicht: es ist eine Prüfstelle in der
+ * Nacharbeit-Datei (tools/nacharbeit.mjs) und in der Liste von `pnpm mindestgroesse`.
+ *
+ * **Rahmen**: passt das Motiv in der erzeugten Größe nicht in den Rahmen des Presets, auch um 90°
+ * gedreht nicht, wird trotzdem erzeugt; eine eigene Zeile gleich unter der ersten warnt (`rahmenZeile`),
+ * auch wo die erzeugte Größe die bestellte ist.
+ *
+ * `--ohne-tor` schaltet die Vergrößerung für Vergleichsmessungen ab: liegt die bestellte Größe unter
+ * der Mindestgröße, tragen die Dateien `_unter-mindestgroesse` im Namen, und die Ausgabe warnt. Zahlen
+ * mit Punkt, wie in den übrigen Werkzeugen.
  */
-import { findMinimumSize, importShapes, mergeRanges } from "@texma-stitch/engine";
+import {
+  designSize,
+  findMinimumSize,
+  fitHoop,
+  importShapes,
+  machineOfPreset,
+} from "@texma-stitch/engine";
 import { scaleSvgToWidth } from "./breite.mjs";
 
 /** Was hinter den Namen einer Datei kommt, die unter der Mindestgröße erzeugt wurde (`--ohne-tor`). */
@@ -25,25 +39,34 @@ const spalte = (name) => name.padEnd(17);
 const mm = (value, digits = 2) => value.toFixed(digits);
 /** Logobreiten: ganze Millimeter ohne Komma, sonst eine Stelle („110.8“). */
 const breite = (value) => (Number.isInteger(value) ? String(value) : value.toFixed(1));
-/** Eine Logobreite, ab der etwas gilt, als ganze Millimeter: „ab 141 mm“ ist dann wahr. */
-const ab = (value) => Math.ceil(value);
+/** Eine Grenze: „1.0“, „0.7“, „0.65“ — ganze Zahlen mit einer Stelle, sonst so, wie sie ist. */
+const grenze = (value) => (Number.isInteger(value) ? value.toFixed(1) : String(value));
+/** Maße des Motivs und des Rahmens: eine Stelle nach dem Punkt, wo sie nötig ist („233“, „201.6“). */
+const eine = (value) => String(Number(value.toFixed(1)));
 
-/** Wie viele Schattenlinien und wie viele Bereiche die Zeilen höchstens nennen, ohne `alle`. */
+/** Wie viele Schattenlinien die Zeile höchstens nennt, ohne `alle`. */
 const SCHATTEN_MAX = 5;
-const BEREICHE_MAX = 6;
 
 /**
  * Die Formen der SVG in der Breite `widthMm`: in der Breite der Datei die eingelesenen selbst, sonst
  * die Datei neu importiert mit umgeschriebener Breite — so liest auch der Lauf sie, und was von der
  * Größe abhängt (was §5.1 als zu klein weglässt, die Glättung der Kurven), wird in dieser Größe
- * entschieden. Wirft, wo die Datei keine Größe oder keine viewBox hat (`scaleSvgToWidth`).
+ * entschieden. Jede Größe wird nur einmal gelesen: die Suche, die Rahmenprüfung und die Prüfstellen
+ * fragen nach derselben. Wirft, wo die Datei keine Größe oder keine viewBox hat (`scaleSvgToWidth`).
  */
 export function formenBei(svgText, original) {
-  return (widthMm) =>
-    Math.abs(widthMm - original.widthMm) < 1e-9
-      ? original.shapes
-      : importShapes(scaleSvgToWidth(svgText, widthMm, original).text).shapes;
+  const gelesen = new Map();
+  return (widthMm) => {
+    if (Math.abs(widthMm - original.widthMm) < 1e-9) return original.shapes;
+    if (!gelesen.has(widthMm)) {
+      gelesen.set(widthMm, importShapes(scaleSvgToWidth(svgText, widthMm, original).text).shapes);
+    }
+    return gelesen.get(widthMm);
+  };
 }
+
+/** `Prüfung` oder `Prüfungen`, je nach Zahl. */
+const pruefungen = (n) => `${n} ${n === 1 ? "Prüfung" : "Prüfungen"}`;
 
 /** Warum die Suche aufgegeben hat, als Text. */
 function aufgabeGrund(search) {
@@ -52,9 +75,21 @@ function aufgabeGrund(search) {
     return `über dem ${faktor}-fachen der bestellten Größe (${breite(search.maxWidthMm)} mm)`;
   }
   return (
-    `nach ${search.steps.length} Prüfungen (${search.steps.map((s) => breite(s.widthMm)).join(" → ")} mm) ` +
+    `nach ${pruefungen(search.steps.length)} (${search.steps.map((s) => breite(s.widthMm)).join(" → ")} mm) ` +
     `hält noch nicht jeder Strich`
   );
+}
+
+/** Der Rahmen des Presets und das Motiv in der Größe `erzeugtMm`; `undefined`, wo es nichts zu sticken gibt. */
+function rahmenBei(formen, erzeugtMm, preset) {
+  let groesse;
+  try {
+    groesse = designSize(formen(erzeugtMm));
+  } catch {
+    return undefined;
+  }
+  if (groesse === undefined) return undefined;
+  return { ...fitHoop(groesse, machineOfPreset(preset?.id ?? "pique")), breiteMm: erzeugtMm };
 }
 
 /**
@@ -66,16 +101,20 @@ function aufgabeGrund(search) {
  *   Mindestgröße. Fehlt, wo der Lauf nicht erzeugen darf (`fehler`);
  * - `vergroessert`: der Lauf skaliert die Quelle auf `erzeugtMm`;
  * - `unterMindestgroesse`: `--ohne-tor`, und die bestellte Größe liegt unter der Mindestgröße;
+ * - `rahmen`: ob das Motiv in `erzeugtMm` in den Rahmen des Presets passt (Engine, `fitHoop`, mit der
+ *   Breite, in der gemessen wurde: `breiteMm`). Fehlt, wo nicht erzeugt wird;
+ * - `formen`: die Formen der SVG je Größe (`formenBei`), für alles, was danach noch in einer Größe lesen will;
  * - `fehler`: warum der Lauf abbrechen muss (die Suche fand keine Größe, und das Tor ist an; oder
  *   die Datei lässt sich nicht in einer anderen Größe lesen).
  *
  * `suche` reicht `maxSteps` und `maxFactor` an die Suche durch.
  */
 export function sucheTor(svgText, original, { bestelltMm, preset, ohneTor = false, suche = {} }) {
-  const basis = { bestelltMm, ohneTor };
+  const formen = formenBei(svgText, original);
+  const basis = { bestelltMm, ohneTor, formen };
   let search;
   try {
-    search = findMinimumSize(formenBei(svgText, original), {
+    search = findMinimumSize(formen, {
       orderedWidthMm: bestelltMm,
       ...(preset === undefined ? {} : { preset }),
       ...suche,
@@ -85,7 +124,14 @@ export function sucheTor(svgText, original, { bestelltMm, preset, ohneTor = fals
   }
   const unterMindestgroesse = ohneTor && search.belowMinimum;
   if (ohneTor) {
-    return { ...basis, search, erzeugtMm: bestelltMm, vergroessert: false, unterMindestgroesse };
+    return {
+      ...basis,
+      search,
+      erzeugtMm: bestelltMm,
+      vergroessert: false,
+      unterMindestgroesse,
+      rahmen: rahmenBei(formen, bestelltMm, preset),
+    };
   }
   if (!search.found) {
     return {
@@ -102,52 +148,79 @@ export function sucheTor(svgText, original, { bestelltMm, preset, ohneTor = fals
     erzeugtMm: search.widthMm,
     vergroessert: search.enlarged,
     unterMindestgroesse: false,
+    rahmen: rahmenBei(formen, search.widthMm, preset),
   };
 }
 
-/** „bestimmt von z04 (1.24 mm bei 240 mm, Grenze 1.3 mm)“ — das Element, das die Größe bestimmt. */
-const bestimmtVon = (d) =>
-  ` — bestimmt von ${d.id} (${mm(d.measuredMm)} mm bei ${breite(d.atWidthMm)} mm, Grenze ${d.limitMm} mm)`;
+/**
+ * „bestimmt von z13-bebebe-012 (0.88 mm bei 80 mm, Grenze 1.0 mm)“ — der Strich, der die Größe bestimmt,
+ * mit der Breite, die er in der bestellten Größe hat, und der Grenze, an die er dort gehalten wird.
+ */
+const bestimmtVon = (d, bestelltMm) =>
+  ` — bestimmt von ${d.id} (${mm(d.orderedMm)} mm bei ${breite(bestelltMm)} mm, Grenze ${grenze(d.limitMm)} mm)`;
 
 /**
- * Die erste Zeile der Ausgabe (und, wo die Datei unter der Mindestgröße bleibt, die Warnung
- * darunter): bestellt, stickbar ab, erzeugt, und das Element, das die Mindestgröße bestimmt. Als
- * `meldung` (für `pnpm mindestgroesse`, das nichts erzeugt) ohne das Erzeugte: bestellt, stickbar ab,
- * bestimmendes Element.
+ * Die Warnung, wo das Motiv in der erzeugten Größe nicht in den Rahmen des Presets passt (Spec §5.2,
+ * „Rahmen“): die Größe, der Rahmen mit seinen Maßen, und dass trotzdem erzeugt wird. `rahmen` ist das
+ * Ergebnis von `fitHoop` mit `breiteMm`.
+ */
+export function rahmenZeile(rahmen) {
+  const m = rahmen.machine;
+  return (
+    `WARNUNG Rahmen: Das Motiv ist in ${breite(rahmen.breiteMm)} mm ${eine(rahmen.widthMm)} × ${eine(rahmen.heightMm)} mm ` +
+    `groß, der Rahmen „${m.label}“ fasst ${eine(m.hoopWMm)} × ${eine(m.hoopHMm)} mm — auch um 90° gedreht ` +
+    `passt es nicht. Erzeugt wird trotzdem: der Rahmen ist eine Frage der Maschine (größerer Rahmen, ` +
+    `Teilung), das Motiv selbst ist in dieser Größe stickbar.`
+  );
+}
+
+/**
+ * Die erste Zeile der Ausgabe, gleich darunter die Rahmenwarnung (wo das Motiv nicht in den Rahmen
+ * passt) und, wo die Datei unter der Mindestgröße bleibt, die Warnung vor den Dateien: bestellt,
+ * stickbar ab, erzeugt, und der Strich, der die Mindestgröße bestimmt. Als `meldung` (für
+ * `pnpm mindestgroesse`, das nichts erzeugt) ohne das Erzeugte: bestellt, stickbar ab, bestimmender Strich.
  */
 export function torKopf(tor, { meldung = false } = {}) {
   const { search: s, ohneTor } = tor;
   const bestellt = `Bestellt ${breite(tor.bestelltMm)} mm`;
   const marke = ohneTor ? " (--ohne-tor)" : "";
+  const rahmen = tor.rahmen !== undefined && !tor.rahmen.fits ? [rahmenZeile(tor.rahmen)] : [];
   if (meldung) {
     if (!s.found) return [`${bestellt} · keine Mindestgröße gefunden (${aufgabeGrund(s)})`];
     return [
       s.enlarged
-        ? `${bestellt} · stickbar ab ${breite(s.widthMm)} mm${s.decisive === undefined ? "" : bestimmtVon(s.decisive)}`
+        ? `${bestellt} · stickbar ab ${breite(s.widthMm)} mm${s.decisive === undefined ? "" : bestimmtVon(s.decisive, tor.bestelltMm)}`
         : `${bestellt} · stickbar in dieser Größe`,
+      ...rahmen,
     ];
   }
   if (!s.found) {
     const erzeugt = ohneTor ? ` · erzeugt in ${breite(tor.bestelltMm)} mm${marke}` : "";
-    const lines = [`${bestellt} · keine Mindestgröße gefunden (${aufgabeGrund(s)})${erzeugt}`];
+    const lines = [
+      `${bestellt} · keine Mindestgröße gefunden (${aufgabeGrund(s)})${erzeugt}`,
+      ...rahmen,
+    ];
     if (ohneTor && tor.unterMindestgroesse) lines.push(warnung(tor.bestelltMm));
     return lines;
   }
-  const von = s.decisive === undefined ? "" : bestimmtVon(s.decisive);
+  const von = s.decisive === undefined ? "" : bestimmtVon(s.decisive, tor.bestelltMm);
   if (!s.enlarged) {
     return [
       `${bestellt} · stickbar in dieser Größe · erzeugt in ${breite(tor.erzeugtMm)} mm${marke}`,
+      ...rahmen,
     ];
   }
   if (ohneTor) {
     return [
       `${bestellt} · stickbar ab ${breite(s.widthMm)} mm · erzeugt in ${breite(tor.bestelltMm)} mm ` +
         `(--ohne-tor: nicht vergrößert)${von}`,
+      ...rahmen,
       warnung(tor.bestelltMm, s.widthMm),
     ];
   }
   return [
     `${bestellt} · stickbar ab ${breite(s.widthMm)} mm · erzeugt in ${breite(tor.erzeugtMm)} mm${von}`,
+    ...rahmen,
   ];
 }
 
@@ -160,7 +233,7 @@ export function torKurz(tor) {
   const von =
     d === undefined
       ? ""
-      : ` · bestimmt von ${d.id}, ${mm(d.measuredMm)} mm bei ${breite(d.atWidthMm)} mm`;
+      : ` · bestimmt von ${d.id}, ${mm(d.orderedMm)} mm bei ${breite(tor.bestelltMm)} mm`;
   return `Mindestgröße ${breite(s.widthMm)} mm (bestellt ${breite(tor.bestelltMm)} mm${von})`;
 }
 
@@ -183,27 +256,17 @@ function elemente(ids, max) {
   return `${ids.slice(0, max).join(", ")} … und ${rest} ${rest === 1 ? "weiteres" : "weitere"}`;
 }
 
-/** Was ein Bereich über der gefundenen Größe sagt: das Element, wie es heute ist, und wo es zu schmal wird. */
-function beschreibung(r) {
-  const heute = `${mm(r.measuredMm)} mm bei ${breite(r.atWidthMm)} mm`;
-  if (r.kind === "loses-shadow") {
-    return (
-      `Schattenlinie, ${heute}: ab ${ab(r.fromMm)} mm ohne Stoffspalt unter 1.0 mm, ` +
-      `hält ab ${ab(r.toMm)} mm`
-    );
-  }
-  return `Laufstich, ${heute}: ab ${ab(r.fromMm)} mm Satin, hält ab ${ab(r.toMm)} mm`;
-}
-
 /**
  * Die Zeilen unter der ersten (für `pnpm mindestgroesse` und den Abschnitt „Feinheit“ von
- * `pnpm inkstitch`): die Schattenlinien, der Weg der Suche, und die Bereiche über der gefundenen
- * Größe, in denen ein Strich zu schmal wird. Ohne `alle` sind die Listen gekürzt und sagen es.
+ * `pnpm inkstitch`): wie viele Satinstriche die bestellte Größe zählt, die Schattenlinien darunter
+ * (beides in der bestellten Größe bestimmt) und der Weg der Suche. Ohne `alle` ist die Liste der
+ * Schattenlinien gekürzt und sagt es. Einen Bereich darüber gibt es nicht mehr: die Suche ist monoton.
  */
 export function torDetails(tor, { alle = false } = {}) {
   const s = tor.search;
   const lines = [];
   const l = s.limits;
+  const bestellt = breite(s.orderedWidthMm);
   // Wo mit --ohne-tor unter der Mindestgröße erzeugt wird, sagt es auch dieser Abschnitt: er steht
   // weit unter der ersten Zeile, und die Warnung dort ist beim Lesen des Endes nicht zu sehen.
   if (tor.unterMindestgroesse && s.found) {
@@ -212,61 +275,29 @@ export function torDetails(tor, { alle = false } = {}) {
         `liegen darunter`,
     );
   }
-  const regel = `Grenze ${l.shadowMinMm} mm statt ${l.satinMinMm} mm, Rail an einem Stoffspalt unter 1.0 mm`;
 
-  // Wie viele in der bestellten Größe, wie viele in der gefundenen: eine Schattenlinie hält bei der
-  // einen und ist bei der anderen, wo ihr Spalt offen ist, keine mehr.
-  const inBestellt = s.steps[0].shadowLines;
-  const inGefunden = s.shadowLines.length;
-  const zwei = s.found && s.steps.length > 1;
-  const zahl = zwei
-    ? `${inBestellt} in ${breite(s.steps[0].widthMm)} mm, ${inGefunden} in ${breite(s.widthMm)} mm`
-    : s.found
-      ? `${inGefunden}`
-      : `${inBestellt} in ${breite(s.steps[0].widthMm)} mm`;
+  const n = s.ordered.length;
   lines.push(
-    !zwei && s.found && inGefunden === 0
+    n === 0
+      ? `${spalte("Gezählt")}keine Satinstriche in der bestellten Größe (${bestellt} mm)`
+      : `${spalte("Gezählt")}${n} ${n === 1 ? "Satinstrich" : "Satinstriche"} der bestellten Größe ` +
+          `(${bestellt} mm), jeder mit seiner Grenze: ${grenze(l.satinMinMm)} mm, ` +
+          `Schattenlinien ${grenze(l.shadowMinMm)} mm`,
+  );
+
+  const regel = `Grenze ${grenze(l.shadowMinMm)} mm statt ${grenze(l.satinMinMm)} mm, Rail an einem Stoffspalt unter 1.0 mm`;
+  lines.push(
+    s.shadowLines.length === 0
       ? `${spalte("Schattenlinien")}keine (${regel})`
-      : `${spalte("Schattenlinien")}${zahl} (${regel})` +
-          (s.found && inGefunden > 0
-            ? `: ${elemente(s.shadowLines, alle ? Infinity : SCHATTEN_MAX)}`
-            : ""),
+      : `${spalte("Schattenlinien")}${s.shadowLines.length} (${regel}, in ${bestellt} mm bestimmt): ` +
+          elemente(s.shadowLines, alle ? Infinity : SCHATTEN_MAX),
   );
 
   lines.push(
     `${spalte("Suche")}${s.steps.map((x) => breite(x.widthMm)).join(" → ")} mm ` +
-      `(${s.steps.length} ${s.steps.length === 1 ? "Prüfung" : "Prüfungen"}), ` +
+      `(${pruefungen(s.steps.length)}), ` +
       `Striche unter der Grenze: ${s.steps.map((x) => x.under).join(" → ")}`,
   );
-
-  if (!s.found) return lines;
-  if (s.above.length === 0) {
-    lines.push(
-      `${spalte("Bereich darüber")}keiner erwartet: nach den Breiten wird ab ${breite(s.widthMm)} mm ` +
-        `in keiner größeren Größe ein Strich zu schmal`,
-    );
-    return lines;
-  }
-  const spans = mergeRanges(s.above);
-  lines.push(
-    `${spalte("Bereich darüber")}` +
-      (spans.length === 1
-        ? `1 Bereich, in dem ein Strich nach den Breiten zu schmal wird`
-        : `${spans.length} Bereiche, in denen ein Strich nach den Breiten zu schmal wird`) +
-      ` (von … bis unter …; die Prüfung in der Größe entscheidet):`,
-  );
-  const shown = alle ? spans : spans.slice(0, BEREICHE_MAX);
-  for (const span of shown) {
-    const ids = span.ranges.map((r) => r.id);
-    const was =
-      span.ranges.length === 1 ? `${ids[0]} (${beschreibung(span.ranges[0])})` : elemente(ids, 3);
-    lines.push(`${" ".repeat(19)}${ab(span.fromMm)}–${ab(span.toMm)} mm  ${was}`);
-  }
-  if (shown.length < spans.length) {
-    lines.push(
-      `${" ".repeat(19)}… und ${spans.length - shown.length} weitere Bereiche (alle: --alle)`,
-    );
-  }
   return lines;
 }
 

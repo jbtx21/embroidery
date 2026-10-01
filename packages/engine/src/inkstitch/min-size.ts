@@ -17,7 +17,16 @@
  *   lies under 0.1 mm away is no gap). A shape with several columns needs one column with such a
  *   rail. The limit does not hang on the width of the stroke: as satin it always holds, since
  *   satin starts at that width. `measureShapes` reads this once per shape and size; the search
- *   over the size (`min-size-search.ts`) reads the same.
+ *   over the size (`min-size-search.ts`) reads the same, once, in the ORDERED size.
+ * - **Check points of the gate** (spec §5.2, "Tor", and §13.4, 01.10.2026). The gate decides which
+ *   strokes count in the ordered size and keeps them (`orderedStrokes`, `OrderedStroke`); given that
+ *   set (`ordered`) the check tells the satin findings of the size it runs at apart: `satin-stroke`,
+ *   a stroke of the set under the limit it had in the ordered size; `satin-late`, a form that was no
+ *   satin stroke in the ordered size, is one in this size and lies under its limit — it did not set the
+ *   size, it is a check point; `satin-near`, a stroke that holds but is narrower than the typical
+ *   column of the archive (`SATIN_TYPICAL_MM`, 1.3 mm) — a shadow line is no such stroke, it is held to
+ *   0.7 mm and stitches cleanly at 0.75 mm. Without the set the check knows the one limit and finds the
+ *   first kind only.
  * - **Gap**: the shapes of one colour are united and closed by half the limit
  *   (out and back, as `smoothOutline` does, spec §7.8.4). What the closing adds
  *   is a gap narrower than `GAP_MIN_MM`, unless a later shape covers it whole.
@@ -125,11 +134,18 @@ import { FABRIC_GAP_MAX_MM, formIndex, isFabricGap, railGaps } from "./rail-pull
 import { designForms } from "./template.js";
 
 /**
- * A satin stroke narrower than this is too fine (spec §5.2, decided 29.09.2026).
- * Origin: the TEXMA archive — mean satin width per file over 192 production files,
- * p5 1.29 mm (minimum 1.05, median 1.98).
+ * A load-bearing satin stroke narrower than this is too fine (spec §5.2): 1.3 mm decided 29.09.2026,
+ * lowered to 1.0 mm on 01.10.2026 — the usual lower limit for satin. Measured at the gate with 1.3 mm:
+ * STUTTGART 80 mm → 118 mm, Köln 90 mm → 169 mm; with 1.0 mm 91 and 144 mm.
  */
-export const SATIN_STROKE_MIN_MM = 1.3;
+export const SATIN_STROKE_MIN_MM = 1.0;
+/**
+ * The typical satin column of a file in the TEXMA archive: p5 of the mean satin width per file over 192
+ * production files, 1.29 mm (minimum 1.05, median 1.98) — the old limit. It describes the typical
+ * column of a file, not the narrowest that holds: a satin stroke between `SATIN_STROKE_MIN_MM` and this
+ * holds, and is a check point (`satin-near`, spec §13.4); the trial stitch-out confirms or corrects it.
+ */
+export const SATIN_TYPICAL_MM = 1.3;
 /**
  * A shadow line — a satin stroke with a rail at a fabric gap under 1.0 mm — narrower than this is
  * too fine (spec §5.2, decided 30.09.2026). It is where satin starts (`SATIN_FROM_MM`, spec §7.8.1):
@@ -170,16 +186,21 @@ const HOLE_MATCH_MM = 1e-3;
 /** Bisection steps for the inscribed circle: 0.4 mm down to well under a micrometre. */
 const INSCRIBED_STEPS = 20;
 
-export type MinimumSizeKind = "satin-stroke" | "gap" | "fabric-gap";
+export type MinimumSizeKind = "satin-stroke" | "satin-late" | "satin-near" | "gap" | "fabric-gap";
 
 export type MinimumSizeFinding = {
   /**
-   * The shape's id for a satin stroke; `gap-<colour>-<nnn>` for a gap, numbered per
-   * colour in reading order (top to bottom, left to right) among every piece the closing added,
-   * with `-2`, `-3` for the further parts of a piece the opening fell apart; `fabric-<nnn>` for a
-   * fabric gap, numbered the same way among every piece the closing of all shapes added.
+   * The shape's id for a satin stroke (any of the three kinds); `gap-<colour>-<nnn>` for a gap,
+   * numbered per colour in reading order (top to bottom, left to right) among every piece the closing
+   * added, with `-2`, `-3` for the further parts of a piece the opening fell apart; `fabric-<nnn>` for
+   * a fabric gap, numbered the same way among every piece the closing of all shapes added.
    */
   id: string;
+  /**
+   * `satin-stroke`: under its limit; `satin-late`: under its limit, and no satin stroke in the ordered
+   * size (given `MinimumSizeOptions.ordered`); `satin-near`: holds, but narrower than the typical column
+   * (given `ordered` too).
+   */
   kind: MinimumSizeKind;
   /**
    * The colour of the shape (satin stroke) or of the gap. A fabric gap belongs to no colour: this
@@ -194,7 +215,10 @@ export type MinimumSizeFinding = {
    * fills whole — a counter, which has no medial axis — the circle that fits in it.
    */
   measure: "median" | "inscribed-circle";
-  /** The limit it falls under, mm. */
+  /**
+   * The limit it falls under, mm: for `satin-near` the typical column it is narrower than; for a stroke of
+   * the set (`satin-stroke` given `ordered`) the limit it had in the ordered size.
+   */
   limitMm: number;
   /** Logo width, mm, from which the element holds: ordered width × limit ÷ measured width. */
   holdsFromWidthMm: number;
@@ -209,16 +233,37 @@ export type MinimumSizeFinding = {
    */
   at: Point;
   /**
-   * A satin stroke of 0.7 to 1.3 mm may be a thin decorative line, better set as a running
+   * A satin stroke of 0.7 to 1.0 mm may be a thin decorative line, better set as a running
    * stitch (spec §5.2). The check names the possibility; the user decides.
    */
   runningAlternative: boolean;
   /**
    * A satin stroke with a rail at a fabric gap under 1.0 mm — measured against `shadowMinMm`, not
    * `satinMinMm`. Always false for a gap. Only a finding where the limit of a shadow line is raised
-   * above satin's start (`MinimumSizeOptions.shadowMinMm`); with the default it never is one.
+   * above satin's start (`MinimumSizeOptions.shadowMinMm`); with the default it never is one. For a
+   * stroke of the set (`ordered`) the status of the ordered size.
    */
   shadowLine: boolean;
+};
+
+/**
+ * A satin stroke of the ORDERED size, as the gate keeps it (spec §5.2, "Tor", 01.10.2026): whether a
+ * form is satin (§7.8.1) and whether it is a shadow line is decided in the ordered size and stays, so
+ * that a form which only turns satin as the logo grows does not set the size. The limit is the one it
+ * has there: a shadow line's or the ordinary one.
+ */
+export type OrderedStroke = {
+  /** The key of the shape (`ShapeMeasure.key`): how it is found again in another size. */
+  key: string;
+  /** The id of the shape, for the output. */
+  id: string;
+  color: string;
+  /** Median width in the ordered size, mm. */
+  widthMm: number;
+  /** A rail at a fabric gap under 1.0 mm in the ordered size (`ShapeMeasure.shadowLine`). */
+  shadowLine: boolean;
+  /** The limit it is held to in every size: `shadowMinMm` for a shadow line, else `satinMinMm`. */
+  limitMm: number;
 };
 
 export type MinimumSizeOptions = {
@@ -230,6 +275,16 @@ export type MinimumSizeOptions = {
   gapMinMm?: number;
   /** The limit of a shadow line. Default `SHADOW_LINE_MIN_MM`. */
   shadowMinMm?: number;
+  /** The typical column, over which a stroke is no check point. Default `SATIN_TYPICAL_MM`. */
+  typicalMm?: number;
+  /**
+   * The satin strokes of the ordered size (`orderedStrokes`, `MinimumSizeSearch.ordered`). Given, the
+   * check holds those to the limit they have there and tells the other satin findings apart: a form
+   * under its limit that is not in the set is `satin-late`, a stroke between the limit and the typical
+   * column is `satin-near` (module doc). The minimum size then comes from the strokes of the set alone.
+   * Without it the check knows one limit for every satin stroke, and `satin-stroke` is the only kind.
+   */
+  ordered?: readonly OrderedStroke[];
   /**
    * The preset the satin columns are set with — only `underlapMm` is read, for the rails of a stroke
    * whose shadow line status is asked. Default Piqué, as the template's default.
@@ -275,15 +330,18 @@ export type MinimumSizeResult = {
   /** The ordered logo width the check ran at, mm. */
   widthMm: number;
   /** The limits it ran with, mm — the options, or their defaults. */
-  limits: { satinMinMm: number; gapMinMm: number; shadowMinMm: number };
-  /** All three kinds, the largest `holdsFromWidthMm` first. */
+  limits: { satinMinMm: number; gapMinMm: number; shadowMinMm: number; typicalMm: number };
+  /** Whether the check was given the set of the ordered size (`MinimumSizeOptions.ordered`). */
+  ordered: boolean;
+  /** All kinds, the largest `holdsFromWidthMm` first. */
   findings: MinimumSizeFinding[];
   /**
    * The minimum size at this size's measurement, mm: the logo width from which every satin stroke
    * holds its limit (`limits.satinMinMm`, `limits.shadowMinMm` for a shadow line), as the widths
    * scale linearly. Above `widthMm` where a stroke is too fine, below it where every one holds.
    * Absent for a logo without a satin stroke. A reading of this one size: the size the logo must
-   * be stitched at is found by searching over the size (`findMinimumSize`, spec §5.2, Tor).
+   * be stitched at is found by searching over the size (`findMinimumSize`, spec §5.2, Tor). Given
+   * `ordered`, from the strokes of the set alone.
    */
   minimumWidthMm?: number;
   /**
@@ -295,7 +353,7 @@ export type MinimumSizeResult = {
   /**
    * The satin strokes the lower limit is applied to: a rail at a fabric gap under 1.0 mm and
    * narrower than `limits.satinMinMm` — by id, in document order. Without the shadow line they
-   * would be findings.
+   * would be findings. The status of this size, whatever `ordered` says.
    */
   shadowLines: string[];
   /**
@@ -371,9 +429,31 @@ const readingOrder = (p: { box: Rect }, q: { box: Rect }): number =>
   Math.round(p.box.minY * 100) - Math.round(q.box.minY * 100) ||
   Math.round(p.box.minX * 100) - Math.round(q.box.minX * 100);
 
+/** Separates the id of a shape from its number where an id comes twice (a character no XML attribute may hold). */
+const KEY_SEPARATOR = "\u0001";
+
+/**
+ * The key of every shape of a list, in document order: the id of an area shape, and for the second
+ * and later shape with one id (an SVG may carry an id twice) the id with its number. `undefined` for
+ * a line. The same SVG read at another size has the same shapes in the same order, so a shape is
+ * found again by its key — what the gate holds to a limit in every size it tries (`OrderedStroke`).
+ */
+export function areaKeys(shapes: ImportedShape[]): (string | undefined)[] {
+  const seen = new Map<string, number>();
+  return shapes.map((shape) => {
+    if (shape.kind !== "area") return undefined;
+    const n = (seen.get(shape.id) ?? 0) + 1;
+    seen.set(shape.id, n);
+    return n === 1 ? shape.id : `${shape.id}${KEY_SEPARATOR}${n}`;
+  });
+}
+
 /** What the check reads of one area shape at the size it runs at (`measureShapes`). */
 export type ShapeMeasure = {
+  /** The id of the shape, as the output names it. */
   id: string;
+  /** How the shape is found again in another size (`areaKeys`): the id, unless it comes twice. */
+  key: string;
   color: string;
   polygon: Polygon;
   box: Rect;
@@ -384,34 +464,22 @@ export type ShapeMeasure = {
   /**
    * The gaps of the rails that lie at a fabric gap (spec §7.8.3 rule 1, `railGaps`), mm: one per
    * such rail, over all columns of the shape — each the median over its column. Empty where no rail
-   * lies at one, where the shape has no columns that hold, where it is no satin stroke (unless
-   * `hypothetical`), or where the stroke is not narrow enough to be asked (`MeasureOptions.railsBelowMm`).
+   * lies at one, where the shape has no columns that hold, where it is no satin stroke, or where the
+   * stroke is not narrow enough to be asked (`MeasureOptions.railsBelowMm`).
    */
   railGapsMm: number[];
-  /**
-   * A satin stroke with a rail at a fabric gap: its limit is the one of a shadow line. False for a
-   * shape that is no satin stroke, even where `railGapsMm` holds a hypothesis.
-   */
+  /** A satin stroke with a rail at a fabric gap: its limit is the one of a shadow line. */
   shadowLine: boolean;
-  /**
-   * `railGapsMm` is what the rails of a running stitch would have were it set as a satin stroke
-   * (`MeasureOptions.running`): the search over the size reads it to see whether such a shape, as it
-   * grows into satin, is a shadow line at that size or not.
-   */
-  hypothetical: boolean;
 };
 
 export type MeasureOptions = {
   /** The preset the columns are set with (`underlapMm`). Default Piqué. */
   preset?: Preset;
-  /** Also set the columns of running stitches, as a hypothesis (`ShapeMeasure.hypothetical`). Default off. */
-  running?: boolean;
   /**
    * The rails — and with them `railGapsMm` and `shadowLine` — are only asked of satin strokes narrower
-   * than this, mm. A stroke at or above the larger of the two limits is under none of them whatever
-   * its rails are, and the columns are the dearest part of the measurement (a search over the size
-   * makes it again at every size): `checkMinimumSize` and `findMinimumSize` pass that limit.
-   * Default: every satin stroke.
+   * than this, mm. A stroke at or above the largest limit asked about is under none of them whatever
+   * its rails are, and the columns are the dearest part of the measurement: `checkMinimumSize` and
+   * `findMinimumSize` pass that limit. Default: every satin stroke.
    */
   railsBelowMm?: number;
 };
@@ -459,15 +527,16 @@ function railForms(shapes: ImportedShape[]): { index: FormIndex; own: Map<string
  * Class, width and rail gaps of every area shape, in document order, at the size the shapes are in
  * (spec §5.2). Lines are no areas; they are forms for the rail gaps (`designForms`) and nothing else.
  * The columns are only set where they can matter: for a satin stroke that has another form near
- * enough, and, asked for (`running`), for a running stitch (`addRunningRails`).
+ * enough.
  */
 export function measureShapes(shapes: ImportedShape[], opts: MeasureOptions = {}): ShapeMeasure[] {
   const preset = opts.preset ?? PRESETS.pique;
   const railsBelow = opts.railsBelowMm ?? Infinity;
   const { index, own } = railForms(shapes);
+  const keys = areaKeys(shapes);
   const out: ShapeMeasure[] = [];
-  for (const shape of shapes) {
-    if (shape.kind !== "area") continue;
+  shapes.forEach((shape, i) => {
+    if (shape.kind !== "area") return;
     const cls = classifyShape(shape.polygon, shape.id);
     const box = polygonBbox(shape.polygon);
     const satin = cls.shapeClass === "satin";
@@ -477,6 +546,7 @@ export function measureShapes(shapes: ImportedShape[], opts: MeasureOptions = {}
         : [];
     out.push({
       id: shape.id,
+      key: keys[i]!,
       color: shape.color,
       polygon: shape.polygon,
       box,
@@ -484,47 +554,58 @@ export function measureShapes(shapes: ImportedShape[], opts: MeasureOptions = {}
       widthMm: cls.widthMm,
       railGapsMm,
       shadowLine: satin && railGapsMm.length > 0,
-      hypothetical: false,
     });
-  }
-  return opts.running === true ? addRunningRails(out, shapes, preset) : out;
+  });
+  return out;
 }
 
-/**
- * The measures with the rails a running stitch would have were it set as a satin stroke: the gaps of
- * the columns the template would set for it, as a hypothesis (`ShapeMeasure.hypothetical`). Nothing
- * else changes — a running stitch is still no satin stroke, and no shadow line. `shapes` are the
- * shapes the measures were made of.
- */
-export function addRunningRails(
-  measures: ShapeMeasure[],
-  shapes: ImportedShape[],
-  preset: Preset = PRESETS.pique,
-): ShapeMeasure[] {
-  const { index, own } = railForms(shapes);
-  return measures.map((m) => {
-    if (m.shapeClass !== "running") return m;
-    const railGapsMm = hasNeighbour(m.id, m.box, index)
-      ? railGapsOf(m.polygon, m.id, own.get(m.id), index, preset)
-      : [];
-    return { ...m, railGapsMm, hypothetical: true };
-  });
-}
+type SatinLimits = { satinMinMm: number; shadowMinMm: number };
 
 /** The limit a measured satin stroke is held to: a shadow line's, or the ordinary one. */
-const limitOf = (m: ShapeMeasure, limits: { satinMinMm: number; shadowMinMm: number }): number =>
+const limitOf = (m: ShapeMeasure, limits: SatinLimits): number =>
   m.shadowLine ? limits.shadowMinMm : limits.satinMinMm;
 
-/** Is this shape a satin stroke under the limit it is held to? The one test of the check and the search. */
-export const isTooNarrow = (
-  m: ShapeMeasure,
-  limits: { satinMinMm: number; shadowMinMm: number },
-): boolean => m.shapeClass === "satin" && m.widthMm < limitOf(m, limits);
+/**
+ * The satin strokes of the ordered size (spec §5.2, "Tor"): every shape `measures` calls satin, with the
+ * limit it is held to there — a shadow line's or the ordinary one — which the gate keeps for every size
+ * it tries. `measures` are those of the ordered size, made with `railsBelowMm` of at least the larger
+ * limit (a stroke at or above it needs no status: it holds either way).
+ */
+export function orderedStrokes(measures: ShapeMeasure[], limits: SatinLimits): OrderedStroke[] {
+  return measures
+    .filter((m) => m.shapeClass === "satin")
+    .map((m) => ({
+      key: m.key,
+      id: m.id,
+      color: m.color,
+      widthMm: m.widthMm,
+      shadowLine: m.shadowLine,
+      limitMm: limitOf(m, limits),
+    }));
+}
 
-function satinStrokes(
+type SatinCheckLimits = SatinLimits & { typicalMm: number };
+
+/**
+ * The satin findings of one size, the decisive stroke for the minimum size and the shadow lines
+ * (module doc). Without `ordered` every satin stroke is held to the limit it has in this size and the
+ * only kind is `satin-stroke`. With it:
+ *
+ * - a stroke of the set is held to the limit it had in the ordered size (a shadow line to the lower
+ *   one, whatever its rails say now): under it, it is `satin-stroke`;
+ * - a satin stroke not in the set — a form that was no satin stroke there — is held to the limit of
+ *   this size (`limitOf`): under it, it is `satin-late`;
+ * - a stroke that is not under its limit, is no shadow line in this size and is narrower than the
+ *   typical column is `satin-near`. A stroke narrower than the ordinary limit is none of them, where it
+ *   only holds because the set calls it a shadow line.
+ *
+ * Only the strokes of the set decide the minimum size.
+ */
+function satinFindings(
   measures: ShapeMeasure[],
   widthMm: number,
-  limits: { satinMinMm: number; shadowMinMm: number },
+  limits: SatinCheckLimits,
+  ordered: ReadonlyMap<string, OrderedStroke> | undefined,
 ): {
   findings: MinimumSizeFinding[];
   decisive: MinimumSizeFinding | undefined;
@@ -533,29 +614,54 @@ function satinStrokes(
   const findings: MinimumSizeFinding[] = [];
   const shadowLines: string[] = [];
   let decisive: MinimumSizeFinding | undefined;
+  const finding = (
+    m: ShapeMeasure,
+    kind: MinimumSizeKind,
+    limitMm: number,
+    shadowLine: boolean,
+  ): MinimumSizeFinding => ({
+    id: m.id,
+    kind,
+    color: m.color,
+    measuredMm: m.widthMm,
+    measure: "median",
+    limitMm,
+    holdsFromWidthMm: holdsFromWidth(widthMm, limitMm, m.widthMm),
+    polygon: m.polygon,
+    at: anchor(m.polygon, m.box),
+    runningAlternative: m.widthMm < SATIN_STROKE_MIN_MM,
+    shadowLine,
+  });
   for (const m of measures) {
     if (m.shapeClass !== "satin") continue;
-    const limitMm = limitOf(m, limits);
-    const stroke: MinimumSizeFinding = {
-      id: m.id,
-      kind: "satin-stroke",
-      color: m.color,
-      measuredMm: m.widthMm,
-      measure: "median",
-      limitMm,
-      holdsFromWidthMm: holdsFromWidth(widthMm, limitMm, m.widthMm),
-      polygon: m.polygon,
-      at: anchor(m.polygon, m.box),
-      runningAlternative: m.widthMm < SATIN_STROKE_MIN_MM,
-      shadowLine: m.shadowLine,
-    };
-    // The stroke that holds from the largest width decides; the first of equals: the same input
-    // names the same stroke.
-    if (decisive === undefined || stroke.holdsFromWidthMm > decisive.holdsFromWidthMm) {
-      decisive = stroke;
-    }
-    if (isTooNarrow(m, limits)) findings.push(stroke);
     if (m.shadowLine && m.widthMm < limits.satinMinMm) shadowLines.push(m.id);
+    const kept = ordered?.get(m.key);
+    const limitMm = kept !== undefined ? kept.limitMm : limitOf(m, limits);
+    const stroke = finding(
+      m,
+      "satin-stroke",
+      limitMm,
+      kept !== undefined ? kept.shadowLine : m.shadowLine,
+    );
+    // The stroke that holds from the largest width decides; the first of equals: the same input
+    // names the same stroke. A form that is not in the set sets nothing.
+    if (ordered === undefined || kept !== undefined) {
+      if (decisive === undefined || stroke.holdsFromWidthMm > decisive.holdsFromWidthMm) {
+        decisive = stroke;
+      }
+    }
+    if (m.widthMm < limitMm) {
+      findings.push(
+        ordered === undefined || kept !== undefined ? stroke : { ...stroke, kind: "satin-late" },
+      );
+    } else if (
+      ordered !== undefined &&
+      !m.shadowLine &&
+      m.widthMm >= limits.satinMinMm &&
+      m.widthMm < limits.typicalMm
+    ) {
+      findings.push(finding(m, "satin-near", limits.typicalMm, false));
+    }
   }
   return { findings, decisive, shadowLines };
 }
@@ -878,6 +984,40 @@ function requirePositive(name: string, value: number): void {
   }
 }
 
+/** Largest `holdsFromWidthMm` first; ties by kind and id, never by the order the geometry happened to come in. */
+const byHoldsFrom = (p: MinimumSizeFinding, q: MinimumSizeFinding): number =>
+  q.holdsFromWidthMm - p.holdsFromWidthMm ||
+  (p.kind < q.kind ? -1 : p.kind > q.kind ? 1 : 0) ||
+  (p.id < q.id ? -1 : p.id > q.id ? 1 : 0);
+
+/** The limits of a check or a review, from its options and the defaults; refuses what cannot be a limit. */
+function checkLimits(opts: Omit<MinimumSizeOptions, "widthMm">): {
+  satinMinMm: number;
+  shadowMinMm: number;
+  typicalMm: number;
+} {
+  const satinMinMm = opts.satinMinMm ?? SATIN_STROKE_MIN_MM;
+  const shadowMinMm = opts.shadowMinMm ?? SHADOW_LINE_MIN_MM;
+  const typicalMm = opts.typicalMm ?? SATIN_TYPICAL_MM;
+  requirePositive("satinMinMm", satinMinMm);
+  requirePositive("shadowMinMm", shadowMinMm);
+  requirePositive("typicalMm", typicalMm);
+  return { satinMinMm, shadowMinMm, typicalMm };
+}
+
+/** The set of the ordered size as the map the check looks strokes up in, by key. */
+const orderedMap = (ordered: readonly OrderedStroke[] | undefined) =>
+  ordered === undefined ? undefined : new Map(ordered.map((o) => [o.key, o]));
+
+/**
+ * The rails of a stroke are asked where its status can matter: under the larger of the limits, and,
+ * given the set of the ordered size, under the typical column (a shadow line is no `satin-near`).
+ */
+const railsBelowOf = (
+  limits: { satinMinMm: number; shadowMinMm: number; typicalMm: number },
+  ordered: boolean,
+): number => Math.max(limits.satinMinMm, limits.shadowMinMm, ordered ? limits.typicalMm : 0);
+
 /**
  * The fineness check of spec §5.2 (module doc) on the shapes of an SVG, in document order,
  * at the ordered width. Stroked lines are not areas: they neither make a gap nor cover one, nor
@@ -888,40 +1028,36 @@ export function checkMinimumSize(
   opts: MinimumSizeOptions,
 ): MinimumSizeResult {
   const { widthMm } = opts;
-  const satinMinMm = opts.satinMinMm ?? SATIN_STROKE_MIN_MM;
   const gapMinMm = opts.gapMinMm ?? GAP_MIN_MM;
-  const shadowMinMm = opts.shadowMinMm ?? SHADOW_LINE_MIN_MM;
   requirePositive("widthMm", widthMm);
-  requirePositive("satinMinMm", satinMinMm);
   requirePositive("gapMinMm", gapMinMm);
-  requirePositive("shadowMinMm", shadowMinMm);
+  const limits = checkLimits(opts);
+  const ordered = orderedMap(opts.ordered);
 
   const areas: Area[] = shapes.flatMap((shape, index) =>
     shape.kind === "area" ? [{ index, shape, box: polygonBbox(shape.polygon) }] : [],
   );
 
-  const satin = satinStrokes(
+  const satin = satinFindings(
     measureShapes(shapes, {
-      railsBelowMm: Math.max(satinMinMm, shadowMinMm),
+      railsBelowMm: railsBelowOf(limits, ordered !== undefined),
       ...(opts.preset === undefined ? {} : { preset: opts.preset }),
     }),
     widthMm,
-    { satinMinMm, shadowMinMm },
+    limits,
+    ordered,
   );
   const gapResult = gaps(areas, widthMm, gapMinMm);
   const fabricResult = fabricGaps(areas, gapResult.findings, widthMm, gapMinMm);
-  // Largest first; ties by kind and id, never by the order the geometry happened to come in.
   const findings = [...satin.findings, ...gapResult.findings, ...fabricResult.findings].sort(
-    (p, q) =>
-      q.holdsFromWidthMm - p.holdsFromWidthMm ||
-      (p.kind < q.kind ? -1 : p.kind > q.kind ? 1 : 0) ||
-      (p.id < q.id ? -1 : p.id > q.id ? 1 : 0),
+    byHoldsFrom,
   );
   // The findings are sorted, so the first gap of either kind is the gap that asks for the most.
-  const decisiveGap = findings.find((f) => f.kind !== "satin-stroke");
+  const decisiveGap = findings.find((f) => f.kind === "gap" || f.kind === "fabric-gap");
   return {
     widthMm,
-    limits: { satinMinMm, gapMinMm, shadowMinMm },
+    limits: { ...limits, gapMinMm },
+    ordered: ordered !== undefined,
     findings,
     ...(satin.decisive
       ? { minimumWidthMm: satin.decisive.holdsFromWidthMm, decisive: satin.decisive }
@@ -935,4 +1071,32 @@ export function checkMinimumSize(
     fabricParts: fabricResult.parts,
     fabricIgnored: fabricResult.ignored,
   };
+}
+
+/**
+ * The satin findings of one size alone — the three kinds `checkMinimumSize` gives for the strokes,
+ * the same, in the same order — without the gap analysis, which is the dearer half: the check points
+ * of the gate (spec §5.2, "Tor") are wanted for a size nothing is checked at otherwise.
+ */
+export function reviewSatin(
+  shapes: ImportedShape[],
+  opts: Pick<
+    MinimumSizeOptions,
+    "widthMm" | "satinMinMm" | "shadowMinMm" | "typicalMm" | "preset"
+  > & {
+    ordered: readonly OrderedStroke[];
+  },
+): MinimumSizeFinding[] {
+  requirePositive("widthMm", opts.widthMm);
+  const limits = checkLimits(opts);
+  const satin = satinFindings(
+    measureShapes(shapes, {
+      railsBelowMm: railsBelowOf(limits, true),
+      ...(opts.preset === undefined ? {} : { preset: opts.preset }),
+    }),
+    opts.widthMm,
+    limits,
+    orderedMap(opts.ordered),
+  );
+  return satin.findings.sort(byHoldsFrom);
 }

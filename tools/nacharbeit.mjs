@@ -18,10 +18,14 @@
  * a file that would still change is replaced by the updated one.
  *
  * The check points are what the run already knows, nothing is measured again: the findings of the
- * fineness check (§5.2) with their place; the shapes that did not hold as satin and went to tatami or
- * a running stitch (§7.8.5); satin on a smoothed outline (§7.8.4); areas that became a line under
- * 0.7 mm; tatami without the grid underlay (§8.8); columns under 1.0 mm (§7.8.3); and from the DST
- * itself: needle pile-ups, dense cells and jumps over 5 mm without a thread cut (§11, §10.2).
+ * fineness check (§5.2) with their place — satin strokes under their limit (only with `--ohne-tor`),
+ * forms that only turned satin in the size made and lie under their limit, and satin strokes between
+ * 1.0 and 1.3 mm, the typical column of the archive (the two check points of the gate, 01.10.2026:
+ * they did not set the size, the trial stitch-out confirms or corrects them); the shapes that did not
+ * hold as satin and went to tatami or a running stitch (§7.8.5); satin on a smoothed outline (§7.8.4);
+ * areas that became a line under 0.7 mm; tatami without the grid underlay (§8.8); columns under 1.0 mm
+ * (§7.8.3); and from the DST itself: needle pile-ups, dense cells and jumps over 5 mm without a thread
+ * cut (§11, §10.2).
  *
  * **DST and page.** Ink/Stitch moves the design before writing so that the middle of the box of its
  * stitches is the origin of the DST (`lib/output.py`, `get_origin`). The box of the stitches on the page
@@ -75,6 +79,8 @@ const PRIORITY = [
   "Nadelhäufung",
   "Stichdichte",
   "Satinstrich zu schmal",
+  "Erst in dieser Größe Satin",
+  "Satinstrich 1,0 bis 1,3 mm",
   "Säule unter 1,0 mm",
   "Rückfall Tatami",
   "Rückfall Laufstich",
@@ -171,6 +177,22 @@ export function collectSpots(known) {
         f.at.y,
         `${f.id}: ${measured} mm statt ${limit} mm, hält ab ${holds} · größer sticken` +
           `${f.runningAlternative ? " oder als Laufstich" : ""}`,
+      );
+    } else if (f.kind === "satin-late") {
+      // A form that was no satin stroke in the ordered size (spec §5.2, "Tor"): it did not set the size.
+      put(
+        "Erst in dieser Größe Satin",
+        f.at.x,
+        f.at.y,
+        `${f.id}: ${measured} mm statt ${limit} mm, hält ab ${holds} · als Laufstich lassen oder Probestick`,
+      );
+    } else if (f.kind === "satin-near") {
+      // A satin stroke that holds but is narrower than the typical column of the archive (§13.4).
+      put(
+        "Satinstrich 1,0 bis 1,3 mm",
+        f.at.x,
+        f.at.y,
+        `${f.id}: ${measured} mm, üblich sind ${limit} mm · Probestick bestätigt oder korrigiert`,
       );
     } else if (f.kind === "gap") {
       put(

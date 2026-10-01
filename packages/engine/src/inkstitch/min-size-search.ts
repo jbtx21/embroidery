@@ -1,70 +1,71 @@
 /**
- * The minimum size of a logo as a search over the size (spec §5.2, "Tor", 30.09.2026): the smallest
- * size from the ordered one upwards at which the check finds no satin stroke under its limit.
+ * The minimum size of a logo as a search over the size (spec §5.2, "Tor", 01.10.2026): the smallest
+ * whole-millimetre size from the ordered one upwards in which every satin stroke of the ORDERED size
+ * holds the limit it has there.
  *
- * Extrapolating from the ordered size does not hold. A stroke that is a running stitch at 80 mm
- * turns into satin as the logo grows — at 0.7 mm — and is too narrow from there until it is 1.3 mm
- * wide: a gray stroke of the STUTTGART logo is 0.47 mm at 80 mm and 0.70 mm at 120 mm, and the
- * minimum size read at 80 mm (118 mm) became 223 mm when read at 120 mm. Every stroke has a range
- * of logo widths in which it is satin and too narrow (`ForbiddenRange`), and the minimum size is the
- * smallest size outside all of them.
+ * **The ordered size decides which strokes count.** Whether a shape is satin (§7.8.1) and whether it is
+ * a shadow line — a rail at a fabric gap under 1.0 mm, measured as the pull compensation measures it —
+ * is read once, in the ordered size R, and kept (`OrderedStroke`: the shape by its key, the limit it is
+ * held to: 1.0 mm, or 0.7 mm as a shadow line). The version of 30.09.2026 classified again in every size
+ * it tried: any hairline of a vectorisation turns into a narrow satin stroke at some size, the ranges
+ * in which it is too narrow lined up, and the minimum size ran away (STUTTGART 80 mm → 252 mm, Köln
+ * 90 mm → 567 mm, Eislingen 200 mm → 1,266 mm), driven by decorative parts such as a blue gusset of
+ * 0.8 × 2.7 mm. What only turns satin as the logo grows does not set the size; it is a check point
+ * (`checkMinimumSize` with `ordered`, §13.4).
  *
- * - **Ranges** (`forbiddenRanges`): a stroke of median width `w` at logo width `c` is `k·w` wide at
- *   `k·c`. It is satin from `k = 0.7 / w` and holds from `k = limit / w`: the range is
- *   `[0.7 / w, limit / w)`, and `limit` is 1.3 mm — or, as a shadow line, 0.7 mm, which makes the
- *   range empty. A shadow line owes its status to its gap, and the gap grows with the size as well:
- *   at `k = 1.0 / g` (`g` the gap of its rail, `railGaps`) it stops being one and is held to 1.3 mm
- *   again — the range `[1.0 / g, 1.3 / w)`, if the stroke is still too narrow then.
- * - **Search** (`findMinimumSize`): from a size `c` where the check finds strokes under their limit,
- *   the smallest whole-millimetre size outside the ranges of the satin strokes of `c`. The shapes
- *   are then read again at that size (`shapesAt`: the SVG imported at that width, the way the run
- *   reads it), the strokes and their shadow line status measured there, and the check made for
- *   real. It passes, or finds strokes under their limit — a running stitch that has turned satin, a
- *   stroke that measures a little less than it was read, a shadow line that has lost its gap — and
- *   the search goes on from there. Only upwards, never below the ordered size.
+ * **The search is monotone.** A stroke of the set grows with the logo, so from the size where all hold
+ * no larger size lets one fall under again, and there is no range above in which the logo fails once
+ * more. With the strokes of R alone — a satin stroke is 0.7 mm wide at least and held to 1.0 mm at
+ * most — the size found is by proportion at most 1.43 times R; measured on the customer logos it is
+ * 1.1 to 1.6 times (STUTTGART 80 mm → 91 mm, Köln 90 mm → 144 mm, Eislingen 200 mm → 294 mm), where
+ * the 30.09.2026 version ran to 3 to 6 times.
  *
- *   The ranges of a running stitch are left out of the jump: whether it is a shadow line once it is
- *   satin depends on the gap at that size, which only the check in that size knows. A range taken
- *   from it would skip sizes that hold. So a size that lies in no range of a satin stroke is the
- *   next one to check; that is what makes the size found the smallest.
- * - **Whole millimetres**: the size is rounded up (`ceil`), never down: "from 119 mm" is then true.
+ * - **Search** (`findMinimumSize`): at a size `c` the strokes of the set are measured (the median
+ *   width of the same shapes, found again by their key: `shapesAt(c)` imports the SVG at that width,
+ *   the way the run reads it). Where one is under its limit, the next size is the smallest whole
+ *   millimetre at which every one would hold if its width grew in proportion to the size — the largest
+ *   of `c × limit ÷ width` — and the strokes are measured again there. It passes, or finds strokes under
+ *   their limit, and the search goes on from there. Only upwards, never below the ordered size.
+ * - **Whole millimetres**: the size is rounded up (`ceil`), never down: "from 91 mm" is then true.
  *   Where the ordered size itself holds it stays as it is.
- * - **Above** (`MinimumSizeSearch.above`): the ranges that lie above the size found, for the output
- *   (an order for a larger logo would land above them). Read from the shapes at that size, the
- *   running stitches included with the rails they would have as satin strokes
- *   (`addRunningRails`): a hairline next to a letter becomes satin as a shadow line, and is no
- *   problem until its gap reaches 1.0 mm. The widths scale linearly in these ranges, which they do
- *   not exactly (the measurement of a thin strip reads a few per cent higher at small sizes): the
- *   ranges are where to look, and the check in that size is what decides.
+ * - **Nothing is skipped.** The median width of a thin shape grows slower than the size (its outline
+ *   is sampled every perimeter / 300, between 0.3 and 2 mm, and the measure reads a few per cent high at
+ *   small sizes: a bar of 0.9 mm reads 0.95 mm at 80 mm and 0.99 mm at 85 mm). By proportion a stroke
+ *   cannot hold before the size the formula names, so the first size that holds is the one found; where
+ *   the measurement in that size says otherwise, the formula is applied again from it.
+ * - **Only the strokes of the set are measured above the ordered size** — their widths, not the whole
+ *   classification and not the columns: the status of a shadow line is not asked again.
  *
- * Known limits (measured 30.09.2026 on the customer logos):
+ * Known limits (measured 01.10.2026 on the customer logos):
  *
- * - The median width of a thin shape is not linear in the size: the outline is sampled every
- *   perimeter / 300, between 0.3 and 2 mm, so the measure of a bar of 0.9 mm reads 0.95 mm at
- *   80 mm and 0.92 times the growth factor above. The ranges are predictions; a size inside one can
- *   hold, and the search does not look for it. STUTTGART from 80 mm: the real check (every
- *   millimetre from 241 to 252 mm) holds from 243 mm, the search finds 252 mm — a small shape
- *   measures about 1.24 mm from 216 to 242 mm, and each range reads 5 % further on than the last.
- *   The size found is one that holds, not always the smallest.
- * - Every shape the classification calls satin counts, however small: the two black specks of about
- *   1 mm² in the STUTTGART logo (z04-000000-001, -002) are satin strokes of 1.2 mm to the check, and
- *   set the minimum size from 185 mm to 252 mm on their own. Shapes that grow into
- *   satin (the hairlines of a vectorisation) push the size up a range at a time: Köln 90 mm is found
- *   at 567 mm, Eislingen 200 mm at 1266 mm, each about 6 times the ordered width.
+ * - The size found is one from which every stroke of the set holds, not always the smallest that does.
+ *   The width of a small shape is no smooth function of the size: where the medial axis of a sliver
+ *   changes, it jumps (the blue gusset of the Köln logo, 0.8 × 2.7 mm, is 0.91 mm at 131 mm and 1.14 mm at
+ *   144 mm; by proportion it would be 1.0 mm at 144 mm). Köln 90 mm is found at 144 mm, and every size
+ *   from 134 mm holds; Eislingen 200 mm is found at 294 mm, from 286 mm every size holds; Atzensport 80 mm
+ *   at 109 mm, and 108 mm holds, 107 mm does not. STUTTGART 80 mm (91 mm), Atzensport-PDF 80 mm (107 mm)
+ *   and Atzensport 200 mm (222 mm) are the smallest. Above the size found every size held, on all six
+ *   logos, as far as it was looked (to 40 mm above): the search is monotone there.
+ * - Every shape the classification calls satin in R counts, however small: a speck of 1 mm² that
+ *   measures 0.9 mm at R sets the size on its own. Whether such a shape is stitched at all is not asked
+ *   (`DROP_TINY_MM2` is the importer's, not the template's).
+ * - A shadow line that loses its gap as the logo grows (the gap is 0.9 mm at R, 1.0 mm at 1.11 R) keeps
+ *   its limit of 0.7 mm: the status is the one of R. It is narrower than 1.0 mm for a while and not a
+ *   check point either (`satin-near` starts at 1.0 mm).
  */
 import type { ImportedShape } from "../import/svg.js";
+import { medianShapeWidthMm } from "../import/svg.js";
 import type { Preset } from "../presets.js";
 import { PRESETS } from "../presets.js";
-import { SATIN_FROM_MM } from "./classify.js";
-import type { ShapeMeasure } from "./min-size.js";
+import type { OrderedStroke } from "./min-size.js";
 import {
-  addRunningRails,
-  isTooNarrow,
+  areaKeys,
+  holdsFromWidth,
   measureShapes,
+  orderedStrokes,
   SATIN_STROKE_MIN_MM,
   SHADOW_LINE_MIN_MM,
 } from "./min-size.js";
-import { FABRIC_GAP_MAX_MM } from "./rail-pull.js";
 
 /** The search stops after this many checks, each in a size of its own. */
 export const SEARCH_MAX_STEPS = 16;
@@ -76,29 +77,6 @@ export const SEARCH_MAX_FACTOR = 10;
  */
 const WHOLE_EPS = 1e-6;
 
-/**
- * What a range is: `too-narrow` holds the size it was read at (a stroke that is under its limit
- * now); `becomes-satin` begins where a running stitch turns satin; `loses-shadow` begins where the
- * gap of a shadow line reaches 1.0 mm and the stroke is held to 1.3 mm again.
- */
-export type SizeRangeKind = "too-narrow" | "becomes-satin" | "loses-shadow";
-
-/** The logo widths at which a stroke is a satin stroke under its limit (module doc). */
-export type ForbiddenRange = {
-  id: string;
-  color: string;
-  /** The range is `[fromMm, toMm)`: the logo widths, mm, at which the stroke is too narrow. */
-  fromMm: number;
-  toMm: number;
-  /** The median width the range was read from, mm… */
-  measuredMm: number;
-  /** …at this logo width, mm. */
-  atWidthMm: number;
-  /** The limit the stroke is held to at the end of the range, mm. */
-  limitMm: number;
-  kind: SizeRangeKind;
-};
-
 export type SizeLimits = { satinMinMm: number; shadowMinMm: number };
 
 const DEFAULT_LIMITS: SizeLimits = {
@@ -106,111 +84,30 @@ const DEFAULT_LIMITS: SizeLimits = {
   shadowMinMm: SHADOW_LINE_MIN_MM,
 };
 
-const byFrom = (p: ForbiddenRange, q: ForbiddenRange): number =>
-  p.fromMm - q.fromMm || p.toMm - q.toMm || (p.id < q.id ? -1 : p.id > q.id ? 1 : 0);
-
 /**
- * The ranges of logo widths, measured at `atWidthMm`, in which the shapes are satin strokes under
- * their limit — by where they begin. A shape that is no satin now (a running stitch) has one from
- * where it turns satin; a wide area has none. `railGapsMm` of a measure, where it has any, is what
- * ends the shadow line status (module doc).
+ * The stroke of the set that sets the size: the one that asked for the most at the last check before the
+ * size found — with the width it has in the ordered size and the limit it was held to there.
  */
-export function forbiddenRanges(
-  measures: ShapeMeasure[],
-  atWidthMm: number,
-  limits: SizeLimits = DEFAULT_LIMITS,
-): ForbiddenRange[] {
-  const out: ForbiddenRange[] = [];
-  for (const m of measures) {
-    const w = m.widthMm;
-    if (m.shapeClass === "tatami" || !(w > 0) || !Number.isFinite(w)) continue;
-    // In units of the size the measurement was made at: the factor k of `k·w`.
-    const satinFrom = SATIN_FROM_MM / w;
-    const start = Math.max(1, satinFrom);
-    const startKind: SizeRangeKind = satinFrom > 1 ? "becomes-satin" : "too-narrow";
-    // The smallest gap decides: the stroke is a shadow line while ANY rail is at a gap.
-    const gapOpens = m.railGapsMm.length > 0 ? FABRIC_GAP_MAX_MM / Math.min(...m.railGapsMm) : 0;
-    const add = (from: number, to: number, limitMm: number, kind: SizeRangeKind): void => {
-      if (!(from < to)) return;
-      out.push({
-        id: m.id,
-        color: m.color,
-        fromMm: atWidthMm * from,
-        toMm: atWidthMm * to,
-        measuredMm: w,
-        atWidthMm,
-        limitMm,
-        kind,
-      });
-    };
-    if (gapOpens > start) {
-      // A shadow line until its gap is 1.0 mm — held to the limit of a shadow line — then an ordinary stroke.
-      add(start, Math.min(gapOpens, limits.shadowMinMm / w), limits.shadowMinMm, startKind);
-      add(gapOpens, limits.satinMinMm / w, limits.satinMinMm, "loses-shadow");
-    } else {
-      add(start, limits.satinMinMm / w, limits.satinMinMm, startKind);
-    }
-  }
-  return out.sort(byFrom);
-}
-
-/**
- * The smallest size from `fromMm` that lies in none of the `ranges` (half open: the end is outside,
- * the start inside), with the range whose end it is — the last one it had to get past. With `whole`
- * a whole number of millimetres, rounded up: a size inside a range is followed to the end of it,
- * rounded up, and so on until one lies in none.
- */
-export function smallestWidthOutside(
-  ranges: ForbiddenRange[],
-  fromMm: number,
-  opts: { whole?: boolean } = {},
-): { widthMm: number; by?: ForbiddenRange } {
-  const whole = opts.whole === true;
-  const up = (x: number): number => (whole ? Math.ceil(x - WHOLE_EPS) : x);
-  // A range that ends within the tolerance of a whole number ends there.
-  const tolerance = whole ? WHOLE_EPS : 0;
-  let s = up(fromMm);
-  let by: ForbiddenRange | undefined;
-  for (;;) {
-    // Of the ranges that hold it, the one that reaches furthest: fewest steps, and the same on every run.
-    let hit: ForbiddenRange | undefined;
-    for (const r of ranges) {
-      if (!(r.fromMm <= s && s < r.toMm - tolerance)) continue;
-      if (hit === undefined || r.toMm > hit.toMm || (r.toMm === hit.toMm && r.id < hit.id)) hit = r;
-    }
-    if (hit === undefined) return by === undefined ? { widthMm: s } : { widthMm: s, by };
-    s = up(hit.toMm);
-    by = hit;
-  }
-}
-
-/** A stretch of logo widths that is in some range: where the ranges overlap or touch, they are one. */
-export type WidthSpan = {
-  fromMm: number;
+export type SizeDriver = {
+  id: string;
+  color: string;
+  /** Median width in the ordered size, mm. */
+  orderedMm: number;
+  /** The limit it is held to, mm: 1.0, or 0.7 as a shadow line. */
+  limitMm: number;
+  shadowLine: boolean;
+  /** The width it had at the last check before the size found, mm… */
+  measuredMm: number;
+  /** …at this logo width, mm. */
+  atWidthMm: number;
+  /** The logo width, mm, from which it holds if its width grows in proportion; the size found is this rounded up. */
   toMm: number;
-  /** The ranges it is made of, by where they begin. */
-  ranges: ForbiddenRange[];
 };
-
-/** The ranges as stretches of logo widths, by where they begin. */
-export function mergeRanges(ranges: ForbiddenRange[]): WidthSpan[] {
-  const spans: WidthSpan[] = [];
-  for (const r of [...ranges].sort(byFrom)) {
-    const last = spans[spans.length - 1];
-    if (last !== undefined && r.fromMm <= last.toMm) {
-      last.toMm = Math.max(last.toMm, r.toMm);
-      last.ranges.push(r);
-    } else {
-      spans.push({ fromMm: r.fromMm, toMm: r.toMm, ranges: [r] });
-    }
-  }
-  return spans;
-}
 
 export type MinimumSizeSearchOptions = {
   /** The ordered logo width, mm: where the search starts, and the size it never goes below. */
   orderedWidthMm: number;
-  /** The preset the columns are set with (`underlapMm`). Default Piqué. */
+  /** The preset the columns are set with, in the ordered size only (`underlapMm`). Default Piqué. */
   preset?: Preset;
   /** Default `SATIN_STROKE_MIN_MM`. */
   satinMinMm?: number;
@@ -222,19 +119,16 @@ export type MinimumSizeSearchOptions = {
   maxFactor?: number;
 };
 
-/**
- * One check of the search: a logo width, how many satin strokes were under their limit in it, and
- * how many were held to the lower limit of a shadow line (`MinimumSizeResult.shadowLines`).
- */
-export type SearchStep = { widthMm: number; under: number; shadowLines: number };
+/** One check of the search: a logo width, and how many strokes of the set were under their limit in it. */
+export type SearchStep = { widthMm: number; under: number };
 
 export type MinimumSizeSearch = {
   /** The ordered logo width the search started from, mm. */
   orderedWidthMm: number;
   /**
-   * The minimum size, mm: where `found`, the smallest size from the ordered one at which the check
-   * finds no satin stroke under its limit — the ordered size itself where that holds, else a whole
-   * number of millimetres. Where not, the last size checked: no size that holds.
+   * The minimum size, mm: where `found`, the smallest size from the ordered one in which every stroke
+   * of the set holds — the ordered size itself where that holds, else a whole number of millimetres.
+   * Where not, the last size checked: no size that holds.
    */
   widthMm: number;
   /** False where the search gave up (`reason`). */
@@ -247,34 +141,38 @@ export type MinimumSizeSearch = {
   enlarged: boolean;
   /** The ordered size is under the minimum size — or, where none was found, has strokes under their limit. */
   belowMinimum: boolean;
-  /**
-   * The stroke that sets the size found, as the range at whose end it lies — with its width, the
-   * logo width it was measured at, and its limit. Absent where the ordered size holds.
-   */
-  decisive?: ForbiddenRange;
+  /** The stroke that sets the size found. Absent where the ordered size holds, or where none was found. */
+  decisive?: SizeDriver;
   /** Every check made, in order: the ordered size first, the size found last. */
   steps: SearchStep[];
-  /** The satin strokes held to the lower limit at the size found (`MinimumSizeResult.shadowLines`). */
-  shadowLines: string[];
   /**
-   * The ranges above the size found, by where they begin (module doc): where a stroke would be too
-   * narrow in a larger logo. Empty where none was found.
+   * The satin strokes of the ordered size with the limit each is held to (`orderedStrokes`): the set the
+   * search kept, and what the check of the size made is given (`MinimumSizeOptions.ordered`).
    */
-  above: ForbiddenRange[];
+  ordered: OrderedStroke[];
+  /** The shadow lines among them, by id: held to the lower limit. */
+  shadowLines: string[];
   /** The limits it ran with, mm. */
   limits: SizeLimits;
 };
-
-/** The satin strokes held to the lower limit: a rail at a fabric gap, and narrower than the ordinary one. */
-const shadowLinesOf = (measures: ShapeMeasure[], limits: SizeLimits): string[] =>
-  measures
-    .filter((m) => m.shapeClass === "satin" && m.shadowLine && m.widthMm < limits.satinMinMm)
-    .map((m) => m.id);
 
 function requirePositive(name: string, value: number): void {
   if (!Number.isFinite(value) || value <= 0) {
     throw new RangeError(`${name} must be a positive number, got ${value}`);
   }
+}
+
+/** The median widths of the strokes of the set in a list of shapes, by key; a stroke not in the list is left out. */
+function widthsOf(shapes: ImportedShape[], keys: ReadonlySet<string>): Map<string, number> {
+  const widths = new Map<string, number>();
+  const all = areaKeys(shapes);
+  shapes.forEach((shape, i) => {
+    const key = all[i];
+    if (shape.kind === "area" && key !== undefined && keys.has(key)) {
+      widths.set(key, medianShapeWidthMm(shape.polygon));
+    }
+  });
+  return widths;
 }
 
 /**
@@ -288,8 +186,8 @@ export function findMinimumSize(
 ): MinimumSizeSearch {
   const ordered = opts.orderedWidthMm;
   const limits: SizeLimits = {
-    satinMinMm: opts.satinMinMm ?? SATIN_STROKE_MIN_MM,
-    shadowMinMm: opts.shadowMinMm ?? SHADOW_LINE_MIN_MM,
+    satinMinMm: opts.satinMinMm ?? DEFAULT_LIMITS.satinMinMm,
+    shadowMinMm: opts.shadowMinMm ?? DEFAULT_LIMITS.shadowMinMm,
   };
   const maxSteps = opts.maxSteps ?? SEARCH_MAX_STEPS;
   const maxFactor = opts.maxFactor ?? SEARCH_MAX_FACTOR;
@@ -303,21 +201,34 @@ export function findMinimumSize(
     throw new RangeError(`maxFactor must be a number from 1, got ${maxFactor}`);
   }
   const preset = opts.preset ?? PRESETS.pique;
-  const measureOpts = { preset, railsBelowMm: Math.max(limits.satinMinMm, limits.shadowMinMm) };
   const cap = ordered * maxFactor;
+
+  // The ordered size, once and with the columns: which shapes are satin, which are shadow lines. A
+  // stroke at or above the larger limit holds either way, and is not asked for its rails.
+  const set = orderedStrokes(
+    measureShapes(shapesAt(ordered), {
+      preset,
+      railsBelowMm: Math.max(limits.satinMinMm, limits.shadowMinMm),
+    }),
+    limits,
+  );
+  const keys = new Set(set.map((o) => o.key));
 
   const steps: SearchStep[] = [];
   let width = ordered;
-  let shapes = shapesAt(width);
-  let measures = measureShapes(shapes, measureOpts);
-  let decisive: ForbiddenRange | undefined;
+  let widths = new Map(set.map((o) => [o.key, o.widthMm]));
+  let decisive: SizeDriver | undefined;
   let found = false;
   let reason: MinimumSizeSearch["reason"];
 
   for (;;) {
-    const under = measures.filter((m) => isTooNarrow(m, limits)).length;
-    steps.push({ widthMm: width, under, shadowLines: shadowLinesOf(measures, limits).length });
-    if (under === 0) {
+    // A stroke that is not in the shapes of this size cannot be held to a limit there.
+    const under = set.flatMap((o) => {
+      const w = widths.get(o.key);
+      return w !== undefined && w < o.limitMm ? [{ stroke: o, widthMm: w }] : [];
+    });
+    steps.push({ widthMm: width, under: under.length });
+    if (under.length === 0) {
       found = true;
       break;
     }
@@ -325,32 +236,37 @@ export function findMinimumSize(
       reason = "steps";
       break;
     }
-    // Below the end of the ranges of the satin strokes every size fails; the next one to check is
-    // the first whole millimetre outside them (module doc). It lies above this one: the strokes
-    // under their limit here are in a range that holds the size.
-    const ranges = forbiddenRanges(
-      measures.filter((m) => m.shapeClass === "satin"),
-      width,
-      limits,
-    );
-    const next = smallestWidthOutside(ranges, width, { whole: true });
-    const nextWidth = Math.max(next.widthMm, Math.floor(width) + 1);
+    // The size at which every one holds if its width grew in proportion: the largest of them. A stroke
+    // cannot hold before it (module doc, "Nothing is skipped"); the check in that size says whether it does.
+    let driver = under[0]!;
+    let need = holdsFromWidth(width, driver.stroke.limitMm, driver.widthMm);
+    for (const u of under) {
+      const n = holdsFromWidth(width, u.stroke.limitMm, u.widthMm);
+      // The first of equals: the same input names the same stroke.
+      if (n > need) {
+        driver = u;
+        need = n;
+      }
+    }
+    const nextWidth = Math.max(Math.ceil(need - WHOLE_EPS), Math.floor(width) + 1);
     if (nextWidth > cap) {
       reason = "factor";
       break;
     }
-    decisive = next.by;
+    decisive = {
+      id: driver.stroke.id,
+      color: driver.stroke.color,
+      orderedMm: driver.stroke.widthMm,
+      limitMm: driver.stroke.limitMm,
+      shadowLine: driver.stroke.shadowLine,
+      measuredMm: driver.widthMm,
+      atWidthMm: width,
+      toMm: need,
+    };
     width = nextWidth;
-    shapes = shapesAt(width);
-    measures = measureShapes(shapes, measureOpts);
+    widths = widthsOf(shapesAt(width), keys);
   }
 
-  const shadowLines = found ? shadowLinesOf(measures, limits) : [];
-  const above = found
-    ? forbiddenRanges(addRunningRails(measures, shapes, preset), width, limits).filter(
-        (r) => r.fromMm > width,
-      )
-    : [];
   return {
     orderedWidthMm: ordered,
     widthMm: width,
@@ -361,8 +277,8 @@ export function findMinimumSize(
     belowMinimum: steps[0]!.under > 0,
     ...(found && decisive !== undefined ? { decisive } : {}),
     steps,
-    shadowLines,
-    above,
+    ordered: set,
+    shadowLines: set.filter((o) => o.shadowLine).map((o) => o.id),
     limits,
   };
 }

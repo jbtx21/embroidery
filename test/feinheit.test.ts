@@ -5,7 +5,8 @@
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { initGeometry } from "@texma-stitch/geometry";
-import { checkMinimumSize } from "@texma-stitch/engine";
+import { checkMinimumSize, measureShapes, orderedStrokes } from "@texma-stitch/engine";
+import { growScene, scaledAt } from "../packages/engine/test/fixtures/gate.js";
 import {
   areaShape,
   gapBlocks,
@@ -19,6 +20,7 @@ import {
   befundZeilen,
   feinheitSvg,
   mm,
+  pruefstellenZeile,
   svgZuPng,
   zusammenfassung,
 } from "../tools/feinheit.mjs";
@@ -28,29 +30,44 @@ beforeAll(async () => {
 });
 
 const GRAY = "#bebebe";
-/** Eine Lücke von 0,5 mm (Rang 1: hält ab ≈ 116 mm) und ein Strich von 1 mm (Rang 2, ≈ 102 mm). */
+/** Eine Lücke von 0,5 mm (Rang 1: hält ab ≈ 116 mm) und ein Strich von 0,8 mm (Rang 2, ≈ 96 mm). */
 function szene() {
   const [a, b] = gapBlocks(0.5);
   const shapes = [
     areaShape("a", a, GRAY),
     areaShape("b", b, GRAY),
-    areaShape("zier", polygonOf(rect(0, 20, 40, 1.0)), "#000000"),
+    areaShape("zier", polygonOf(rect(0, 20, 40, 0.8)), "#000000"),
   ];
   return { shapes, result: checkMinimumSize(shapes, { widthMm: 80 }) };
 }
 
 /**
- * Stoff von 0,5 mm zwischen Grau und Rot (Rang 1: hält ab ≈ 116 mm) und ein Strich von 1 mm
- * (Rang 2, ≈ 102 mm): dieselbe Szene, nur ist die zweite Form rot statt grau.
+ * Stoff von 0,5 mm zwischen Grau und Rot (Rang 1: hält ab ≈ 116 mm) und ein Strich von 0,8 mm
+ * (Rang 2, ≈ 96 mm): dieselbe Szene, nur ist die zweite Form rot statt grau.
  */
 function szeneStoff() {
   const [a, b] = gapBlocks(0.5);
   const shapes = [
     areaShape("a", a, GRAY),
     areaShape("b", b, "#c8102e"),
-    areaShape("zier", polygonOf(rect(0, 20, 40, 1.0)), "#000000"),
+    areaShape("zier", polygonOf(rect(0, 20, 40, 0.8)), "#000000"),
   ];
   return { shapes, result: checkMinimumSize(shapes, { widthMm: 80 }) };
+}
+
+/**
+ * Die Prüfstellen des Tors: bestellt in 80 mm, geprüft in 96 mm. Das Haar von 0,6 mm war in 80 mm ein
+ * Laufstich und ist in 96 mm Satin unter 1,0 mm („Erst Satin“, Rang 1); der Strich von 0,85 mm war Satin
+ * und ist in 96 mm etwa 1,07 mm breit („Satin knapp“, Rang 2).
+ */
+function szenePruefstellen() {
+  const shapes = growScene(0.6);
+  const ordered = orderedStrokes(measureShapes(shapes, { railsBelowMm: 1.0 }), {
+    satinMinMm: 1.0,
+    shadowMinMm: 0.7,
+  });
+  const at = scaledAt(shapes)(96);
+  return { shapes: at, result: checkMinimumSize(at, { widthMm: 96, ordered }) };
 }
 
 describe("mm", () => {
@@ -62,8 +79,30 @@ describe("mm", () => {
 
 describe("befundeJeArt", () => {
   it("zählt Satinstriche, Lücken und Stofflücken getrennt", () => {
-    expect(befundeJeArt(szene().result)).toEqual({ satin: 1, luecke: 1, stoff: 0 });
-    expect(befundeJeArt(szeneStoff().result)).toEqual({ satin: 1, luecke: 0, stoff: 1 });
+    expect(befundeJeArt(szene().result)).toEqual({
+      satin: 1,
+      luecke: 1,
+      stoff: 0,
+      spaet: 0,
+      knapp: 0,
+    });
+    expect(befundeJeArt(szeneStoff().result)).toEqual({
+      satin: 1,
+      luecke: 0,
+      stoff: 1,
+      spaet: 0,
+      knapp: 0,
+    });
+  });
+
+  it("zählt die Prüfstellen des Tors als eigene Arten: erst Satin, und knapp", () => {
+    expect(befundeJeArt(szenePruefstellen().result)).toEqual({
+      satin: 0,
+      luecke: 0,
+      stoff: 0,
+      spaet: 1,
+      knapp: 1,
+    });
   });
 });
 
@@ -73,11 +112,11 @@ describe("zusammenfassung", () => {
     const lines = zusammenfassung(result);
     expect(lines[0]).toContain(`Mindestgröße     ${Math.ceil(result.minimumWidthMm!)} mm`);
     expect(lines[0]).toContain(`bestimmt von Satinstrich ${result.decisive!.id}`);
-    expect(lines[0]).toContain("Grenze 1.3 mm");
+    expect(lines[0]).toContain("Grenze 1.0 mm");
     expect(lines[1]).toContain(`Lücken offen ab  ${Math.ceil(result.gapsOpenFromWidthMm!)} mm`);
     expect(lines[1]).toContain(`bestimmt von Lücke ${result.decisiveGap!.id}`);
     expect(lines[1]).toContain("Grenze 0.8 mm");
-    expect(lines.join("\n")).toContain("1 Satinstrich unter 1.3 mm, 1 Lücke unter 0.8 mm");
+    expect(lines.join("\n")).toContain("1 Satinstrich unter 1.0 mm, 1 Lücke unter 0.8 mm");
     // Die Lücke verlangt mehr als der Strich — und ändert die Mindestgröße trotzdem nicht.
     expect(result.gapsOpenFromWidthMm!).toBeGreaterThan(result.minimumWidthMm!);
   });
@@ -91,7 +130,7 @@ describe("zusammenfassung", () => {
     expect(lines[0]).toContain("die bestellten 80.0 mm halten");
     expect(result.minimumWidthMm!).toBeLessThan(80);
     expect(lines[1]).toContain("keine zu feinen Lücken bei 80.0 mm");
-    expect(lines.join("\n")).toContain("0 Satinstriche unter 1.3 mm, 0 Lücken unter 0.8 mm");
+    expect(lines.join("\n")).toContain("0 Satinstriche unter 1.0 mm, 0 Lücken unter 0.8 mm");
   });
 
   it("sagt es, wenn das Logo keinen Satinstrich hat", () => {
@@ -121,7 +160,7 @@ describe("zusammenfassung", () => {
     expect(lines[1]).toContain("bestimmt von Stofflücke fabric-001");
     expect(lines[1]).toContain("Grenze 0.8 mm");
     expect(lines.join("\n")).toContain(
-      "1 Satinstrich unter 1.3 mm, 0 Lücken unter 0.8 mm, " +
+      "1 Satinstrich unter 1.0 mm, 0 Lücken unter 0.8 mm, " +
         "1 Stofflücke (zwischen Farben) unter 0.8 mm",
     );
     // Die Mindestgröße kommt weiter allein aus den Satinstrichen.
@@ -136,6 +175,22 @@ describe("zusammenfassung", () => {
     expect(lines).toHaveLength(zusammenfassung(result).length - 1);
     // Der Rest ist derselbe Text.
     expect(lines).toEqual(zusammenfassung(result).slice(1));
+  });
+
+  it("sagt, wo das Tor die Menge der bestellten Größe mitgab, die Prüfstellen: erst Satin und knapp", () => {
+    const { result } = szenePruefstellen();
+    const lines = zusammenfassung(result, { ohneMindestgroesse: true });
+    const i = lines.findIndex((l: string) => l.startsWith("Befunde"));
+    // Die Prüfstellen stehen gleich unter den Befunden, und sind keine Satinstriche unter der Grenze.
+    expect(lines[i]).toContain("0 Satinstriche unter 1.0 mm");
+    expect(lines[i + 1]).toBe(
+      "Prüfstellen      1 Form erst in 96 mm Satin, unter 1.0 mm · 1 Satinstrich von 1.0 bis unter 1.3 mm",
+    );
+  });
+
+  it("schweigt von den Prüfstellen, wo die Prüfung die Menge nicht kannte", () => {
+    const { result } = szene();
+    expect(zusammenfassung(result).some((l: string) => l.startsWith("Prüfstellen"))).toBe(false);
   });
 
   it("sagt auch, was der Filter bei den Stofflücken herausgenommen hat", () => {
@@ -173,7 +228,7 @@ describe("befundZeilen", () => {
       /^ {3}1 {2}Lücke {7}gap-bebebe-001 +0\.\d\d mm +0\.8 mm +\d+ mm {2}\(10\.3, 2\.5\)/,
     );
     expect(lines[2]).toMatch(
-      /^ {3}2 {2}Satinstrich zier +1\.\d\d mm +1\.3 mm +\d+ mm {2}\(20\.0, 20\.5\)/,
+      /^ {3}2 {2}Satinstrich zier +0\.\d\d mm +1\.0 mm +\d+ mm {2}\(20\.0, 20\.4\)/,
     );
   });
 
@@ -224,6 +279,21 @@ describe("befundZeilen", () => {
     expect(lines[1]).toContain("Loch: Breite = einbeschriebener Kreis");
   });
 
+  it("nennt die Prüfstellen des Tors mit eigener Art und einem Hinweis, was sie sind", () => {
+    const { result } = szenePruefstellen();
+    expect(result.findings.map((f) => [f.kind, f.id])).toEqual([
+      ["satin-late", "haar"],
+      ["satin-near", "strich"],
+    ]);
+    const lines = befundZeilen(result.findings);
+    expect(lines[1]).toMatch(
+      /^ {3}1 {2}Erst Satin {2}haar +0\.\d\d mm +1\.0 mm +\d+ mm {2}\(\d+\.\d, \d+\.\d\) +erst in dieser Größe Satin; alternativ Laufstich/,
+    );
+    expect(lines[2]).toMatch(
+      /^ {3}2 {2}Satin knapp strich +1\.\d\d mm +1\.3 mm +\d+ mm {2}\(\d+\.\d, \d+\.\d\) +schmaler als die übliche Säule \(Probestick\)$/,
+    );
+  });
+
   it("kürzt die Anzeige und sagt, wie viele fehlen", () => {
     const { result } = szene();
     const lines = befundZeilen(result.findings, { max: 1 });
@@ -266,6 +336,14 @@ describe("feinheitSvg", () => {
     const blau = svg.split(`<g fill="#0057d9"`)[1]!.split("</g>")[0]!;
     expect(blau.match(/<path /g)).toHaveLength(1);
     expect(svg).toContain("blau: Stofflücke");
+  });
+
+  it("beschriftet die Prüfstellen des Tors: E erst Satin, K knapp", () => {
+    const { shapes, result } = szenePruefstellen();
+    const svg = feinheitSvg(shapes, result, { name: "probe", heightMm: 30 });
+    expect(svg.match(/>E1</g)).toHaveLength(2);
+    expect(svg.match(/>K2</g)).toHaveLength(2);
+    expect(svg).toContain("E erst Satin, K knapp");
   });
 
   it("stellt die Seite und, wo Formen darüber hinausreichen, auch diese dar", () => {
@@ -327,7 +405,7 @@ describe("feinheitSvg", () => {
       areaShape("b", b, GRAY),
       areaShape("c", polygonOf(rect(0, 40, 10, 5)), GRAY),
       areaShape("d", polygonOf(rect(10.7, 40, 10, 5)), GRAY),
-      areaShape("zier", polygonOf(rect(0, 20, 40, 1.0)), "#000000"),
+      areaShape("zier", polygonOf(rect(0, 20, 40, 0.8)), "#000000"),
     ];
     const result = checkMinimumSize(shapes, { widthMm: 80 });
     expect(result.findings.map((f) => f.kind)).toEqual(["gap", "satin-stroke", "gap"]);
@@ -357,6 +435,31 @@ describe("feinheitSvg", () => {
     const svg = feinheitSvg(shapes, result, { name: "a&b<c>" });
     expect(svg).toContain("a&amp;b&lt;c&gt;");
     expect(svg).not.toContain("a&b<c>");
+  });
+});
+
+describe("pruefstellenZeile (die Prüfstellen des Tors in einer Zeile)", () => {
+  it("zählt die Formen, die erst in dieser Größe Satin werden, und die Satinstriche von 1,0 bis unter 1,3 mm", () => {
+    const { result } = szenePruefstellen();
+    expect(pruefstellenZeile(result.findings, { breiteMm: 96, limits: result.limits })).toBe(
+      "Prüfstellen      1 Form erst in 96 mm Satin, unter 1.0 mm · 1 Satinstrich von 1.0 bis unter 1.3 mm",
+    );
+  });
+
+  it("sagt Mehrzahl, Null und Breiten mit einer Stelle", () => {
+    const limits = { satinMinMm: 1.0, typicalMm: 1.3 };
+    const f = (kind: string) => ({ kind }) as never;
+    expect(
+      pruefstellenZeile([f("satin-late"), f("satin-late"), f("satin-near")], {
+        breiteMm: 110.828,
+        limits,
+      }),
+    ).toBe(
+      "Prüfstellen      2 Formen erst in 110.8 mm Satin, unter 1.0 mm · 1 Satinstrich von 1.0 bis unter 1.3 mm",
+    );
+    expect(pruefstellenZeile([], { breiteMm: 80, limits })).toBe(
+      "Prüfstellen      0 Formen erst in 80 mm Satin, unter 1.0 mm · 0 Satinstriche von 1.0 bis unter 1.3 mm",
+    );
   });
 });
 

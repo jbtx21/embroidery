@@ -53,7 +53,8 @@ export function tScene(near: "stem" | "bar" | "none", strokeMm = 0.9): ImportedS
 /**
  * A stroke of 0.85 mm (satin and too narrow at 80 mm) and, far from it, a bar of `hairMm`: a
  * running stitch at 80 mm that turns satin as the logo grows — the case of the grey stroke in the
- * STUTTGART logo (0.47 mm at 80 mm, 0.70 mm at 120 mm).
+ * STUTTGART logo (0.47 mm at 80 mm, 0.70 mm at 120 mm). It is not one of the strokes of the ordered
+ * size: it does not set the size the stroke sets, and in that size it is a check point.
  */
 export function growScene(hairMm: number): ImportedShape[] {
   return [
@@ -63,15 +64,26 @@ export function growScene(hairMm: number): ImportedShape[] {
 }
 
 /**
- * A stroke of 0.8 mm with a red block 0.9 mm below it: at 80 mm a shadow line (the gap is under
- * 1.0 mm), from 1.0 ÷ 0.9 = 1.11 times the size on an ordinary stroke again — and then still too
- * narrow until it is 1.3 mm wide.
+ * A stroke of `barMm` (0.8 mm) with a red block 0.9 mm below it: at 80 mm a shadow line (the gap is
+ * under 1.0 mm), from 1.0 ÷ 0.9 = 1.11 times the size on an ordinary stroke again — as a drawing
+ * measured in the size it is stitched in, not as the gate holds it (the gate keeps the status of
+ * the ordered size, spec §5.2, Tor).
  */
-export function fadingScene(): ImportedShape[] {
+export function fadingScene(barMm = 0.8): ImportedShape[] {
   return [
-    areaShape("schatten", barAt(0, 0, 40, 0.8), GOLD),
-    areaShape("buchstabe", barAt(0, 0.8 + 0.9, 40, 3), RED),
+    areaShape("schatten", barAt(0, 0, 40, barMm), GOLD),
+    areaShape("buchstabe", barAt(0, barMm + 0.9, 40, 3), RED),
   ];
+}
+
+/**
+ * The shadow line that fades (`fadingScene`, 0.72 mm) and, far from it, a free stroke of 0.8 mm
+ * that is too narrow at 80 mm and sets the size: where it holds (97 mm) the gap of the shadow line
+ * is 1.09 mm — no gap any more — and the stroke 0.9 mm wide. Held to the limit it had at 80 mm
+ * (a shadow line: 0.7 mm) it still holds; measured afresh it would be too narrow.
+ */
+export function frozenScene(): ImportedShape[] {
+  return [...fadingScene(0.72), areaShape("frei", barAt(0, 30, 40, 0.8), GRAY)];
 }
 
 /** A stroked line 0.5 mm from the bar: what the template counts as a form too (`lineCover`). */

@@ -19,6 +19,8 @@ import {
   aloneScene,
   barAt,
   fadingScene,
+  frozenScene,
+  growScene,
   lineNeighbourScene,
   scaledAt,
   shadowScene,
@@ -28,6 +30,7 @@ import { PRESETS } from "../presets.js";
 import { classifyShape, SATIN_FROM_MM } from "./classify.js";
 import { satinColumns } from "./columns.js";
 import {
+  areaKeys,
   checkMinimumSize,
   GAP_MIN_MM,
   GAP_SAMPLE_MM,
@@ -35,7 +38,10 @@ import {
   GAP_THIN_MM,
   holdsFromWidth,
   measureShapes,
+  orderedStrokes,
+  reviewSatin,
   SATIN_STROKE_MIN_MM,
+  SATIN_TYPICAL_MM,
   SHADOW_LINE_MIN_MM,
 } from "./min-size.js";
 import { buildInkstitchTemplate, designForms, lineCover, LINE_COVER_HALF_MM } from "./template.js";
@@ -59,7 +65,10 @@ const coverOverGap = (h = 7): Polygon => polygonOf(rect(9, -1, 3, h));
 
 describe("constants (spec §5.2)", () => {
   it("carries the decided limits and the filter values of the second version", () => {
-    expect(SATIN_STROKE_MIN_MM).toBe(1.3);
+    // 29.09.2026: 1.3 mm; 01.10.2026: 1.0 mm for a load-bearing stroke — the 1.3 mm of the archive
+    // describe the typical column of a file, not the narrowest that holds, and stay as the check point.
+    expect(SATIN_STROKE_MIN_MM).toBe(1.0);
+    expect(SATIN_TYPICAL_MM).toBe(1.3);
     expect(GAP_MIN_MM).toBe(0.8);
     // Slivers under 0.01 mm come off (an opening by half of it), the width is read every 0.1 mm,
     // and a piece under 0.1 mm — the DST resolution — is not a gap.
@@ -86,26 +95,26 @@ describe("holdsFromWidth", () => {
 });
 
 describe("checkMinimumSize — satin strokes and the minimum size", () => {
-  it("flags a satin stroke under 1.3 mm and names the width it holds from", () => {
-    const r = checkMinimumSize([areaShape("balken", bar(1.0))], { widthMm: B });
+  it("flags a satin stroke under 1.0 mm and names the width it holds from", () => {
+    const r = checkMinimumSize([areaShape("balken", bar(0.9))], { widthMm: B });
     expect(r.findings).toHaveLength(1);
     const f = r.findings[0]!;
     expect(f.kind).toBe("satin-stroke");
     expect(f.id).toBe("balken");
     expect(f.color).toBe(BLACK);
-    expect(f.limitMm).toBe(1.3);
+    expect(f.limitMm).toBe(1.0);
     expect(f.measure).toBe("median");
-    expect(f.measuredMm).toBeGreaterThan(0.95);
-    expect(f.measuredMm).toBeLessThan(1.1);
-    expect(f.holdsFromWidthMm).toBeCloseTo((B * 1.3) / f.measuredMm, 9);
+    expect(f.measuredMm).toBeGreaterThan(0.9);
+    expect(f.measuredMm).toBeLessThan(1.0);
+    expect(f.holdsFromWidthMm).toBeCloseTo((B * 1.0) / f.measuredMm, 9);
     // What the finding carries for the preview: the shape itself, and where it is.
-    expect(polygonArea(f.polygon)).toBeCloseTo(40 * 1.0, 6);
+    expect(polygonArea(f.polygon)).toBeCloseTo(40 * 0.9, 6);
     expect(f.at.x).toBeCloseTo(20, 6);
-    expect(f.at.y).toBeCloseTo(0.5, 6);
+    expect(f.at.y).toBeCloseTo(0.45, 6);
   });
 
-  it("takes the minimum size from the satin strokes: the width from which all are 1.3 mm", () => {
-    const r = checkMinimumSize([areaShape("balken", bar(1.0))], { widthMm: B });
+  it("takes the minimum size from the satin strokes: the width from which all are 1.0 mm", () => {
+    const r = checkMinimumSize([areaShape("balken", bar(0.9))], { widthMm: B });
     const f = r.findings[0]!;
     expect(r.minimumWidthMm).toBe(f.holdsFromWidthMm);
     expect(r.minimumWidthMm!).toBeGreaterThan(B);
@@ -116,8 +125,8 @@ describe("checkMinimumSize — satin strokes and the minimum size", () => {
   it("lets the narrowest of several strokes decide", () => {
     const r = checkMinimumSize(
       [
-        areaShape("breit", shift(bar(1.2), 0, 10)),
-        areaShape("schmal", bar(0.9)),
+        areaShape("breit", shift(bar(0.95), 0, 10)),
+        areaShape("schmal", bar(0.8)),
         areaShape("gut", shift(bar(2.0), 0, 20)),
       ],
       { widthMm: B },
@@ -128,7 +137,7 @@ describe("checkMinimumSize — satin strokes and the minimum size", () => {
   });
 
   it("measures it the way the classification does, one width for both", () => {
-    const shape = bar(1.1);
+    const shape = bar(0.85);
     const r = checkMinimumSize([areaShape("balken", shape)], { widthMm: B });
     expect(r.findings[0]!.measuredMm).toBe(classifyShape(shape, "balken").widthMm);
   });
@@ -141,11 +150,18 @@ describe("checkMinimumSize — satin strokes and the minimum size", () => {
   it("leaves a stroke of 1.5 mm alone and says how far the logo could shrink", () => {
     const r = checkMinimumSize([areaShape("balken", bar(1.5))], { widthMm: B });
     expect(r.findings).toEqual([]);
-    // Every stroke holds at the ordered width; the minimum is where the narrowest reaches 1.3 mm.
+    // Every stroke holds at the ordered width; the minimum is where the narrowest reaches 1.0 mm.
     expect(r.decisive!.id).toBe("balken");
-    expect(r.minimumWidthMm).toBeCloseTo(holdsFromWidth(B, 1.3, r.decisive!.measuredMm), 9);
-    expect(r.minimumWidthMm!).toBeGreaterThan(65);
-    expect(r.minimumWidthMm!).toBeLessThan(72);
+    expect(r.minimumWidthMm).toBeCloseTo(holdsFromWidth(B, 1.0, r.decisive!.measuredMm), 9);
+    expect(r.minimumWidthMm!).toBeGreaterThan(50);
+    expect(r.minimumWidthMm!).toBeLessThan(56);
+  });
+
+  it("leaves a stroke between 1.0 and 1.3 mm alone: no finding without a set of the ordered size", () => {
+    // The typical column of the archive is a check point of the gate (`ordered`), not a limit of this check.
+    const r = checkMinimumSize([areaShape("balken", bar(1.1))], { widthMm: B });
+    expect(r.findings).toEqual([]);
+    expect(r.ordered).toBe(false);
   });
 
   it("does not count a hairline: under 0.7 mm it is a running stitch, not a satin stroke", () => {
@@ -176,7 +192,7 @@ describe("checkMinimumSize — satin strokes and the minimum size", () => {
   });
 });
 
-describe("checkMinimumSize — shadow lines: limit 0.7 mm instead of 1.3 mm (spec §5.2, 30.09.2026)", () => {
+describe("checkMinimumSize — shadow lines: limit 0.7 mm instead of 1.0 mm (spec §5.2, 30.09.2026)", () => {
   type Result = ReturnType<typeof checkMinimumSize>;
   const strokes = (r: Result) => r.findings.filter((f) => f.kind === "satin-stroke");
 
@@ -186,18 +202,18 @@ describe("checkMinimumSize — shadow lines: limit 0.7 mm instead of 1.3 mm (spe
     expect(r.shadowLines).toEqual(["schatten"]);
   });
 
-  it("flags the same bar standing alone, against 1.3 mm", () => {
+  it("flags the same bar standing alone, against 1.0 mm", () => {
     const r = checkMinimumSize(aloneScene(), { widthMm: B });
     expect(strokes(r)).toHaveLength(1);
     expect(strokes(r)[0]!.id).toBe("schatten");
-    expect(strokes(r)[0]!.limitMm).toBe(1.3);
+    expect(strokes(r)[0]!.limitMm).toBe(1.0);
     expect(strokes(r)[0]!.shadowLine).toBe(false);
     expect(r.shadowLines).toEqual([]);
   });
 
-  it("does not hang the limit on the width: a stroke of 1.2 mm is a finding alone and none at a gap", () => {
-    expect(strokes(checkMinimumSize(aloneScene(1.2), { widthMm: B }))).toHaveLength(1);
-    const beside = checkMinimumSize(shadowScene(0.5, 1.2), { widthMm: B });
+  it("does not hang the limit on the width: a stroke of 0.95 mm is a finding alone and none at a gap", () => {
+    expect(strokes(checkMinimumSize(aloneScene(0.95), { widthMm: B }))).toHaveLength(1);
+    const beside = checkMinimumSize(shadowScene(0.5, 0.95), { widthMm: B });
     expect(strokes(beside)).toEqual([]);
     expect(beside.shadowLines).toEqual(["schatten"]);
   });
@@ -268,9 +284,9 @@ describe("checkMinimumSize — shadow lines: limit 0.7 mm instead of 1.3 mm (spe
   });
 
   it("lets the stroke that asks for the most decide — not the narrowest, where the limits differ", () => {
-    // A shadow line of 0.75 mm holds from ~0.93 times the size; a free stroke of 1.0 mm from 1.3 times.
+    // A shadow line of 0.75 mm holds from ~0.9 times the size; a free stroke of 0.9 mm from 1.05 times.
     const r = checkMinimumSize(
-      [...shadowScene(0.5, 0.75), areaShape("frei", barAt(0, 30, 40, 1.0), "#000000")],
+      [...shadowScene(0.5, 0.75), areaShape("frei", barAt(0, 30, 40, 0.9), "#000000")],
       { widthMm: B },
     );
     expect(r.decisive!.id).toBe("frei");
@@ -279,22 +295,22 @@ describe("checkMinimumSize — shadow lines: limit 0.7 mm instead of 1.3 mm (spe
   });
 
   it("takes the limit of a shadow line as an option, and says so on the finding", () => {
-    const r = checkMinimumSize(shadowScene(0.5), { widthMm: B, shadowMinMm: 1.0 });
+    const r = checkMinimumSize(shadowScene(0.5), { widthMm: B, shadowMinMm: 1.2 });
     expect(strokes(r)).toHaveLength(1);
-    expect(strokes(r)[0]!.limitMm).toBe(1.0);
+    expect(strokes(r)[0]!.limitMm).toBe(1.2);
     expect(strokes(r)[0]!.shadowLine).toBe(true);
-    expect(r.limits.shadowMinMm).toBe(1.0);
+    expect(r.limits.shadowMinMm).toBe(1.2);
   });
 
   it("counts only the strokes the lower limit matters for: a wide stroke at a gap is no shadow line", () => {
-    // The red letter stroke of 3 mm has a rail at the gap as well; its limit is 1.3 mm either way.
+    // The red letter stroke of 3 mm has a rail at the gap as well; its limit is 1.0 mm either way.
     const r = checkMinimumSize(shadowScene(0.5), { widthMm: B });
     expect(r.shadowLines).toEqual(["schatten"]);
   });
 
   it("loses the lower limit where the drawing grows and the gap with it: 0.9 mm at 80 mm, 1.01 mm at 90 mm", () => {
     // The gap is measured in the millimetres of the size the check runs at — a shadow line at one
-    // size is an ordinary stroke at another, and too narrow for a while after it (spec §5.2).
+    // size is an ordinary stroke at another (the gate keeps the status of the ordered size: `ordered`).
     const shapes = fadingScene();
     const at80 = checkMinimumSize(shapes, { widthMm: 80 });
     expect(strokes(at80)).toEqual([]);
@@ -302,7 +318,7 @@ describe("checkMinimumSize — shadow lines: limit 0.7 mm instead of 1.3 mm (spe
     const at90 = checkMinimumSize(scaledAt(shapes)(90), { widthMm: 90 });
     expect(at90.shadowLines).toEqual([]);
     expect(strokes(at90)).toHaveLength(1);
-    expect(strokes(at90)[0]!.limitMm).toBe(1.3);
+    expect(strokes(at90)[0]!.limitMm).toBe(1.0);
   });
 
   it("agrees with the template: a stroke is a shadow line where the template leaves a rail without compensation", () => {
@@ -346,6 +362,178 @@ describe("checkMinimumSize — shadow lines: limit 0.7 mm instead of 1.3 mm (spe
     expect(checkMinimumSize(shapes, { widthMm: B })).toEqual(
       checkMinimumSize(shapes, { widthMm: B }),
     );
+  });
+});
+
+/** The set of the ordered size, as `findMinimumSize` keeps it: the satin strokes of the shapes as they are ordered. */
+const setOf = (shapes: ReturnType<typeof growScene>) =>
+  orderedStrokes(measureShapes(shapes, { railsBelowMm: 1.0 }), {
+    satinMinMm: 1.0,
+    shadowMinMm: 0.7,
+  });
+
+describe("checkMinimumSize — check points of the gate: a form that turns satin, a stroke between the limit and the typical column (spec §5.2, 01.10.2026)", () => {
+  type Result = ReturnType<typeof checkMinimumSize>;
+  const kinds = (r: Result, kind: string) => r.findings.filter((f) => f.kind === kind);
+
+  it("reports a form that was no satin stroke in the ordered size and is one under its limit now as 'satin-late'", () => {
+    // The hairline of 0.6 mm is a running stitch at 80 mm; at 96 mm it is satin, about 0.77 mm wide.
+    const shapes = growScene(0.6);
+    const ordered = setOf(shapes);
+    const r = checkMinimumSize(scaledAt(shapes)(96), { widthMm: 96, ordered });
+    const late = kinds(r, "satin-late");
+    expect(late.map((f) => f.id)).toEqual(["haar"]);
+    expect(late[0]).toMatchObject({
+      color: "#bebebe",
+      limitMm: 1.0,
+      shadowLine: false,
+      measure: "median",
+    });
+    expect(late[0]!.measuredMm).toBeGreaterThanOrEqual(0.7);
+    expect(late[0]!.measuredMm).toBeLessThan(1.0);
+    expect(late[0]!.holdsFromWidthMm).toBeCloseTo((96 * 1.0) / late[0]!.measuredMm, 9);
+    expect(late[0]!.runningAlternative).toBe(true);
+    // The stroke of the set is wide enough at 96 mm: no other finding of the satin kinds.
+    expect(kinds(r, "satin-stroke")).toEqual([]);
+    expect(r.ordered).toBe(true);
+  });
+
+  it("reports the same form as a finding of the ordinary kind where there is no set: nobody knows it was a running stitch", () => {
+    const shapes = growScene(0.6);
+    const r = checkMinimumSize(scaledAt(shapes)(96), { widthMm: 96 });
+    expect(kinds(r, "satin-stroke").map((f) => f.id)).toEqual(["haar"]);
+    expect(kinds(r, "satin-late")).toEqual([]);
+    expect(r.ordered).toBe(false);
+  });
+
+  it("keeps a stroke of the set under its limit an ordinary finding: it was satin in the ordered size", () => {
+    const shapes = aloneScene(0.9);
+    const r = checkMinimumSize(shapes, { widthMm: B, ordered: setOf(shapes) });
+    expect(kinds(r, "satin-stroke").map((f) => f.id)).toEqual(["schatten"]);
+    expect(kinds(r, "satin-late")).toEqual([]);
+  });
+
+  it("holds a stroke of the set to the limit it had in the ordered size: a shadow line to 0.7 mm", () => {
+    // The shadow line of 0.72 mm and its gap of 0.9 mm: at 97 mm it has no gap under 1.0 mm any more and
+    // measures about 0.9 mm — an ordinary stroke under 1.0 mm if looked at afresh. The set says: shadow line.
+    const shapes = frozenScene();
+    const ordered = setOf(shapes);
+    const at = scaledAt(shapes)(97);
+    const kept = checkMinimumSize(at, { widthMm: 97, ordered });
+    expect(kept.findings.filter((f) => f.id === "schatten")).toEqual([]);
+    // Without the set the same stroke is a finding at 97 mm.
+    const afresh = checkMinimumSize(at, { widthMm: 97 });
+    expect(
+      afresh.findings.filter((f) => f.kind === "satin-stroke" && f.id === "schatten"),
+    ).toHaveLength(1);
+  });
+
+  it("reports a satin stroke between 1.0 and 1.3 mm as 'satin-near', against the typical column of 1.3 mm", () => {
+    const shapes = aloneScene(1.1);
+    const r = checkMinimumSize(shapes, { widthMm: B, ordered: setOf(shapes) });
+    expect(r.findings).toHaveLength(1);
+    const f = r.findings[0]!;
+    expect(f).toMatchObject({
+      kind: "satin-near",
+      id: "schatten",
+      limitMm: 1.3,
+      shadowLine: false,
+    });
+    expect(f.measuredMm).toBeGreaterThanOrEqual(1.0);
+    expect(f.measuredMm).toBeLessThan(1.3);
+    expect(f.holdsFromWidthMm).toBeCloseTo((B * 1.3) / f.measuredMm, 9);
+    expect(f.runningAlternative).toBe(false);
+    // A stroke over the typical column is no check point...
+    const wide = aloneScene(1.5);
+    expect(checkMinimumSize(wide, { widthMm: B, ordered: setOf(wide) }).findings).toEqual([]);
+    // ...and one under the limit is a finding, not 'near'.
+    const thin = aloneScene(0.9);
+    const under = checkMinimumSize(thin, { widthMm: B, ordered: setOf(thin) });
+    expect(kinds(under, "satin-near")).toEqual([]);
+  });
+
+  it("reports no 'satin-near' without a set: the check alone knows one limit", () => {
+    expect(checkMinimumSize(aloneScene(1.1), { widthMm: B }).findings).toEqual([]);
+  });
+
+  it("does not report a shadow line as near: its limit is 0.7 mm, and 0.75 mm has been stitched cleanly", () => {
+    // A shadow line of 1.1 mm — the shadow of a letter in a larger size.
+    const shapes = shadowScene(0.5, 1.1);
+    const r = checkMinimumSize(shapes, { widthMm: B, ordered: setOf(shapes) });
+    expect(kinds(r, "satin-near")).toEqual([]);
+    // The channel of 0.5 mm between the shadow line and the letter is a fabric gap, and the only finding.
+    expect(r.findings.map((f) => f.kind)).toEqual(["fabric-gap"]);
+  });
+
+  it("leaves the minimum size to the strokes of the set: a form that turns satin sets none", () => {
+    const shapes = growScene(0.6);
+    const ordered = setOf(shapes);
+    const r = checkMinimumSize(scaledAt(shapes)(96), { widthMm: 96, ordered });
+    expect(r.decisive!.id).toBe("strich");
+    // The form is still a finding of the check, with the width it would hold from.
+    const haar = r.findings.find((f) => f.id === "haar")!;
+    expect(haar.holdsFromWidthMm).toBeGreaterThan(r.minimumWidthMm!);
+  });
+
+  it("takes the typical column as an option", () => {
+    const shapes = aloneScene(1.1);
+    const ordered = setOf(shapes);
+    expect(checkMinimumSize(shapes, { widthMm: B, ordered, typicalMm: 1.05 }).findings).toEqual([]);
+    const wider = checkMinimumSize(shapes, { widthMm: B, ordered, typicalMm: 1.6 });
+    expect(wider.findings[0]).toMatchObject({ kind: "satin-near", limitMm: 1.6 });
+  });
+
+  it("lists the check points among the findings by the width they hold from, and finds the same for the same input", () => {
+    const shapes = [...growScene(0.6), areaShape("nah", barAt(0, 40, 40, 1.1), "#000000")];
+    const ordered = setOf(shapes);
+    const at = scaledAt(shapes)(96);
+    const r = checkMinimumSize(at, { widthMm: 96, ordered });
+    const widths = r.findings.map((f) => f.holdsFromWidthMm);
+    expect(widths).toEqual([...widths].sort((x, y) => y - x));
+    expect(r.findings.map((f) => f.kind)).toContain("satin-near");
+    expect(r.findings.map((f) => f.kind)).toContain("satin-late");
+    expect(checkMinimumSize(at, { widthMm: 96, ordered })).toEqual(r);
+  });
+});
+
+describe("reviewSatin (the satin findings of one size, without the gap analysis)", () => {
+  it("gives the satin findings of the check, all three kinds, in the same order", () => {
+    const shapes = [
+      ...growScene(0.6),
+      areaShape("nah", barAt(0, 40, 40, 1.1), "#000000"),
+      areaShape("frei", barAt(0, 50, 40, 0.9), "#000000"),
+    ];
+    const ordered = setOf(shapes);
+    const kinds = new Set<string>();
+    for (const widthMm of [80, 96]) {
+      const at = scaledAt(shapes)(widthMm);
+      const full = checkMinimumSize(at, { widthMm, ordered });
+      const lean = reviewSatin(at, { widthMm, ordered });
+      const satin = full.findings.filter((f) => f.kind.startsWith("satin"));
+      expect(lean, `${widthMm} mm`).toEqual(satin);
+      for (const f of lean) kinds.add(f.kind);
+    }
+    // At 80 mm two strokes are under the limit and one is near; at 96 mm the hairline has turned satin.
+    expect([...kinds].sort()).toEqual(["satin-late", "satin-near", "satin-stroke"]);
+  });
+
+  it("finds a form that turns satin in the size looked at", () => {
+    const shapes = growScene(0.6);
+    const lean = reviewSatin(scaledAt(shapes)(96), { widthMm: 96, ordered: setOf(shapes) });
+    // The hairline is satin now and under 1.0 mm; the stroke of 0.85 mm has grown to about 1.07 mm.
+    expect(lean.map((f) => [f.kind, f.id])).toEqual([
+      ["satin-late", "haar"],
+      ["satin-near", "strich"],
+    ]);
+  });
+
+  it("takes the limits as options and refuses what it cannot divide by", () => {
+    const shapes = aloneScene(1.1);
+    const ordered = setOf(shapes);
+    expect(reviewSatin(shapes, { widthMm: B, ordered, typicalMm: 1.05 })).toEqual([]);
+    expect(() => reviewSatin(shapes, { widthMm: 0, ordered })).toThrow(RangeError);
+    expect(() => reviewSatin(shapes, { widthMm: B, ordered, satinMinMm: 0 })).toThrow(RangeError);
+    expect(() => reviewSatin(shapes, { widthMm: B, ordered, typicalMm: -1 })).toThrow(RangeError);
   });
 });
 
@@ -421,7 +609,7 @@ describe("measureShapes (what the check reads of every area shape at the size it
     const wide = m.find((x) => x.id === "buchstabe")!;
     expect(wide.shadowLine).toBe(false);
     expect(wide.railGapsMm).toEqual([]);
-    // The check gives the same either way: the stroke of 3 mm is held to 1.3 mm with or without its rails.
+    // The check gives the same either way: the stroke of 3 mm is held to 1.0 mm with or without its rails.
     const r = checkMinimumSize(shadowScene(0.5), { widthMm: B });
     expect(r.findings.filter((f) => f.kind === "satin-stroke")).toEqual([]);
     expect(r.shadowLines).toEqual(["schatten"]);
@@ -432,7 +620,7 @@ describe("measureShapes (what the check reads of every area shape at the size it
     expect(m.every((x) => !x.shadowLine && x.railGapsMm.length === 0)).toBe(true);
   });
 
-  it("leaves a running stitch without columns unless asked: a stroke that is no satin has no rails", () => {
+  it("leaves a running stitch without columns: a stroke that is no satin has no rails", () => {
     const shapes = [
       areaShape("lauf", barAt(0, 0, 40, 0.5), "#d1b35a"),
       areaShape("buchstabe", barAt(0, 1.0, 40, 3), "#c8102e"),
@@ -441,28 +629,101 @@ describe("measureShapes (what the check reads of every area shape at the size it
     expect(plain[0]!.shapeClass).toBe("running");
     expect(plain[0]!.shadowLine).toBe(false);
     expect(plain[0]!.railGapsMm).toEqual([]);
-    expect(plain[0]!.hypothetical).toBe(false);
   });
 
-  it("with `running`, reads what a running stitch would have as a satin stroke: its rails as a hypothesis", () => {
-    const shapes = [
-      areaShape("lauf", barAt(0, 0, 40, 0.5), "#d1b35a"),
-      areaShape("buchstabe", barAt(0, 1.0, 40, 3), "#c8102e"),
-    ];
-    const m = measureShapes(shapes, { running: true });
-    expect(m[0]!.shapeClass).toBe("running");
-    expect(m[0]!.hypothetical).toBe(true);
-    expect(m[0]!.railGapsMm).toHaveLength(1);
-    expect(m[0]!.railGapsMm[0]!).toBeCloseTo(0.5, 2);
-    // A satin shape is not a hypothesis.
-    expect(m[1]!.hypothetical).toBe(false);
-  });
-
-  it("reads the fading shadow line: a gap of 0.9 mm is a rail gap today, and is what it loses the limit at", () => {
+  it("reads the fading shadow line: a gap of 0.9 mm is a rail gap today, and is what it loses the status at", () => {
     const m = measureShapes(fadingScene(), {});
     const s = m.find((x) => x.id === "schatten")!;
     expect(s.shadowLine).toBe(true);
     expect(s.railGapsMm[0]!).toBeCloseTo(0.9, 2);
+  });
+
+  it("keys every area shape by its id; a second shape with the same id gets a key of its own", () => {
+    const shapes = [
+      areaShape("a", barAt(0, 0, 40, 0.9)),
+      areaShape("b", barAt(0, 10, 40, 0.9)),
+      areaShape("a", barAt(0, 20, 40, 0.9)),
+      areaShape("a", barAt(0, 30, 40, 0.9)),
+    ];
+    const m = measureShapes(shapes, {});
+    expect(m.map((x) => x.id)).toEqual(["a", "b", "a", "a"]);
+    expect(new Set(m.map((x) => x.key)).size).toBe(4);
+    // The first keeps its id as the key: what a set made of one size finds again in another.
+    expect(m[0]!.key).toBe("a");
+    expect(m[1]!.key).toBe("b");
+    expect(measureShapes(shapes, {}).map((x) => x.key)).toEqual(m.map((x) => x.key));
+  });
+});
+
+describe("areaKeys (how a shape is found again in another size)", () => {
+  it("is the id of an area shape, and undefined for a line: lines are no strokes", () => {
+    const keys = areaKeys([
+      areaShape("a", barAt(0, 0, 40, 0.9)),
+      lineShape("linie", [pt(0, 5), pt(40, 5)]),
+      areaShape("b", barAt(0, 10, 40, 0.9)),
+    ]);
+    expect(keys).toEqual(["a", undefined, "b"]);
+  });
+
+  it("numbers a second shape with the same id apart, in document order, with a character no XML id holds", () => {
+    const keys = areaKeys([
+      areaShape("x", barAt(0, 0, 40, 0.9)),
+      areaShape("x", barAt(0, 10, 40, 0.9)),
+      areaShape("x", barAt(0, 20, 40, 0.9)),
+    ]);
+    expect(keys).toEqual(["x", "x\u00012", "x\u00013"]);
+    // An id of a file cannot be mistaken for such a key: XML allows no U+0001 in an attribute.
+    expect(keys[1]).not.toBe("x2");
+  });
+
+  it("is the same for the same shapes at another size", () => {
+    const shapes = [areaShape("x", barAt(0, 0, 40, 0.9)), areaShape("x", barAt(0, 10, 40, 0.9))];
+    expect(areaKeys(scaledAt(shapes)(120))).toEqual(areaKeys(shapes));
+  });
+});
+
+describe("orderedStrokes (the satin strokes of the ordered size, each with the limit it is held to)", () => {
+  const limits = { satinMinMm: 1.0, shadowMinMm: 0.7 };
+  const ordered = (shapes: ReturnType<typeof shadowScene>) =>
+    orderedStrokes(measureShapes(shapes, { railsBelowMm: 1.0 }), limits);
+
+  it("lists what the classification calls satin, in document order, with its width and limit", () => {
+    const shapes = [
+      areaShape("lauf", barAt(0, 0, 40, 0.5)),
+      areaShape("satin", barAt(0, 10, 40, 0.9)),
+      areaShape("breit", barAt(0, 20, 40, 2.0)),
+      areaShape("platte", barAt(0, 30, 40, 8)),
+      lineShape("linie", [pt(0, 50), pt(40, 50)]),
+    ];
+    const set = ordered(shapes);
+    expect(set.map((o) => o.id)).toEqual(["satin", "breit"]);
+    expect(set[0]).toMatchObject({ id: "satin", color: BLACK, shadowLine: false, limitMm: 1.0 });
+    expect(set[0]!.widthMm).toBe(classifyShape(barAt(0, 10, 40, 0.9), "satin").widthMm);
+    expect(set[1]).toMatchObject({ id: "breit", limitMm: 1.0 });
+  });
+
+  it("holds a stroke at a fabric gap to the lower limit, and says it is a shadow line", () => {
+    const set = ordered(shadowScene(0.5));
+    expect(set.find((o) => o.id === "schatten")).toMatchObject({ shadowLine: true, limitMm: 0.7 });
+    // The letter stroke of 3 mm is wider than the limit: it is not asked for its rails.
+    expect(set.find((o) => o.id === "buchstabe")).toMatchObject({
+      shadowLine: false,
+      limitMm: 1.0,
+    });
+  });
+
+  it("takes the limits it is given", () => {
+    const set = orderedStrokes(measureShapes(shadowScene(0.5), { railsBelowMm: 1.3 }), {
+      satinMinMm: 1.3,
+      shadowMinMm: 0.9,
+    });
+    expect(set.map((o) => o.limitMm)).toEqual([0.9, 1.3]);
+  });
+
+  it("keeps the key of the measure: the way a stroke is found again in another size", () => {
+    const shapes = [areaShape("x", barAt(0, 0, 40, 0.9)), areaShape("x", barAt(0, 20, 40, 0.9))];
+    const m = measureShapes(shapes, {});
+    expect(orderedStrokes(m, limits).map((o) => o.key)).toEqual(m.map((x) => x.key));
   });
 });
 
@@ -558,7 +819,7 @@ describe("checkMinimumSize — gaps within a colour", () => {
     expect(gap.polygon.holes).toHaveLength(1);
     expect(onOutline(gap)).toBe(true);
 
-    const thin = polygonOf(rect(0, 0, 20, 12), [rect(1, 1, 18, 10).reverse()]); // a wall of 1 mm
+    const thin = polygonOf(rect(0, 0, 20, 12), [rect(0.8, 0.8, 18.4, 10.4).reverse()]); // a wall of 0.8 mm
     const stroke = checkMinimumSize([areaShape("wand", thin)], { widthMm: B }).findings[0]!;
     expect(stroke.kind).toBe("satin-stroke");
     expect(onOutline(stroke)).toBe(true);
@@ -987,7 +1248,7 @@ describe("checkMinimumSize — fabric gaps between colours (spec §5.2)", () => 
   });
 
   it("counts toward the second number, and leaves the minimum size to the satin strokes", () => {
-    // Fabric of 0.5 mm between grey and red; a gap of 0.7 mm within grey elsewhere; a stroke of 1.0 mm.
+    // Fabric of 0.5 mm between grey and red; a gap of 0.7 mm within grey elsewhere; a stroke of 0.8 mm.
     const [a, b] = gapBlocks(0.5, 10, 8);
     const [c, d] = gapBlocks(0.7, 10, 8);
     const r = checkMinimumSize(
@@ -996,12 +1257,12 @@ describe("checkMinimumSize — fabric gaps between colours (spec §5.2)", () => 
         red("b", b),
         gray("c", shift(c, 0, 30)),
         gray("d", shift(d, 0, 30)),
-        areaShape("zier", shift(bar(1.0), 0, 60), BLACK),
+        areaShape("zier", shift(bar(0.8), 0, 60), BLACK),
       ],
       { widthMm: B },
     );
-    // By the width they hold from, the largest first: fabric 0.5 mm → 125 mm, stroke 1.0 mm →
-    // 104 mm, gap 0.7 mm → 91 mm.
+    // By the width they hold from, the largest first: fabric 0.5 mm → 125 mm, stroke 0.8 mm →
+    // 96 mm, gap 0.7 mm → 91 mm.
     expect(r.findings.map((f) => f.kind)).toEqual(["fabric-gap", "satin-stroke", "gap"]);
     const [fabric, stroke] = r.findings as [
       (typeof r.findings)[number],
@@ -1093,7 +1354,7 @@ describe("checkMinimumSize — the second number: all gaps open from", () => {
   };
 
   it("comes from the gaps alone and does not move the minimum size, which the strokes set", () => {
-    const r = checkMinimumSize(scene(0.5, 1.0), { widthMm: B });
+    const r = checkMinimumSize(scene(0.5, 0.8), { widthMm: B });
     expect(r.findings).toHaveLength(2);
     const stroke = r.findings.find((f) => f.kind === "satin-stroke")!;
     const gap = r.findings.find((f) => f.kind === "gap")!;
@@ -1138,15 +1399,15 @@ describe("checkMinimumSize — the second number: all gaps open from", () => {
   });
 
   it("lists the findings of both kinds by the width they hold from, the largest first", () => {
-    const r = checkMinimumSize(scene(0.5, 1.0), { widthMm: B });
+    const r = checkMinimumSize(scene(0.5, 0.8), { widthMm: B });
     const widths = r.findings.map((f) => f.holdsFromWidthMm);
     expect(widths).toEqual([...widths].sort((x, y) => y - x));
     expect(r.findings[0]!.kind).toBe("gap");
   });
 
   it("scales with the ordered width like the minimum size does", () => {
-    const at80 = checkMinimumSize(scene(0.5, 1.0), { widthMm: 80 });
-    const at160 = checkMinimumSize(scene(0.5, 1.0), { widthMm: 160 });
+    const at80 = checkMinimumSize(scene(0.5, 0.8), { widthMm: 80 });
+    const at160 = checkMinimumSize(scene(0.5, 0.8), { widthMm: 160 });
     expect(at160.gapsOpenFromWidthMm).toBeCloseTo(2 * at80.gapsOpenFromWidthMm!, 6);
     expect(at160.minimumWidthMm).toBeCloseTo(2 * at80.minimumWidthMm!, 6);
   });
@@ -1177,23 +1438,30 @@ describe("checkMinimumSize — options, input, accounting", () => {
       (B * 2) / stroke.findings[0]!.measuredMm,
       9,
     );
-    // The decorative-line remark is the spec's 0.7 to 1.3 mm, not whatever limit was passed.
+    // The decorative-line remark is the spec's 0.7 to 1.0 mm, not whatever limit was passed.
     expect(stroke.findings[0]!.runningAlternative).toBe(false);
   });
 
   it("says which limits it ran with", () => {
     expect(checkMinimumSize([], { widthMm: B }).limits).toEqual({
-      satinMinMm: 1.3,
+      satinMinMm: 1.0,
       gapMinMm: 0.8,
       shadowMinMm: 0.7,
+      typicalMm: 1.3,
     });
     const custom = checkMinimumSize([], {
       widthMm: B,
       satinMinMm: 1.5,
       gapMinMm: 0.6,
       shadowMinMm: 0.9,
+      typicalMm: 2,
     });
-    expect(custom.limits).toEqual({ satinMinMm: 1.5, gapMinMm: 0.6, shadowMinMm: 0.9 });
+    expect(custom.limits).toEqual({
+      satinMinMm: 1.5,
+      gapMinMm: 0.6,
+      shadowMinMm: 0.9,
+      typicalMm: 2,
+    });
   });
 
   it("refuses an ordered width it cannot divide by", () => {
@@ -1203,6 +1471,7 @@ describe("checkMinimumSize — options, input, accounting", () => {
     expect(() => checkMinimumSize([], { widthMm: B, satinMinMm: 0 })).toThrow(RangeError);
     expect(() => checkMinimumSize([], { widthMm: B, gapMinMm: -1 })).toThrow(RangeError);
     expect(() => checkMinimumSize([], { widthMm: B, shadowMinMm: 0 })).toThrow(RangeError);
+    expect(() => checkMinimumSize([], { widthMm: B, typicalMm: 0 })).toThrow(RangeError);
   });
 
   it("finds nothing in nothing", () => {

@@ -4,14 +4,21 @@
  *   pnpm mindestgroesse <svg> [preset] [--breite <mm>] [--alle]
  *
  * Liest die SVG in der bestellten Größe (Breite der SVG in mm, oder `--breite`) und meldet zuerst
- * das **Tor** (tools/tor.mjs): die kleinste Größe ab der bestellten, in der kein Satinstrich unter
- * seiner Grenze liegt, und das Element, das sie bestimmt — gesucht über die Größe, nicht aus der
- * bestellten hochgerechnet —, dazu die Schattenlinien (Grenze 0,7 mm statt 1,3 mm) und die Bereiche
- * darüber, in denen ein Strich zu schmal wird. Nichts davon ändert die Vorlage; `pnpm inkstitch`
- * erzeugt in der Mindestgröße.
+ * das **Tor** (tools/tor.mjs): die kleinste Größe ab der bestellten, in der jeder Satinstrich der
+ * bestellten Größe seine Grenze hält (1,0 mm, Schattenlinien 0,7 mm; welche Formen Satin und welche
+ * Schattenlinien sind, wird in der bestellten Größe festgelegt und bleibt), und der Strich, der sie
+ * bestimmt — gesucht über die Größe, nicht aus der bestellten hochgerechnet —, dazu die Zahl der
+ * gezählten Striche und die Schattenlinien. Passt das Motiv in dieser Größe nicht in den Rahmen des
+ * Presets, auch gedreht nicht, steht gleich unter der ersten Zeile die Rahmenwarnung. Nichts davon
+ * ändert die Vorlage; `pnpm inkstitch` erzeugt in der Mindestgröße.
+ *
+ * Danach die **Prüfstellen in der erzeugten Größe** (Spec §5.2, §13.4): Formen, die erst in dieser
+ * Größe Satin werden und unter ihrer Grenze liegen — sie bestimmen die Größe nicht —, und Satinstriche
+ * von 1,0 bis unter 1,3 mm, der üblichen Säule des Archivs; je mit Kennung, gemessen, Grenze. Dieselben
+ * stehen als Prüfstellen in der Nacharbeit-Datei von `pnpm inkstitch`.
  *
  * Danach die Feinheit **in der bestellten Größe**: welche Elemente zu fein sind — Satinstriche
- * unter ihrer Grenze (1,3 mm, Schattenlinien 0,7 mm), Lücken innerhalb einer Farbe unter 0,8 mm und
+ * unter ihrer Grenze (1,0 mm, Schattenlinien 0,7 mm), Lücken innerhalb einer Farbe unter 0,8 mm und
  * Stofflücken zwischen Farben (Stoff, der zwischen zwei Elementen offen bleibt, etwa der Spalt
  * zwischen Buchstabe und Schatten; ebenfalls unter 0,8 mm) — und ab welcher Logobreite sie halten.
  * Die Lücken ergeben eine zweite Zahl, „**Lücken offen ab**“ (feine Zierkanäle treiben sie weit
@@ -22,14 +29,27 @@
  * bestimmenden beschriftet (S Satinstrich, L Lücke, F Stofflücke) — und daneben
  * out/<name>.feinheit.png (tools/feinheit.mjs).
  *
- * Die Liste ist auf 40 Befunde gekürzt und sagt es; --alle druckt jeden (und alle Bereiche und
- * Schattenlinien). Das Bild zeigt sie alle.
+ * Die Listen sind auf 40 Zeilen gekürzt und sagen es; --alle druckt jede (und alle Schattenlinien).
+ * Das Bild zeigt alle Befunde.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
-import { checkMinimumSize, importShapes, initEngine, PRESETS } from "@texma-stitch/engine";
-import { befundZeilen, feinheitSvg, svgZuPng, zusammenfassung } from "./feinheit.mjs";
-import { formenBei, sucheTor, torDetails, torKopf, torKurz } from "./tor.mjs";
+import {
+  checkMinimumSize,
+  importShapes,
+  initEngine,
+  PRESETS,
+  reviewSatin,
+  SATIN_TYPICAL_MM,
+} from "@texma-stitch/engine";
+import {
+  befundZeilen,
+  feinheitSvg,
+  pruefstellenZeile,
+  svgZuPng,
+  zusammenfassung,
+} from "./feinheit.mjs";
+import { sucheTor, torDetails, torKopf, torKurz } from "./tor.mjs";
 
 const LISTE_MAX = 40;
 
@@ -91,8 +111,21 @@ if (tor.search === undefined) {
 const torSekunden = (performance.now() - started) / 1000;
 for (const line of torKopf(tor, { meldung: true })) console.log(line);
 
+// Die Prüfstellen des Tors in der Größe, in der erzeugt würde: die Formen in dieser Größe, wie der Lauf sie liest.
+const pruefstart = performance.now();
+const erzeugtMm = tor.search.found ? tor.search.widthMm : undefined;
+const pruefstellen =
+  erzeugtMm === undefined
+    ? undefined
+    : reviewSatin(tor.formen(erzeugtMm), {
+        widthMm: erzeugtMm,
+        ordered: tor.search.ordered,
+        preset,
+      });
+const pruefSekunden = (performance.now() - pruefstart) / 1000;
+
 // Die Feinheit in der bestellten Größe: die Formen in dieser Größe, wie der Lauf sie liest.
-const shapes = formenBei(svgText, original)(bestelltMm);
+const shapes = tor.formen(bestelltMm);
 const feinheitStart = performance.now();
 const result = checkMinimumSize(shapes, { widthMm: bestelltMm, preset });
 const feinheitSekunden = (performance.now() - feinheitStart) / 1000;
@@ -120,6 +153,25 @@ console.log(`Vorschau      out/${name}.feinheit.svg, out/${name}.feinheit.png`);
 
 console.log(`\nMindestgröße (Spec §5.2, Tor) · ${torSekunden.toFixed(1)} s`);
 for (const line of torDetails(tor, { alle })) console.log(`  ${line}`);
+
+if (pruefstellen === undefined) {
+  console.log(
+    "\nPrüfstellen (Spec §5.2, §13.4): ohne gefundene Mindestgröße gibt es keine Größe, in der erzeugt würde",
+  );
+} else {
+  console.log(
+    `\nPrüfstellen in ${Number(erzeugtMm.toFixed(1))} mm, der Größe, in der erzeugt würde ` +
+      `(Spec §5.2, §13.4) · ${pruefSekunden.toFixed(1)} s`,
+  );
+  const limits = { satinMinMm: tor.search.limits.satinMinMm, typicalMm: SATIN_TYPICAL_MM };
+  console.log(`  ${pruefstellenZeile(pruefstellen, { breiteMm: erzeugtMm, limits })}`);
+  if (pruefstellen.length > 0) {
+    console.log("  (eigene Nummern, nicht die der Befunde unten und des Vorschaubilds)");
+    for (const line of befundZeilen(pruefstellen, { max: alle ? Infinity : LISTE_MAX })) {
+      console.log(`  ${line}`);
+    }
+  }
+}
 
 console.log(
   `\nFeinheit (Spec §5.2) in ${Number(bestelltMm.toFixed(1))} mm · ${feinheitSekunden.toFixed(1)} s`,
