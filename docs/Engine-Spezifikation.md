@@ -377,7 +377,7 @@ Nutzer entschied: größer sticken, vereinfachen oder so lassen.)*
 
 | Prüfung | Grenze | Herkunft |
 |---|---|---|
-| Satinstrich, tragend (Formen, die §7.8.1 in der bestellten Größe als Satin einteilt), mittlere Breite | mindestens **1,0 mm** *(01.10.2026, vorher 1,3 mm)* | Übliche Untergrenze für Satin. Die 1,3 mm aus dem TEXMA-Archiv (p5 der mittleren Satinbreite je Datei in 192 Produktionsdateien, Minimum 1,05, Median 1,98) beschreiben die typische Säule einer Datei, nicht die schmalste, die hält. Am Tor gemessen: mit 1,3 mm STUTTGART 80 → 118 mm, Köln 90 → 169 mm; mit 1,0 mm 91 und 144 mm. Tragende Satinstriche zwischen 1,0 und 1,3 mm werden Prüfstellen (§13.4; Schattenlinien nicht, ihre Grenze ist 0,7 mm); der Probestick bestätigt oder korrigiert |
+| Satinstrich, tragend (Formen, die §7.8.1 in der bestellten Größe als Satin einteilt), mittlere Breite | mindestens **1,0 mm** *(01.10.2026, vorher 1,3 mm)* | Übliche Untergrenze für Satin. Die 1,3 mm aus dem TEXMA-Archiv (p5 der mittleren Satinbreite je Datei in 192 Produktionsdateien, Minimum 1,05, Median 1,98) beschreiben die typische Säule einer Datei, nicht die schmalste, die hält. Am Tor gemessen: mit 1,3 mm STUTTGART 80 → 118 mm, Köln 90 → 169 mm; mit 1,0 mm 91 und 134 mm. Tragende Satinstriche zwischen 1,0 und 1,3 mm werden Prüfstellen (§13.4; Schattenlinien nicht, ihre Grenze ist 0,7 mm); der Probestick bestätigt oder korrigiert |
 | Schattenlinie: Satinstrich, von dem mindestens eine Rail an einem Stoffspalt unter 1,0 mm liegt (Messung wie §7.8.3 Regel 1) | mindestens **0,7 mm** — als Satin hält er also immer | Profi-Mütze „Stuttgarter Hofbräu": goldene Schattenlinien von 0,75 mm in 110 mm sauber gestickt |
 | Lücke innerhalb einer Farbe — Punze, Kerbe, Abstand zwischen Buchstaben | mindestens **0,8 mm** | **Schätzwert**: 2 × Zugausgleich (§7.2, 0,2 mm je Seite) plus eine Fadenstärke. Wird an Profi-Dateien und am Probestick nachgemessen |
 
@@ -439,17 +439,22 @@ werden, sondern Mindestgröße angeben und daraus das Stickprogramm erstellen.")
   sichtbar, die Formen nicht.
 - **Die bestellte Größe legt fest, welche Striche zählen** *(01.10.2026, Entscheidung des Nutzers
   — die Fassung vom 30.09. teilte in jeder geprüften Größe neu ein)*. Ob eine Form Satin ist
-  (§7.8.1) und ob sie eine Schattenlinie ist, wird in der bestellten Größe R bestimmt. Die
-  Mindestgröße ist die **kleinste Größe ab R**, in der jeder dieser Satinstriche seine Grenze hält;
-  gesucht wird über die Größe, und in der gefundenen Größe wird nachgemessen, weil kleine Formen
-  nicht genau linear mitwachsen. Formen, die erst beim Vergrößern Satin werden und dort unter
+  (§7.8.1) und ob sie eine Schattenlinie ist, wird in der bestellten Größe R bestimmt. Gesucht
+  wird über die Größe: aus Breite und Grenze die nächste ganze Größe, dort nachgemessen, weiter, bis
+  jeder dieser Satinstriche seine Grenze hält; von der gefundenen Größe aus wird in ganzen
+  Millimetern nach unten geprüft. Die **Mindestgröße** ist der Anfang der Reihe haltender Größen,
+  die bis zur gefundenen reicht — nicht die erste haltende von unten, denn kleine Formen messen
+  nicht genau proportional (Atzensport 80 mm hält bei 106 mm, bei 107 mm nicht, ab 108 mm wieder;
+  Köln 90 mm: Proportion 144 mm, gefunden 134 mm). Formen, die erst beim Vergrößern Satin werden und dort unter
   ihrer Grenze liegen, treiben die Größe nicht — sie werden Prüfstellen (§13.4). Grund, gemessen
   am 30.09.2026: Mit der Einteilung in jeder geprüften Größe wird jede Haarlinie beim Vergrößern
   irgendwann schmaler Satin, die Bereiche reihen sich, und die Mindestgröße lief davon
   (STUTTGART 80 mm → 252 mm, Köln 90 mm → 567 mm, Eislingen 200 mm → 1.266 mm), getrieben von
-  Zierteilen wie einem blauen Zwickel von 0,8 × 2,7 mm. Mit der Einteilung von R ist die Suche
-  monoton — ein gezählter Strich wird beim Vergrößern nur breiter —, einen Bereich darüber, in
-  dem das Logo wieder durchfällt, gibt es nicht.
+  Zierteilen wie einem blauen Zwickel von 0,8 × 2,7 mm. Mit der Einteilung von R wird ein
+  gezählter Strich beim Vergrößern breiter; bis auf die Messung kleiner Formen ist die Suche damit
+  monoton, und einen Bereich darüber, in dem das Logo wieder durchfällt, gibt es nicht mehr
+  (gemessen, nicht bewiesen: an allen sechs vergrößerten Kundenlogos hielt jede Größe bis 40 mm
+  über der gefundenen).
 - **Rahmen** *(01.10.2026, Entscheidung des Nutzers)*. Passt das Motiv in der erzeugten Größe
   nicht in den Rahmen des Presets, auch um 90° gedreht nicht, wird trotzdem erzeugt, und die
   Ausgabe warnt deutlich: der Rahmen ist eine Frage der Maschine (größerer Rahmen, Teilung), das
