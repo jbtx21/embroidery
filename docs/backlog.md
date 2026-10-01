@@ -3,6 +3,23 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Nacharbeit-Datei und Ink/Stitch 3.3.0 (30.09.2026)
+
+- **Am Arbeitsplatz prüfen** (Nutzer): die Nacharbeit-Datei in Inkscape mit Ink/Stitch 3.3.0 öffnen
+  — kein Dialog, Ebenenfolge, Ebene „Prüfstellen" einblenden, Parameter eines Objekts, Simulator.
+  Hier gibt es kein Inkscape; abgeleitet ist das aus dem Quelltext und kopflosen Läufen.
+- **`output` startet in rund 12 s**, fast alles in `ThreadCatalog()` (150 Farbpaletten, für die DST
+  ohne Wirkung). Probeweise mit einem Eingriff in `run.py` (nicht eingebaut): `output` auf der
+  Hofbräu-Vorlage 9,0 statt 19,7 s, dieselbe DST. Mit der Nacharbeit-Datei läuft `output` zweimal
+  mehr (Prüfung, PES). Entscheidung offen, ob `run.py` den Katalog für DST/PES überspringen soll.
+- **Kein Schalter für die Nacharbeit-Datei.** Sie kostet je Lauf 20–60 s (STUTTGART 252 mm: 65 s,
+  davon 62 s PES). Für Messreihen wäre `--ohne-nacharbeit` nützlich.
+- **Lage der Prüfstellen** ist die Mitte der Objekt-Box; bei langen, dünnen Objekten liegt der
+  Kreis nicht immer auf dem Objekt (darum steht die Kennung im Text). Besser: ein Punkt auf der
+  Form selbst. Bei Köln sind es 350 Prüfstellen — die Vorschau wird dicht.
+- **Rückfall-Gründe englisch.** Die Texte bei „Rückfall Tatami/Laufstich" kommen aus den
+  `Warning`-Meldungen der Vorlage (Code englisch); in der Nacharbeit-Datei sollten sie deutsch sein.
+
 ## Probestick-Stand und Atzensport aus dem PDF (29.09.2026)
 
 Beim Erzeugen der fünf Probestick-Dateien und beim Umstieg von der Atzensport-Nachzeichnung auf das
@@ -28,12 +45,11 @@ Vektor-PDF des Nutzers (Zahlen in `docs/umsetzungsstand.md`).
   Rot #D1070D, die übrige Schrift #E00310 — für die Vorlage zwei Farben, für jeden Sticker ein Faden.
   Die Vorlage stickt die Umlautstriche als achten Farbblock zuletzt. Denkbar: Farben unter einem
   kleinen Abstand zusammenlegen und das in der Ausgabe nennen (§10.1 sagt dazu nichts).
-- **Der Importer übergeht den Ursprung der viewBox.** `unitScale` (`import/svg.ts`) nimmt Breite und
-  Höhe der viewBox, nicht ihren Ursprung. Eine SVG aus einem PDF hat meist einen (Hofbräu:
-  `viewBox="29.9 367.2 …"`); ihre Formen liegen in der Vorlage um den Ursprung verschoben, beim
-  Hofbräu-Motiv um 76 mm in y. Die DST ändert das nicht (sie ist auf ihre Mitte bezogen), aber die
-  Lagen in den Berichten sind verschoben: `pnpm mindestgroesse` meldet am 51 mm hohen Hofbräu-Motiv
-  „path33 bei (36.9, 88.3) mm".
+- ~~**Der Importer übergeht den Ursprung der viewBox.**~~ _Erledigt 30.09.2026 (`77099ef`, mit der
+  Nacharbeit-Datei, Spec §13.4): der Importer zieht den Ursprung ab, dann skaliert er. Hofbräu
+  9.425 → 9.420 Stiche, Atzensport aus dem PDF 12.450 → 12.411; Logos mit Ursprung 0 unverändert._
+  Vorher lagen die Formen einer PDF-SVG um den Ursprung verschoben (Hofbräu: 76 mm in y), und die
+  Lagen in den Berichten stimmten nicht („path33 bei (36.9, 88.3) mm" im 51 mm hohen Motiv).
 - **Atzensport 80 mm: die Trims bleiben auch aus dem PDF über p90** (9,16 statt 9,70 je 1000). Die
   raue Nachzeichnung war nicht die Ursache; 27 der 114 Trims setzt §10.2 (Sprung ab 5 mm), die
   übrigen setzt Ink/Stitch selbst (u. a. `auto_satin --trim`, siehe `inkstitch/README.md`). Dasselbe bei der

@@ -385,11 +385,13 @@ Stiche, TEXMA Stitch bereitet die Vorlage vor und prüft das Ergebnis; die eigen
 Stichgenerierung ist eingefroren. Phase 1b in Spec §16.
 
 **Schritt 1 — Einbau, fertig.** `inkstitch/setup.sh` holt Ink/Stitch im festen Commit
-`d59c9ab` nach `~/.cache/texma-stitch` und legt eine venv mit festen Versionen an (Erstlauf
-17–27 s, danach No-op in 11–20 ms; ein SessionStart-Hook ruft es auf). `inkstitch/run.py`
-startet jede Erweiterung kopflos und leitet Meldungen, die Ink/Stitch sonst nur im GUI-Dialog
-zeigt, auf stderr. `pnpm inkstitch <svg> [preset]` schreibt DST, PNG und die Kennzahlen gegen
-das Archiv. Jeder Ink/Stitch-Aufruf kostet rund 9 s allein für den Start.
+`d59c9ab` (seit 30.09.2026 die offizielle Version 3.3.0, siehe unten) nach
+`~/.cache/texma-stitch` und legt eine venv mit festen Versionen an (Erstlauf 17–27 s, danach
+No-op in 11–20 ms; ein SessionStart-Hook ruft es auf). `inkstitch/run.py` startet jede
+Erweiterung kopflos und leitet Meldungen, die Ink/Stitch sonst nur im GUI-Dialog zeigt, auf
+stderr. `pnpm inkstitch <svg> [preset]` schreibt DST, PNG und die Kennzahlen gegen das Archiv.
+Start eines Ink/Stitch-Aufrufs: rund 12 s für `output` (berichtigt 30.09.2026: `ThreadCatalog`
+rechnet 150 Farbpaletten um, für die DST ohne Wirkung), rund 1 s für die übrigen Erweiterungen.
 
 Die sechs Kundenlogos ergeben **Stich für Stich den Probelauf** — Ink/Stitch ist bei gleicher
 Vorlage und gleichem Commit deterministisch:
@@ -649,3 +651,54 @@ Zeichenketten je Prozess und damit die Reihenfolge von Mengen, die Ink/Stitch du
 ist einmal zu leeren (`inkstitch/README.md`). Nachgeprüft über `pnpm inkstitch`: kalter und warmer
 Cache geben dieselbe DST wie die drei Läufe mit festem Seed. Die fünf Probestick-Dateien oben
 entstanden vor dieser Änderung; ein Lauf heute kann um wenige Stiche von ihnen abweichen.
+
+**Schritt 5 — Ink/Stitch 3.3.0 statt Entwicklungsstand (30.09.2026, Entscheidung des Nutzers).** Die
+Stich-Engine läuft in der offiziellen Version 3.3.0 (Tag `v3.3.0`, Commit
+`b0edd96311ece82ee48816dc93466274b12c2a9c`, 31.07.2026) — der Version vom Arbeitsplatz, damit eine
+Nacharbeit in Inkscape genauso rechnet wie die Pipeline (ADR 0001); vorher der Entwicklungsstand
+`d59c9ab` (17.09.2026). `inkstitch/setup.sh` holt den Commit flach, sonst über den Tag, und prüft ihn
+nach dem Holen; bei einem Umstieg ersetzt es den Klon, lässt die venv bei gleichen Pins und weist auf
+Ink/Stitchs Stichplan-Cache hin (`~/.config/inkstitch/cache` — sein Schlüssel kennt die Version
+nicht; für Messungen zwischen zwei Versionen je Lauf ein leeres `XDG_CONFIG_HOME`). Die Pins in
+`inkstitch/requirements.txt` bleiben: Ink/Stitchs eigene `requirements.txt` ist an 3.3.0 dieselbe
+wie an `d59c9ab`. **Gemessen** an acht Motiven (sechs Kundenlogos, Atzensport aus dem PDF, Hofbräu),
+je Lauf mit leerem Cache und derselben Vorlage: die DST ist mit 3.3.0 **Byte für Byte dieselbe**,
+die Laufzeit liegt innerhalb von 2 %. Die elf Commits dazwischen sind Umbauten (Satin-Spalte in ein
+Paket zerlegt, Typannotationen), Simulator, Bau und Übersetzungen; `fill_stitch.py`,
+`tatami_fill.py`, `stitch_plan.py`, `output.py`, `jump_to_trim.py`, `update.py` und die
+Erweiterungen `auto_satin`, `fill_to_satin`, `output` sind in beiden Ständen byte-gleich. Rauchtest
+gegen 3.3.0: 12 von 12. Ohne festen Hash-Seed streut auch 3.3.0 (Hofbräu 9.424, 9.426, 9.427
+Stiche) — der Seed bleibt nötig.
+
+**Schritt 5 — Nacharbeit-Datei (30.09.2026, Spec §13.4).** Jeder Lauf von `pnpm inkstitch` schreibt
+nach der DST das Ink/Stitch-Dokument, aus dem sie entstand, als `<name>.nacharbeit.svg`: Seite in
+mm, eine Ebene je Farbblock in Stichfolge („01 Gold #D1B35A"), Objektnamen „Art · Farbe ·
+Quell-Kennung", und als letzte, ausgeblendete Ebene „Prüfstellen" (Kreis und Kurztext je
+Schwachstelle). Dazu `.pes` (Ink/Stitchs `output --format=pes` auf genau diese Datei),
+`.farbfolge.txt` (Nadelbelegung je Stopp, „dieselbe Nadel wie Stopp N?" bis RGB-Abstand 8) und
+`.nacharbeit.png` (Garnfarben, Prüfstellen nummeriert). Die Ebenen verschieben kein Objekt und
+teilen keine Gruppe. Gebaut in `packages/engine/src/inkstitch/` (`nacharbeit.ts`, `dst-spots.ts`,
+ein kleiner XML-Baum `xml.ts`, ohne DOM) und `tools/nacharbeit.mjs`; `--tatami` schreibt keine.
+
+Nachweis: die Nacharbeit-Datei unverändert durch `output` gibt die DST des Laufs Byte für Byte
+(kalter Cache, Rauchtest in `test/inkstitch.smoke.test.ts`):
+
+| Motiv                           | Ebenen | Prüfstellen | md5 der DST                      |
+| ------------------------------- | -----: | ----------: | -------------------------------- |
+| Hofbräu 110 mm (`cap`)          |      2 |         137 | ce94d248824854f14881f4c3d120ed33 |
+| STUTTGART 80 mm (`--ohne-tor`)  |      6 |          90 | 7211c05e5198bb756b3befc17fa0ecb0 |
+| Atzensport 80 mm (`--ohne-tor`) |      8 |         239 | 67e50d78d5970a35d9db01a971d67db1 |
+| Köln 90 mm (`--ohne-tor`)       |     15 |         350 | 127513bed3490f3d5d3f1d7418fa3e46 |
+
+Beim Bauen gefunden: (1) Der Importer rechnete den Ursprung der `viewBox` nicht ein; eine PDF-SVG
+wie Hofbräu lag rund 76 mm neben der Seite. Jetzt eingerechnet: Hofbräu 9.425 → 9.420 Stiche,
+Atzensport aus dem PDF 12.450 → 12.411 (die Zahlen im Probestick-Stand oben sind damit überholt),
+Logos mit Ursprung 0 unverändert. (2) Ein Dokument ohne `inkstitch_svg_version` hält Ink/Stitch für
+ein Altdokument und aktualisiert es beim Öffnen (`lib/update.py`, u. a. `running_stitch_length_mm`
+1,5 statt 2,5 an Nicht-Satin-Elementen); kopflos antwortet unser Platzhalter still, in Inkscape
+käme ein Dialog. Die Nacharbeit-Datei ist deshalb schon aktualisiert und trägt Version 4.
+(3) Die Prüfstellen-Ebene braucht neben `display:none` auch `inkstitch:ignore_object`: eingeblendet
+und ohne das Attribut würden ihre Kreise gestickt (DST 30.077 statt 30.005 Byte). (4) Das Feld
+`LA:` im DST-Kopf kommt aus `sodipodi:docname`; die Datei trägt keinen Namen. Kosten: ein
+`output`-Lauf mehr, 18–22 s bei 9.000 bis 21.000 Stichen. Noch nicht geprüft: das Öffnen in Inkscape
+am Arbeitsplatz (kein Dialog, Ebenenfolge, Simulator) — hier gibt es kein Inkscape.
