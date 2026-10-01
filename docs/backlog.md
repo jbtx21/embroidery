@@ -3,6 +3,24 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Mindestgrößen-Tor (01.10.2026)
+
+- **Zierteile bestimmen die Mindestgröße.** Von sieben vergrößerten Messungen bestimmt nur bei
+  Eislingen Schrift (Bruchstück der Pinselschrift); sonst eine Randlinie ums Schriftband
+  (STUTTGART), ein blauer Zwickel von 0,8 × 2,7 mm im Äskulapstab (Köln), das Innenohr des Pferds
+  (Atzensport), ein Lichtreflex in der Nüster. Ein Puncher vergrößert für solche Teile kein Logo, er
+  stickt sie als Laufstich oder schmalen Satin. Denkbar: Schrift erkennen und nur sie die Größe
+  bestimmen lassen, oder eine Flächengrenze für Größentreiber. Entscheiden mit den Profi-Paaren
+  (Phase 1b Schritt 6) und dem Probestick.
+- **Kleine Formen messen nicht proportional** (Mittelachse mit Abtastung): Köln-Zwickel 0,91 mm bei
+  131 mm, 1,14 mm bei 144 mm; ein Splitter von 1,5 × 0,75 mm 0,995 mm bei 103 mm, 0,842 mm bei
+  104 mm. Die Suche prüft deshalb von der gefundenen Größe nach unten; dass jede größere hält, ist an
+  sechs Logos bis 40 mm darüber gemessen, nicht bewiesen. Feinere Abtastung für kleine Formen
+  könnte das glätten.
+- **Rahmen:** Die Rahmenzeile misst die Umrisse (ohne Zugausgleich), `analyze()` die Stiche; knapp
+  unter dem Rahmenmaß kann `analyze()` noch warnen. Ein Rand zwischen Stickfeld und Rahmen ist nicht
+  berücksichtigt.
+
 ## Nacharbeit-Datei und Ink/Stitch 3.3.0 (30.09.2026)
 
 - **Am Arbeitsplatz prüfen** (Nutzer): die Nacharbeit-Datei in Inkscape mit Ink/Stitch 3.3.0 öffnen

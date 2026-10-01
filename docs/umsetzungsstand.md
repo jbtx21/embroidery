@@ -702,3 +702,52 @@ und ohne das Attribut würden ihre Kreise gestickt (DST 30.077 statt 30.005 Byte
 `LA:` im DST-Kopf kommt aus `sodipodi:docname`; die Datei trägt keinen Namen. Kosten: ein
 `output`-Lauf mehr, 18–22 s bei 9.000 bis 21.000 Stichen. Noch nicht geprüft: das Öffnen in Inkscape
 am Arbeitsplatz (kein Dialog, Ebenenfolge, Simulator) — hier gibt es kein Inkscape.
+
+**Schritt 4 — Mindestgröße als Tor (30.09. und 01.10.2026, Spec §5.2).** Vor jedem Lauf von
+`pnpm inkstitch` sucht das Tor die kleinste Größe ab der bestellten, ab der jeder Satinstrich der
+bestellten Größe seine Grenze hält, und erzeugt dort (ganze Millimeter, proportional vergrößert;
+nicht für `--tatami`). Die erste Zeile der Ausgabe sagt es — „Bestellt 80 mm · stickbar ab 91 mm ·
+erzeugt in 91 mm — bestimmt von z13-bebebe-012 (0.88 mm bei 80 mm, Grenze 1.0 mm)" —, die Dateien
+tragen `-91mm` im Namen. `--ohne-tor` stickt für Vergleichsmessungen in der bestellten Größe
+(`_unter-mindestgroesse` im Namen, mit Warnung); `pnpm mindestgroesse` meldet dasselbe, ohne zu
+erzeugen. Gebaut in `min-size.ts`, `min-size-search.ts`, `hoop.ts` (Engine, ohne IO) und
+`tools/tor.mjs`; `analyze()` hat dafür die Option `allowTurned`.
+
+Die Fassung vom 30.09. teilte in jeder geprüften Größe neu ein: jede Haarlinie einer Vektorisierung
+wird beim Vergrößern irgendwann schmaler Satin, die Bereiche reihten sich, und die Mindestgröße lief
+davon (STUTTGART 80 mm → 252 mm, Köln 90 mm → 567 mm, Eislingen 200 mm → 1.266 mm). **Entscheidungen
+des Nutzers vom 01.10.2026** (Spec `f6bfef9`, `b9069e4`; umgesetzt in `0535d4e`, `3ff24a7`, `c78dd2c`):
+
+1. **Die bestellte Größe legt fest, welche Striche zählen** — ob eine Form Satin ist und ob sie eine
+   Schattenlinie ist, wird einmal in der bestellten Größe bestimmt (`orderedStrokes`) und über die
+   Kennung in jeder Größe wiedergefunden. Gesucht wird über die Größe bis alle halten, dann in ganzen
+   Millimetern nach unten; die Mindestgröße ist der Anfang der Reihe haltender Größen, die bis zur
+   gefundenen reicht (Zeile „Nach unten", etwa Köln: „143 → 134 mm halten ebenfalls, bei 133 mm liegt
+   1 Strich unter der Grenze").
+2. **Tragende Satinstriche ab 1,0 mm** statt 1,3 mm; Schattenlinien weiter 0,7 mm.
+3. **Prüfstellen statt Größentreiber**: eine Form, die erst in der erzeugten Größe Satin wird und dort
+   unter ihrer Grenze liegt (b), und jeder tragende Satinstrich von 1,0 bis unter 1,3 mm (a) — in der
+   Nacharbeit-Datei, im Abschnitt „Feinheit" und in `pnpm mindestgroesse`.
+4. **Rahmen**: passt das Motiv in der erzeugten Größe nicht in den Rahmen des Presets (`cap`
+   130 × 60 mm, sonst 360 × 200 mm), auch gedreht nicht, wird trotzdem erzeugt; eine Zeile gleich
+   unter der ersten warnt. `analyze()` am Laufende nimmt denselben Rahmen.
+
+Gemessen am 01.10.2026, Stand `c78dd2c` (Preset `pique`, Hofbräu `cap`; Suche 0,4 bis 14 s):
+
+| Motiv                        | bestellt → erzeugt | bestimmender Strich (Farbe, Breite, Fläche)                     | (a) knapp | (b) erst Satin | Rahmen               |
+| ---------------------------- | -----------------: | --------------------------------------------------------------- | --------: | -------------: | -------------------- |
+| STUTTGART 80 mm              |         80 → 91 mm | z13-bebebe-012, Randlinie ums Schriftband (0,88 mm, 69,4 mm²)   |         2 |              2 | passt                |
+| STUTTGART 250 mm             |       250 → 250 mm | —                                                               |         0 |              0 | 250 × 233 — Warnung  |
+| Berufsfeuerwehr Köln 90 mm   |        90 → 134 mm | z25-2e3192-001, Zwickel im Äskulapstab (0,72 mm, 1,6 mm²)       |        13 |             24 | passt                |
+| Eislingen Print 200 mm       |       200 → 286 mm | z01-000000-101, Bruchstück der Pinselschrift (0,71 mm, 6,8 mm²) |         6 |              3 | 286 × 444 — Warnung  |
+| Atzensport Hofbräu 80 mm     |        80 → 108 mm | z09-2e2c2c-002, Innenohr des Pferds (0,78 mm, 2,1 mm²)          |        12 |             10 | passt                |
+| Atzensport Hofbräu 200 mm    |       200 → 222 mm | z06-f4f3ef-004, Lichtreflex in der Nüster (0,92 mm, 3,8 mm²)    |        13 |              1 | 222 × 315 — Warnung  |
+| Stuttgarter Hofbräu (`cap`)  |   110,8 → 110,8 mm | —                                                               |         0 |              0 | passt (Cap 130 × 60) |
+| Atzensport aus dem PDF 80 mm |        80 → 107 mm | path34, Innenohr des Pferds (0,78 mm, 2,1 mm²)                  |         6 |              7 | passt                |
+
+Nachweis: das Tor ändert nur die Größe, nicht die Vorlage. Die DST von STUTTGART in 91 mm ist
+byte-gleich mit einem Lauf mit `--breite 91` vom Stand davor, die von Hofbräu byte-gleich mit dem
+Stand davor; die Nacharbeit-Datei durch `output` gibt in beiden Fällen dieselbe DST. Tests 1.137 →
+1.204, Rauchtest grün, `kennzahlen` STUTTGART 80 mm weiter 11.192 Stiche. Grenzen in
+`docs/backlog.md`: bestimmend sind fast überall Zierteile (nur bei Eislingen Schrift), und dass jede
+größere Größe hält, ist gemessen (bis 40 mm darüber), nicht bewiesen.
