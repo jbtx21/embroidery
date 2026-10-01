@@ -4,10 +4,11 @@
  *   pnpm mindestgroesse <svg> [preset] [--breite <mm>] [--alle]
  *
  * Liest die SVG in der bestellten Größe (Breite der SVG in mm, oder `--breite`) und meldet zuerst
- * das **Tor** (tools/tor.mjs): die kleinste Größe ab der bestellten, in der jeder Satinstrich der
+ * das **Tor** (tools/tor.mjs): die kleinste Größe ab der bestellten, ab der jeder Satinstrich der
  * bestellten Größe seine Grenze hält (1,0 mm, Schattenlinien 0,7 mm; welche Formen Satin und welche
  * Schattenlinien sind, wird in der bestellten Größe festgelegt und bleibt), und der Strich, der sie
- * bestimmt — gesucht über die Größe, nicht aus der bestellten hochgerechnet —, dazu die Zahl der
+ * bestimmt — gesucht über die Größe, nicht aus der bestellten hochgerechnet: nach der Proportion,
+ * dann in ganzen Millimetern nach unten (Zeile „Nach unten“) —, dazu die Zahl der
  * gezählten Striche und die Schattenlinien. Passt das Motiv in dieser Größe nicht in den Rahmen des
  * Presets, auch gedreht nicht, steht gleich unter der ersten Zeile die Rahmenwarnung. Nichts davon
  * ändert die Vorlage; `pnpm inkstitch` erzeugt in der Mindestgröße.

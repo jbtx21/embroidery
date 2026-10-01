@@ -9,7 +9,8 @@
  * that have a colour (`designForms` takes the same, the template plans an object for no other). It
  * does not include the pull compensation (0.4 mm a side at most) nor any margin: a side exactly as
  * long as the hoop fits. The DST-based check of `analyze` (`OBJECT_OUTSIDE_HOOP`) runs on the stitches,
- * after the run, and does not turn the design.
+ * after the run; it measures the design as it stands, unless asked to turn it (`allowTurned`, decided by
+ * `fitHoop` then) — `pnpm inkstitch` asks, so that its two statements about the hoop agree.
  *
  * Pure: shapes in, numbers out, no IO (CLAUDE.md, rule 4).
  */

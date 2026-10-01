@@ -12,16 +12,19 @@
  * The gate (spec §5.2, "Tor", tools/tor.mjs): the ordered size is the width of the
  * SVG or --breite. In it the satin strokes are decided and kept (which shapes are satin,
  * spec §7.8.1, and which of them are shadow lines); before anything is stitched, the smallest
- * size from there at which every one of them holds its limit (1.0 mm, shadow lines 0.7 mm)
- * is searched over the size (packages/engine/src/inkstitch/min-size-search.ts). Where that
+ * size from there from which every one of them holds its limit (1.0 mm, shadow lines 0.7 mm)
+ * is searched over the size (packages/engine/src/inkstitch/min-size-search.ts: by proportion
+ * first, then down in whole millimetres to where the sizes stop holding). Where that
  * is larger, the program is made in it — rounded up to whole millimetres, scaled
  * proportionally like --breite — and the FIRST line of the output says so ("Bestellt 80 mm
  * · stickbar ab 91 mm · erzeugt in 91 mm — bestimmt von …"); the files carry the produced
  * width in their name. Where the motif does not fit the hoop of the preset in the size made,
  * not even turned by 90°, the line directly under the first one warns — the program is made
- * all the same. Where the search finds no size, nothing is made. What only turns satin as the
- * logo grows does not set the size: with the satin strokes between 1.0 and 1.3 mm it is a
- * check point in the Nacharbeit file. --ohne-tor switches the gate off for comparison runs:
+ * all the same; analyze() on the DST at the end takes the same hoop (`analysiere`,
+ * tools/tor.mjs), so that the output does not say two things. Where the search finds no
+ * size, nothing is made. What only turns satin as the logo grows does not set the size: with
+ * the satin strokes between 1.0 and 1.3 mm it is a check point in the Nacharbeit file.
+ * --ohne-tor switches the gate off for comparison runs:
  * no enlarging; below the minimum size the files carry "_unter-mindestgroesse" in their name
  * and the output warns. A program for an order is never made with it. Not for --tatami, which
  * stitches the source as drawn.
@@ -101,7 +104,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import {
-  analyze,
   buildInkstitchTemplate,
   checkMinimumSize,
   CONNECT_DEFAULTS,
@@ -118,7 +120,7 @@ import { zeile } from "./archiv.mjs";
 import { scaleSvgToWidth } from "./breite.mjs";
 import { befundZeilen, zusammenfassung } from "./feinheit.mjs";
 import { isInkstitchReady, runInkstitch, SETUP_HINT } from "./inkstitch-lauf.mjs";
-import { dateiname, sucheTor, torDetails, torKopf } from "./tor.mjs";
+import { analysiere, dateiname, sucheTor, torDetails, torKopf } from "./tor.mjs";
 
 const INKSTITCH_NS = "http://inkstitch.org/namespace";
 
@@ -485,7 +487,8 @@ writeFileSync(dstPath, stdout);
 const inkstitchMs = calls.reduce((sum, c) => sum + c.ms, 0);
 const foreignStitches = unitsToMm(readDst(new Uint8Array(stdout)).stitches);
 const blocks = blocksFromForeignStitches(foreignStitches);
-const { stats: analyzedStats, warnings } = analyze(blocks);
+// The same hoop as the gate's line about it: the preset's, and turned by 90° counts (tools/tor.mjs).
+const { stats: analyzedStats, warnings } = analysiere(blocks, PRESETS[presetArg]);
 const stats = { ...analyzedStats, runtimeSec: inkstitchMs / 1000 };
 const farbbloecke = stats.colorChanges + 1;
 

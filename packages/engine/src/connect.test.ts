@@ -21,6 +21,8 @@ import {
 } from "./analyze.js";
 import { autoOrder } from "./order.js";
 import { coverPolygon, objectStart, orderRank } from "./object.js";
+import { fitHoop } from "./inkstitch/hoop.js";
+import type { MachineProfile } from "./presets.js";
 import {
   densityFactor,
   MACHINE_CAP,
@@ -279,6 +281,88 @@ describe("statistics (spec §11)", () => {
         (w) => w.code,
       ),
     ).toContain("OBJECT_OUTSIDE_HOOP");
+  });
+
+  describe("the hoop, the design turned by 90° (spec §5.2, 'Rahmen', 01.10.2026)", () => {
+    /** Stitches that span a box of `w` × `h` mm. */
+    const box = (w: number, h: number) => [
+      {
+        objectId: "a",
+        threadIndex: 0,
+        stitches: [
+          { x: 0, y: 0, cmd: "stitch" as const },
+          { x: w, y: h, cmd: "stitch" as const },
+        ],
+      },
+    ];
+    const outside = (
+      w: number,
+      h: number,
+      machine?: MachineProfile,
+      opts?: { allowTurned?: boolean },
+    ) => analyze(box(w, h), machine, opts).warnings.find((x) => x.code === "OBJECT_OUTSIDE_HOOP");
+
+    it("measures the design as it stands by default — the frozen behaviour: a design that fits only turned is outside", () => {
+      // 150 × 250 mm: too high for 360 × 200 mm as it stands, inside turned.
+      const w = outside(150, 250);
+      expect(w?.severity).toBe("error");
+      expect(w?.message).toBe("Design 150 × 250 mm does not fit the hoop 360 × 200 mm.");
+      expect(outside(150, 250, MACHINE_DEFAULT, {})).toEqual(w);
+      expect(outside(150, 250, MACHINE_DEFAULT, { allowTurned: false })).toEqual(w);
+      // And a design that fits as it stands is inside either way.
+      expect(outside(300, 150)).toBeUndefined();
+      expect(outside(300, 150, MACHINE_DEFAULT, { allowTurned: true })).toBeUndefined();
+    });
+
+    it("lets a design that fits only turned by 90° be inside, where it is asked to", () => {
+      expect(outside(150, 250, MACHINE_DEFAULT, { allowTurned: true })).toBeUndefined();
+      // The cap frame, 130 × 60 mm: 55 × 120 mm fits turned (120 × 55).
+      expect(outside(55, 120, MACHINE_CAP)).toBeDefined();
+      expect(outside(55, 120, MACHINE_CAP, { allowTurned: true })).toBeUndefined();
+    });
+
+    it("warns where it fits neither way, and says that it tried it turned", () => {
+      const w = outside(250, 233, MACHINE_DEFAULT, { allowTurned: true });
+      expect(w?.severity).toBe("error");
+      expect(w?.message).toBe(
+        "Design 250 × 233 mm does not fit the hoop 360 × 200 mm, not even turned by 90°.",
+      );
+      expect(outside(140, 51, MACHINE_CAP, { allowTurned: true })).toBeDefined();
+    });
+
+    it("decides as the hoop check of the gate does (`fitHoop`): the hoop of the machine, turned or not", () => {
+      const sizes: [number, number][] = [
+        [360, 200],
+        [200, 360],
+        [360.1, 200],
+        [142, 201.6],
+        [201.6, 142],
+        [250, 233],
+        [361, 150],
+        [130, 60],
+        [60, 130],
+        [61, 131],
+      ];
+      for (const machine of [MACHINE_DEFAULT, MACHINE_CAP]) {
+        for (const [w, h] of sizes) {
+          const fits = fitHoop({ widthMm: w, heightMm: h }, machine).fits;
+          expect(
+            outside(w, h, machine, { allowTurned: true }) === undefined,
+            `${machine.id} ${w} × ${h}`,
+          ).toBe(fits);
+        }
+      }
+    });
+
+    it("changes nothing else: the statistics and the other warnings are the same turned or not", () => {
+      const blocks = box(150, 250);
+      const plain = analyze(blocks);
+      const turned = analyze(blocks, MACHINE_DEFAULT, { allowTurned: true });
+      expect(turned.stats).toEqual(plain.stats);
+      expect(turned.warnings.filter((x) => x.code !== "OBJECT_OUTSIDE_HOOP")).toEqual(
+        plain.warnings.filter((x) => x.code !== "OBJECT_OUTSIDE_HOOP"),
+      );
+    });
   });
 });
 

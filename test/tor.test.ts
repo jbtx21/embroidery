@@ -7,6 +7,7 @@
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import {
+  analyze,
   findMinimumSize,
   importShapes,
   initEngine,
@@ -20,6 +21,7 @@ import {
   fadingScene,
   frozenScene,
   growScene,
+  jumpScene,
   ORDERED_MM,
   scaledAt,
   SVG_NO_VIEWBOX,
@@ -28,6 +30,7 @@ import {
 } from "../packages/engine/test/fixtures/gate.js";
 import { areaShape } from "../packages/engine/test/fixtures/shapes.js";
 import {
+  analysiere,
   dateiname,
   formenBei,
   rahmenZeile,
@@ -76,6 +79,7 @@ const suche = (over: Record<string, unknown> = {}) => ({
     { widthMm: 87, under: 3 },
     { widthMm: 91, under: 0 },
   ],
+  refinement: [] as { widthMm: number; under: number }[],
   ordered: strichmenge(24, 3),
   shadowLines: ["z0", "z1", "z2"],
   limits: { satinMinMm: 1.0, shadowMinMm: 0.7 },
@@ -146,6 +150,22 @@ describe("sucheTor (das Tor für eine SVG-Datei)", () => {
     // Dieselbe Zahl wie die Suche der Engine, der die Formen in der Größe gegeben werden.
     const direkt = findMinimumSize(scaledAt(aloneScene(0.9)), { orderedWidthMm: 80 });
     expect(t.search.widthMm).toBe(direkt.widthMm);
+  });
+
+  it("erzeugt in der kleinsten Größe, ab der jede hält — nicht in der ersten, die die Proportion nennt", () => {
+    // Ein Splitter von 1,5 × 0,75 mm: seine Breite springt (0,842 mm bei 104 mm), die Proportion
+    // endet bei 124 mm; ab 111 mm hält jede Größe, bei 110 mm nicht.
+    const { text, original } = svg(jumpScene());
+    const t = sucheTor(text, original, { bestelltMm: 80 });
+    expect(t.search.steps.map((s: { widthMm: number }) => s.widthMm)).toEqual([80, 103, 104, 124]);
+    expect(t.search.widthMm).toBe(111);
+    expect(t.erzeugtMm).toBe(111);
+    expect(t.vergroessert).toBe(true);
+    expect(t.rahmen.breiteMm).toBe(111);
+    // Dieselbe Zahl und derselbe Weg wie in der Engine, der die Formen in der Größe gegeben werden.
+    const direkt = findMinimumSize(scaledAt(jumpScene()), { orderedWidthMm: 80 });
+    expect(t.search.widthMm).toBe(direkt.widthMm);
+    expect(t.search.refinement).toEqual(direkt.refinement);
   });
 
   it("lässt eine Schattenlinie in der bestellten Größe", () => {
@@ -336,6 +356,82 @@ describe("rahmenZeile (die Warnung unter der ersten Zeile)", () => {
     });
     expect(zeile).toContain("in 110.8 mm 142 × 201.6 mm groß");
     expect(zeile).toContain("„Cap-Rahmen“ fasst 130 × 60 mm");
+  });
+});
+
+describe("analysiere (analyze() am Laufende: derselbe Rahmen wie die Rahmenzeile, Spec §5.2)", () => {
+  /** Stiche, die einen Kasten von `w` × `h` mm umspannen. */
+  const kasten = (w: number, h: number) => [
+    {
+      objectId: "a",
+      threadIndex: 0,
+      stitches: [
+        { x: 0, y: 0, cmd: "stitch" as const },
+        { x: w, y: h, cmd: "stitch" as const },
+      ],
+    },
+  ];
+  const draussen = (warnings: { code: string }[]) =>
+    warnings.some((x) => x.code === "OBJECT_OUTSIDE_HOOP");
+  /** Der Rahmen, den die Rahmenzeile für ein Motiv von `w` × `h` mm nennt (`sucheTor`). */
+  const rahmenZeileSagt = (
+    preset: (typeof PRESETS)[keyof typeof PRESETS],
+    w: number,
+    h: number,
+  ) => {
+    const text = svgOf([areaShape("balken", barAt(0, 0, w, h), "#000000")], w, h);
+    return sucheTor(text, importShapes(text), { bestelltMm: w, preset }).rahmen;
+  };
+
+  it("sagt dasselbe wie die Rahmenzeile: der Rahmen des Presets, auch um 90° gedreht", () => {
+    const faelle: [(typeof PRESETS)[keyof typeof PRESETS], number, number][] = [
+      [PRESETS.pique, 300, 150], // passt
+      [PRESETS.pique, 150, 250], // passt nur gedreht
+      [PRESETS.pique, 250, 233], // passt auch gedreht nicht: STUTTGART 250 mm
+      [PRESETS.cap, 100, 50], // passt
+      [PRESETS.cap, 55, 120], // passt nur gedreht
+      [PRESETS.cap, 150, 40], // der Standardrahmen fasst es, der Cap-Rahmen nicht
+      [PRESETS.cap, 140, 70], // passt auch gedreht nicht
+    ];
+    for (const [preset, w, h] of faelle) {
+      const rahmen = rahmenZeileSagt(preset, w, h);
+      expect(draussen(analysiere(kasten(w, h), preset).warnings), `${preset.id} ${w} × ${h}`).toBe(
+        !rahmen.fits,
+      );
+    }
+  });
+
+  it("widerspricht der Rahmenzeile nicht: bei einem Motiv, das nur gedreht passt, schweigen beide", () => {
+    // Ohne den Parameter meldete analyze() ein Motiv von 150 × 250 mm als außerhalb des Rahmens von
+    // 360 × 200 mm, während die Rahmenzeile schwiege.
+    expect(rahmenZeileSagt(PRESETS.pique, 150, 250)).toMatchObject({ fits: true, turned: true });
+    expect(draussen(analyze(kasten(150, 250)).warnings)).toBe(true);
+    expect(draussen(analysiere(kasten(150, 250), PRESETS.pique).warnings)).toBe(false);
+  });
+
+  it("meldet, wo es auch gedreht nicht passt, und sagt es in der Meldung", () => {
+    const w = analysiere(kasten(250, 233), PRESETS.pique).warnings.find(
+      (x) => x.code === "OBJECT_OUTSIDE_HOOP",
+    );
+    expect(w?.severity).toBe("error");
+    expect(w?.message).toBe(
+      "Design 250 × 233 mm does not fit the hoop 360 × 200 mm, not even turned by 90°.",
+    );
+  });
+
+  it("nimmt den Cap-Rahmen für das Cap-Preset und den Standardrahmen sonst — ohne Preset den des Standardpresets", () => {
+    const meldung = (preset: (typeof PRESETS)[keyof typeof PRESETS] | undefined) =>
+      analysiere(kasten(140, 70), preset).warnings.find((x) => x.code === "OBJECT_OUTSIDE_HOOP")
+        ?.message;
+    expect(meldung(PRESETS.cap)).toContain("130 × 60 mm");
+    expect(meldung(PRESETS.pique)).toBeUndefined();
+    expect(meldung(undefined)).toBeUndefined();
+  });
+
+  it("ändert nichts an den Zahlen: dieselben Kennzahlen wie analyze() ohne den Parameter", () => {
+    expect(analysiere(kasten(150, 250), PRESETS.pique).stats).toEqual(
+      analyze(kasten(150, 250)).stats,
+    );
   });
 });
 
@@ -603,6 +699,108 @@ describe("torDetails (was unter der ersten Zeile steht)", () => {
     const lines = torDetails(tor(suche()));
     expect(lines).toHaveLength(3);
     expect(lines.join("\n")).not.toMatch(/Bereich/);
+  });
+
+  describe("„Nach unten“: die Prüfung unter der ersten Größe, die hielt (die kleinste Größe)", () => {
+    /** Wie beim Köln-Logo: die Proportion endet bei 144 mm, ab 134 mm hält jede Größe, 133 mm nicht. */
+    const koeln = (over: Record<string, unknown> = {}) =>
+      tor(
+        suche({
+          orderedWidthMm: 90,
+          widthMm: 134,
+          steps: [
+            { widthMm: 90, under: 9 },
+            { widthMm: 118, under: 3 },
+            { widthMm: 144, under: 0 },
+          ],
+          refinement: [
+            ...Array.from({ length: 10 }, (_, i) => ({ widthMm: 143 - i, under: 0 })),
+            { widthMm: 133, under: 2 },
+          ],
+          ...over,
+        }),
+      );
+
+    it("steht unter der Suche: die Größen, die ebenfalls halten, und die erste, die nicht hält", () => {
+      const lines = torDetails(koeln());
+      expect(lines).toHaveLength(4);
+      expect(lines[2]).toBe(
+        "Suche            90 → 118 → 144 mm (3 Prüfungen), Striche unter der Grenze: 9 → 3 → 0",
+      );
+      expect(lines[3]).toBe(
+        "Nach unten       143 → 134 mm halten ebenfalls, bei 133 mm liegen 2 Striche unter der Grenze " +
+          "(11 Prüfungen)",
+      );
+    });
+
+    it("sagt „hält“ und „liegt 1 Strich“ im Singular", () => {
+      const lines = torDetails(
+        koeln({
+          widthMm: 143,
+          refinement: [
+            { widthMm: 143, under: 0 },
+            { widthMm: 142, under: 1 },
+          ],
+        }),
+      );
+      expect(lines[3]).toBe(
+        "Nach unten       143 mm hält ebenfalls, bei 142 mm liegt 1 Strich unter der Grenze (2 Prüfungen)",
+      );
+    });
+
+    it("sagt, wo schon die erste Prüfung darunter durchfällt, nur das", () => {
+      const lines = torDetails(koeln({ widthMm: 144, refinement: [{ widthMm: 143, under: 3 }] }));
+      expect(lines[3]).toBe(
+        "Nach unten       bei 143 mm liegen 3 Striche unter der Grenze (1 Prüfung)",
+      );
+    });
+
+    it("sagt, wo die Prüfung bei der letzten Größe der Suche endet, die schon durchfiel", () => {
+      // 90 mm fiel in der Suche durch (3 Striche); die Prüfung nach unten liest sie nicht noch einmal.
+      const lines = torDetails(
+        tor(
+          suche({
+            widthMm: 91,
+            steps: [
+              { widthMm: 80, under: 12 },
+              { widthMm: 87, under: 4 },
+              { widthMm: 90, under: 3 },
+              { widthMm: 104, under: 0 },
+            ],
+            refinement: Array.from({ length: 13 }, (_, i) => ({ widthMm: 103 - i, under: 0 })),
+          }),
+        ),
+      );
+      expect(lines[3]).toBe(
+        "Nach unten       103 → 91 mm halten ebenfalls, bei 90 mm (schon in der Suche geprüft) " +
+          "liegen 3 Striche unter der Grenze (13 Prüfungen)",
+      );
+    });
+
+    it("fehlt, wo nichts zu prüfen war: die erste Größe, die hielt, folgt direkt auf die letzte, die durchfiel", () => {
+      expect(torDetails(tor(suche({ refinement: [] })))).toHaveLength(3);
+    });
+
+    it("fehlt, wo die Suche aufgegeben hat", () => {
+      const s = suche({
+        found: false,
+        enlarged: false,
+        reason: "steps",
+        decisive: undefined,
+        steps: [
+          { widthMm: 80, under: 12 },
+          { widthMm: 87, under: 3 },
+        ],
+      });
+      expect(torDetails(tor(s)).join("\n")).not.toContain("Nach unten");
+    });
+
+    it("lässt die erste Zeile, wie sie ist: die kleinste Größe, die erzeugte, der bestimmende Strich", () => {
+      expect(torKopf(koeln())[0]).toBe(
+        "Bestellt 90 mm · stickbar ab 134 mm · erzeugt in 134 mm — bestimmt von z13-bebebe-012 " +
+          "(0.88 mm bei 90 mm, Grenze 1.0 mm)",
+      );
+    });
   });
 });
 

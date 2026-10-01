@@ -13,6 +13,11 @@
  * Was erst beim Vergrößern Satin wird, bestimmt die Größe nicht: es ist eine Prüfstelle in der
  * Nacharbeit-Datei (tools/nacharbeit.mjs) und in der Liste von `pnpm mindestgroesse`.
  *
+ * Die Mindestgröße ist die **kleinste** Größe, ab der jede hält: die Suche nach der Proportion endet
+ * bei einer Größe, die hält; von da an wird in ganzen Millimetern nach unten geprüft, solange jeder
+ * Strich hält (die Zeile „Nach unten“ unter den Details). Die Breite kleiner Formen springt, die
+ * Proportion schießt dann über die kleinste Größe hinaus (Köln 90 mm: 144 → 134 mm).
+ *
  * **Rahmen**: passt das Motiv in der erzeugten Größe nicht in den Rahmen des Presets, auch um 90°
  * gedreht nicht, wird trotzdem erzeugt; eine eigene Zeile gleich unter der ersten warnt (`rahmenZeile`),
  * auch wo die erzeugte Größe die bestellte ist.
@@ -22,6 +27,7 @@
  * mit Punkt, wie in den übrigen Werkzeugen.
  */
 import {
+  analyze,
   designSize,
   findMinimumSize,
   fitHoop,
@@ -80,6 +86,9 @@ function aufgabeGrund(search) {
   );
 }
 
+/** Der Rahmen eines Presets: die Maschine, für die es gemacht ist (Cap-Rahmen oder Standard). */
+const rahmenDes = (preset) => machineOfPreset(preset?.id ?? "pique");
+
 /** Der Rahmen des Presets und das Motiv in der Größe `erzeugtMm`; `undefined`, wo es nichts zu sticken gibt. */
 function rahmenBei(formen, erzeugtMm, preset) {
   let groesse;
@@ -89,8 +98,20 @@ function rahmenBei(formen, erzeugtMm, preset) {
     return undefined;
   }
   if (groesse === undefined) return undefined;
-  return { ...fitHoop(groesse, machineOfPreset(preset?.id ?? "pique")), breiteMm: erzeugtMm };
+  return { ...fitHoop(groesse, rahmenDes(preset)), breiteMm: erzeugtMm };
 }
+
+/**
+ * `analyze()` am Ende des Laufs, auf den Stichen der gelesenen DST: mit demselben Rahmen wie die
+ * Rahmenzeile — dem des Presets, und auch um 90° gedreht gültig (Spec §5.2, „Rahmen“). Sonst widerspräche
+ * die Ausgabe sich: die Rahmenzeile schwiege bei einem Motiv, das nur gedreht passt, und `analyze()` meldete
+ * es als außerhalb — oder, beim Cap-Preset, mit dem Rahmen der Standardmaschine. Die Engine selbst
+ * ändert sich nicht: ohne den Parameter misst `analyze()` wie bisher mit dem Standardrahmen, ungedreht.
+ * Gemessen wird hier an den Stichen, dort an den Umrissen der Formen: ein Motiv, das den Rahmen um
+ * weniger als den Zugausgleich (bis 0,4 mm je Seite) unterschreitet, kann hier noch außerhalb liegen.
+ */
+export const analysiere = (blocks, preset) =>
+  analyze(blocks, rahmenDes(preset), { allowTurned: true });
 
 /**
  * Das Tor für eine SVG-Datei. `original` ist `importShapes(svgText)`; `bestelltMm` die bestellte
@@ -259,7 +280,8 @@ function elemente(ids, max) {
 /**
  * Die Zeilen unter der ersten (für `pnpm mindestgroesse` und den Abschnitt „Feinheit“ von
  * `pnpm inkstitch`): wie viele Satinstriche die bestellte Größe zählt, die Schattenlinien darunter
- * (beides in der bestellten Größe bestimmt) und der Weg der Suche. Ohne `alle` ist die Liste der
+ * (beides in der bestellten Größe bestimmt), der Weg der Suche und, wo die Mindestgröße unter der
+ * ersten Größe liegt, die hielt, die Prüfung nach unten. Ohne `alle` ist die Liste der
  * Schattenlinien gekürzt und sagt es. Einen Bereich darüber gibt es nicht mehr: die Suche ist monoton.
  */
 export function torDetails(tor, { alle = false } = {}) {
@@ -298,7 +320,40 @@ export function torDetails(tor, { alle = false } = {}) {
       `(${pruefungen(s.steps.length)}), ` +
       `Striche unter der Grenze: ${s.steps.map((x) => x.under).join(" → ")}`,
   );
+  const unten = nachUnten(s);
+  if (unten !== undefined) lines.push(unten);
   return lines;
+}
+
+/** „liegt 1 Strich“, „liegen 2 Striche“ — unter der Grenze. */
+const liegen = (n) => (n === 1 ? "liegt 1 Strich" : `liegen ${n} Striche`);
+
+/**
+ * Die Zeile „Nach unten“: was die Suche unter der ersten Größe geprüft hat, die hielt — die Größen,
+ * die ebenfalls halten (von der Größe darunter bis zur Mindestgröße), und die erste, die nicht hält.
+ * An ihr liegt es, dass die Mindestgröße die kleinste ist: eine neue Prüfung, oder die letzte Größe
+ * der Suche, die schon durchfiel (sie wird nicht noch einmal gelesen). `undefined`, wo nichts zu
+ * prüfen war (die erste Größe, die hielt, folgt direkt auf die letzte, die durchfiel) und wo die Suche
+ * keine Größe fand.
+ */
+function nachUnten(s) {
+  const geprueft = s.refinement ?? [];
+  if (!s.found || geprueft.length === 0) return undefined;
+  const haelt = geprueft.filter((x) => x.under === 0);
+  const letzte = geprueft[geprueft.length - 1];
+  const inDerSuche = letzte.under === 0;
+  const darunter = inDerSuche ? s.steps[s.steps.length - 2] : letzte;
+  const ebenfalls =
+    haelt.length === 0
+      ? ""
+      : haelt.length === 1
+        ? `${breite(haelt[0].widthMm)} mm hält ebenfalls, `
+        : `${breite(haelt[0].widthMm)} → ${breite(haelt[haelt.length - 1].widthMm)} mm halten ebenfalls, `;
+  return (
+    `${spalte("Nach unten")}${ebenfalls}bei ${breite(darunter.widthMm)} mm` +
+    `${inDerSuche ? " (schon in der Suche geprüft)" : ""} ${liegen(darunter.under)} unter der Grenze ` +
+    `(${pruefungen(geprueft.length)})`
+  );
 }
 
 /**

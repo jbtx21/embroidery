@@ -86,6 +86,26 @@ export function frozenScene(): ImportedShape[] {
   return [...fadingScene(0.72), areaShape("frei", barAt(0, 30, 40, 0.8), GRAY)];
 }
 
+/**
+ * A speck of 1.5 × 0.75 mm at 80 mm, the way a vectorisation leaves them. The median width of a shape
+ * this small is no smooth function of the size: where its medial axis changes it jumps — 0.995 mm at
+ * 103 mm, 0.842 mm at 104 mm, 1.002 mm at 105 mm, 0.987 mm at 110 mm, 1.057 mm at 111 mm. By proportion
+ * the search asks for 104 mm, then for 124 mm and holds there. But every size from 111 mm holds and
+ * 110 mm does not — and 105 to 109 mm hold on their own, with a failing size above them.
+ */
+export const jumpScene = (): ImportedShape[] => [
+  areaShape("splitter", barAt(0, 0, 1.5, 0.75), GOLD),
+];
+
+/**
+ * A speck of 1.8 × 0.88 mm: 0.992 mm at 87 mm, 0.999 mm at 89 mm, 0.872 mm at 90 mm, over 1.0 mm from
+ * 91 mm on. The proportion goes 80 → 87 → 88 → 90 → 104; the last size it found failing is 90 mm, and
+ * every size above it holds — the smallest is the one right above the last that failed.
+ */
+export const reachScene = (): ImportedShape[] => [
+  areaShape("splitter", barAt(0, 0, 1.8, 0.88), GOLD),
+];
+
 /** A stroked line 0.5 mm from the bar: what the template counts as a form too (`lineCover`). */
 export function lineNeighbourScene(gapMm: number, barMm = 0.9): ImportedShape[] {
   // The cover of a line is a strip of 0.5 mm: its edge lies half of it from the line.

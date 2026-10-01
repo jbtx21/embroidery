@@ -1,4 +1,5 @@
 /** Statistics, density and warnings (spec §11). */
+import { fitHoop } from "./inkstitch/hoop.js";
 import type { MachineProfile } from "./presets.js";
 import { MACHINE_DEFAULT } from "./presets.js";
 import type { Stats, Stitch, StitchBlock, Warning } from "./types.js";
@@ -136,9 +137,19 @@ export function maxDensity(stitches: Stitch[]): number {
   return densityProfile(stitches).max;
 }
 
+export type AnalyzeOptions = {
+  /**
+   * A design that fits the hoop only turned by 90° is inside it (spec §5.2, "Rahmen": the machine can
+   * take the file turned) — the decision of `fitHoop`, the check of the gate on the shapes. Default
+   * false: the design is measured as it stands, which is how the pipeline stitches it.
+   */
+  allowTurned?: boolean;
+};
+
 export function analyze(
   blocks: StitchBlock[],
   machine: MachineProfile = MACHINE_DEFAULT,
+  opts: AnalyzeOptions = {},
 ): { stats: Stats; warnings: Warning[] } {
   const all = blocks.flatMap((b) => b.stitches);
   const warnings: Warning[] = [];
@@ -254,11 +265,15 @@ export function analyze(
   if (longestJump > LONG_JUMP_MM) {
     warnings.push(warn(WARNING.LONG_JUMP, `Jump of over ${longestJump.toFixed(0)} mm.`, "warn"));
   }
-  if (!empty && (stats.bboxMm.w > machine.hoopWMm || stats.bboxMm.h > machine.hoopHMm)) {
+  const allowTurned = opts.allowTurned === true;
+  const outside = allowTurned
+    ? !fitHoop({ widthMm: stats.bboxMm.w, heightMm: stats.bboxMm.h }, machine).fits
+    : stats.bboxMm.w > machine.hoopWMm || stats.bboxMm.h > machine.hoopHMm;
+  if (!empty && outside) {
     warnings.push(
       warn(
         WARNING.OBJECT_OUTSIDE_HOOP,
-        `Design ${stats.bboxMm.w.toFixed(0)} × ${stats.bboxMm.h.toFixed(0)} mm does not fit the hoop ${machine.hoopWMm} × ${machine.hoopHMm} mm.`,
+        `Design ${stats.bboxMm.w.toFixed(0)} × ${stats.bboxMm.h.toFixed(0)} mm does not fit the hoop ${machine.hoopWMm} × ${machine.hoopHMm} mm${allowTurned ? ", not even turned by 90°" : ""}.`,
         "error",
       ),
     );
