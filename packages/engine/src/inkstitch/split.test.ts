@@ -4,17 +4,20 @@ import {
   difference,
   initGeometry,
   intersect,
+  offsetAll,
   pointInPolygon,
   polygonArea,
   union,
 } from "@texma-stitch/geometry";
 import {
+  dippedCable,
   forkWithHead,
   hairStick,
   headWithSticks,
   lens,
   plateWithHole,
   plugAndCable,
+  plugAndDippedCable,
   stickWithHead,
   stripAlong,
   stubbyStick,
@@ -199,6 +202,49 @@ describe("splitNarrowWide: a stick with a head (spec §7.8.7)", () => {
     expect(polygonArea(plan.bulk[0]!)).toBeLessThan(135);
   });
 
+  describe("a band that bends back on itself", () => {
+    // The Yer cable at 120 mm (spec §7.8.7): a dip of 30 degrees, where the two arms leave room for
+    // a disc of the satin limit — a wide spot of the opening that is no head.
+    const survivors = (shape: Polygon, radiusMm: number): number =>
+      offsetAll(offsetAll([shape], -SPLIT_BULK_RADIUS_MM), SPLIT_BULK_RADIUS_MM).flatMap((spot) =>
+        offsetAll([spot], -radiusMm).filter((p) => polygonArea(p) > 1e-6),
+      ).length;
+
+    it("runs the band through the widening at the tip of the bend, from the plug to the far end", () => {
+      const shape = plugAndDippedCable(3.2);
+      // The premise: a disc of the satin limit fits at the tip of the V, one as wide as the band
+      // (twice its half width) only in the plug.
+      expect(survivors(shape, SPLIT_BULK_RADIUS_MM - 0.05)).toBe(2);
+      expect(survivors(shape, (SPLIT_BULK_MIN_RATIO * 3.2) / 2)).toBe(1);
+
+      const plan = split(shape);
+      expect(plan.kept).toEqual([]);
+      expect(plan.bands).toHaveLength(1);
+      const band = plan.bands[0]!;
+      expect(band.columns.ok).toBe(true);
+      // One band, the dip in the middle of it — not the half of the cable…
+      expect(band.lengthMm).toBeGreaterThan(100);
+      for (const at of [pt(-5, 12), pt(10, 12), pt(25, 28), pt(45, 12), pt(54, 12)]) {
+        expect(pointInPolygon(band.polygon, at)).toBe(true);
+      }
+      // …and the plug alone is the wide part.
+      expect(plan.bulk).toHaveLength(1);
+      expect(polygonArea(plan.bulk[0]!)).toBeLessThan(135);
+    });
+
+    it("does so at any width of the band: the spot grows with it, the test with it", () => {
+      // A cable of 4.2 mm (the Yer logo at 150 mm): the spot at the tip is 40 mm², an area no
+      // fixed minimum would have told from a head — but 3.3 mm of radius is still not 4.2.
+      const shape = plugAndDippedCable(4.2);
+      expect(survivors(shape, SPLIT_BULK_RADIUS_MM - 0.05)).toBe(2);
+      expect(survivors(shape, (SPLIT_BULK_MIN_RATIO * 4.2) / 2)).toBe(1);
+      const plan = split(shape);
+      expect(plan.bands).toHaveLength(1);
+      expect(plan.bands[0]!.lengthMm).toBeGreaterThan(100);
+      expect(plan.bulk).toHaveLength(1);
+    });
+  });
+
   it("is the same every time", () => {
     const a = split(plugAndCable());
     const b = split(plugAndCable());
@@ -249,6 +295,10 @@ describe("splitNarrowWide: what stays whole (spec §7.8.7)", () => {
     whole(polygonOf(rect(0, 0, 40, 2.4)));
     whole(GLYPHS.K!);
     whole(GLYPHS.O!);
+  });
+
+  it("a bar with a dip and no head: the widening at the tip of the V is no head", () => {
+    whole(dippedCable());
   });
 
   it("a head that is not twice as wide as the band", () => {

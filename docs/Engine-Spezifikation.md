@@ -808,7 +808,9 @@ geschnitten wird an seinem Rand, am Bogen der letzten Scheibe, die noch passt, u
 ein **Band** ist, wird Satin (`split.ts`). Ein Rest ist ein Band, wenn er mindestens 1,3 mm breit und
 12 Breiten lang ist, seine Breite gleichmäßig bleibt (Breite am 20. Perzentil durch die am 80.
 mindestens 0,7), er an **einem** Ende am breiten Teil hängt, der breite Teil mindestens 20 mm² hat und
-eine Scheibe von zwei Bandbreiten hineinpasst — und wenn seine Säulen halten (§7.8.5). Der breite Teil
+in jeden seiner Flecken, an denen das Band hängt, eine Scheibe von zwei Bandbreiten passt (ein Fleck,
+in den sie nicht passt, ist kein Kopf, sondern eine Verbreiterung des Bandes, und das Band läuft
+hindurch) — und wenn seine Säulen halten (§7.8.5). Der breite Teil
 wird zuerst gestickt (§10.1: Flächen vor Satin) und liegt 0,8 mm unter dem Ende des Bandes (§4.1
 Regel 5), damit der Zug des Satins keine Lücke aufreißt; die Unterlappung liegt im Band, nie außerhalb
 der Form.
@@ -824,6 +826,23 @@ Teil und Bänder zusammen sind die Form (Test). Gemessen am Yer-Logo gegen einen
 quer zum Kabel): 2.744–2.746 gegen 2.753 Stiche — der Schnitt macht keinen Unterschied, der Bogen ist
 der einfachere.
 
+**Köpfe und Verbreiterungen.** Ein Band biegt sich. An der Spitze eines scharfen Knicks lassen die
+beiden Arme Platz für eine Scheibe der Satingrenze, obwohl das Band schmaler ist (bei einem V von 30°
+passt in ein Band von 3,2 mm eine Scheibe von 2,54 mm Radius), und eine Kappe am freien Ende kann breiter
+sein als der Schaft. Die Öffnung hat dort einen Fleck, der kein Kopf ist. Zählte er als breiter Teil,
+schnitte er das Band in zwei Stücke, von denen das eine zwei Anschlüsse hat und ausfällt: das Yer-Kabel
+bei 120 mm Breite wurde so zur Hälfte Satin (69 mm) und zur Hälfte Tatami — ein Bild, das kein Puncher
+macht. Ein Fleck ist ein Kopf, wenn eine Scheibe von zwei Bandbreiten Durchmesser hineinpasst (Radius =
+Breite des Bandes; hängen mehrere Bänder an ihm, des breitesten) — die Prüfung der Zeile „Breitensprung",
+nur je Fleck und nicht an der Form im Ganzen. Besteht ein Fleck sie nicht, gehört er zum Band, und die
+Stücke werden ohne ihn neu gebildet. Eine Mindestfläche leistet das nicht, weil der Fleck mit dem Band
+wächst: Kabel 3,25 mm (120 mm Breite), Fleck an der Spitze des V 20,2 mm² und 2,5 mm Radius, knapp über
+der Mindestfläche von 20 mm²; bei 150 mm (Kabel 4,08 mm) 45,9 mm² mit der Kappe am Ende 43,8 mm²,
+beide mehr als zwei Scheiben der Satingrenze (39,3 mm²); bei 180 mm (Kabel 4,93 mm) 291 mm² und 67 mm² — und
+keiner fasst eine Scheibe der Bandbreite (3,8 und 3,6 mm Radius gegen 4,9; der Stecker 10,3). Mit der
+Prüfung je Fleck teilt sich das Kabel von 80 bis 180 mm Breite ganz, als ein Band (`split.test.ts`:
+Kabel mit Knick bei 3,2 und 4,2 mm).
+
 **Die Prüfungen und ihre Schwellen.** Gemessen an den acht Referenz-Vorlagen (STUTTGART 80 und 250 mm,
 Köln 90 mm, Eislingen 200 mm, Atzensport 80 mm, Hofbräu 110 mm, Yer 90 mm, Christliche 90 mm): 302 Stücke
 der Formen, die §7.8.1 Tatami nennt, bleiben nach der Öffnung neben einem breiten Teil von mindestens
@@ -837,7 +856,7 @@ kein Band sind; wie knapp es dabei zugeht, steht in der Tabelle:
 | Gleichmäßigkeit (Breite p20 durch p80 entlang des Wegs, die Enden ausgenommen) | mindestens **0,7** (`SPLIT_BAND_MIN_UNIFORMITY`) | Satin hält ein Verjüngen auf etwas über die Hälfte (3,0 auf 1,6 mm liest 0,70), ein Bein, das auf ein Drittel läuft (3,0 auf 1,0 mm), liest 0,54. Yer 0,83. 7 Stücke scheitern hieran (nach Breite und Länge geprüft); das einzige, das nur hieran scheitert, ist ein Pferdebein in Atzensport 80 mm (0,44 bei 15,2 Breiten Länge), dazu die Streifen des Rahmens im Köln-Logo (0,25–0,27). Die mittleren 60 % statt 80 %: eine Ecke im Band (Gehrung von 110°) liest sonst 0,68 statt 0,75 |
 | Anschlüsse am breiten Teil | genau **1** | Ein Band, das an beiden Enden am breiten Teil hängt (Henkel, Hantel, Streifen zwischen Loch und Rand), ist kein Stab mit Kopf; das Schnittbild wäre ein anderes. Sicherung: an keinem der Logos entscheidend, im Test an der Hantel |
 | Breiter Teil, Fläche | mindestens **20 mm²** (`KNOCKDOWN_MIN_MM2`, §4.1 Regel 3) | Die Grenze, unter der das Repo einen Schnitt für teurer hält als den doppelten Stich. Yer: 114 mm² |
-| Breitensprung | eine Scheibe von **zwei Bandbreiten** passt in die Form (`SPLIT_BULK_MIN_RATIO`) | Der Kopf muss sich abheben. Yer: größte Scheibe 10,3 mm, 4,3 Bandbreiten. An keinem Logo entscheidend |
+| Breitensprung | in jeden Fleck des breiten Teils, an dem das Band hängt, passt eine Scheibe von **zwei Bandbreiten** Durchmesser (`SPLIT_BULK_MIN_RATIO`); hängen mehrere Bänder an ihm, gilt das breiteste | Der Kopf muss sich abheben. Yer: größte Scheibe im Stecker 10,3 mm, 4,3 Bandbreiten. Entscheidend nur an Flecken, die kein Kopf sind (nächster Absatz); an den Köpfen der acht Logos nirgends |
 | Säulen | `satinColumns` hält (§7.8.5: Schiene in der Form, keine Kreuzung, Deckung ab 0,85) | Ein Band, das als Satin nicht hält, ist keins |
 
 Der Trichter an den acht Logos: von 302 Stücken scheitern 232 an der Mindestfläche von 10 mm², 4 an der

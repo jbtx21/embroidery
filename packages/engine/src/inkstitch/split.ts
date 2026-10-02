@@ -14,6 +14,14 @@
  * the arc of the last disc that fits. It needs no axis to follow and no corner to find, and it is
  * the same for a stick on a flank as for one on a tip.
  *
+ * **Heads, and widenings that are none.** A band bends: at the tip of a sharp bend the two arms
+ * leave room for a disc of the satin limit although the band is narrower (a V of 30 degrees in a
+ * band of 3.2 mm leaves one of 2.5 mm radius), and at a free end a cap may be wider than the stem.
+ * The opening has a spot there that is no head. It is told from one by the test every head has to
+ * pass: a disc as wide as the band is wide, twice over (`SPLIT_BULK_MIN_RATIO`), fits in it — in
+ * the Yer cable at 120 mm the spot at the tip of the V holds 2.5 mm of radius against 3.2 for the
+ * band, the plug 7. A spot that fails is part of the band, which then runs through it.
+ *
  * **Which pieces are bands.** Only a long, even strip held at one end qualifies, and only if its
  * columns hold. Measured on the customer logos (spec §7.8.7): the pieces the opening leaves are
  * legs and manes of a horse, tips of a leaf, strips between a hole and an edge, corners — they
@@ -75,7 +83,11 @@ export const SPLIT_BAND_MIN_ASPECT = 12;
 export const SPLIT_BAND_MIN_UNIFORMITY = 0.7;
 /** The wide part is at least this large, mm² — where the repo itself says a cut costs more than it saves (spec §4.1 rule 3). */
 export const SPLIT_BULK_MIN_MM2 = KNOCKDOWN_MIN_MM2;
-/** …and a disc this many band widths across fits in it. */
+/**
+ * …and a disc this many band widths across fits in it — in every wide spot the band meets, or the
+ * spot is no head but a widening of the band itself (module doc: the tip of a sharp bend, the cap at
+ * the free end).
+ */
 export const SPLIT_BULK_MIN_RATIO = 2;
 /** The wide part reaches this far under the band, mm: as far as an earlier area grows under a later one it touches (spec §4.1 rule 5). */
 export const SPLIT_TUCK_MM = KNOCKDOWN_UNDERLAP_MM;
@@ -310,14 +322,45 @@ function contactsWith(piece: Polygon, bulk: Polygon[]): number {
   ).length;
 }
 
+/** A piece the wide parts leave that is a band by its own shape — long, even, wide enough — and what was read off it. */
+type Candidate = { piece: Polygon; profile: BandProfile };
+
+type Limits = { minWidth: number; minAspect: number; minUniformity: number };
+
+/**
+ * What is left of the shape beside the wide parts: corners of them, slivers, and the narrow parts.
+ * A piece thinner than `SLIVER_MM` goes (an opening by half of it); a piece too small for the
+ * smallest band is not looked at; of the rest those that are long, even strips of the width of a
+ * column are the candidates, in reading order. Whether one is held at one end of the wide part and
+ * its columns hold is for the caller.
+ */
+function candidatePieces(shape: Polygon, wide: Polygon[], limits: Limits): Candidate[] {
+  const smallest = CANDIDATE_AREA_SHARE * limits.minWidth * limits.minWidth * limits.minAspect;
+  const pieces = offsetAll(offsetAll(difference([shape], wide), -SLIVER_MM / 2), SLIVER_MM / 2)
+    .filter((p) => p.holes.length === 0 && polygonArea(p) >= smallest)
+    .sort(readingOrder);
+  const found: Candidate[] = [];
+  for (const piece of pieces) {
+    const profile = bandProfile(piece);
+    if (profile === undefined) continue;
+    if (profile.widthMm < limits.minWidth) continue;
+    if (profile.lengthMm < limits.minAspect * profile.widthMm) continue;
+    if (profile.uniformity < limits.minUniformity) continue;
+    found.push({ piece, profile });
+  }
+  return found;
+}
+
 /**
  * Splits a shape into its wide part and its bands (module doc), or says it stays whole. Every
  * check is on the pieces the opening leaves; where none passes, `bulk` is the shape itself.
  */
 export function splitNarrowWide(shape: Polygon, opts: SplitOptions): SplitPlan {
-  const minWidth = opts.minWidthMm ?? SPLIT_BAND_MIN_WIDTH_MM;
-  const minAspect = opts.minAspect ?? SPLIT_BAND_MIN_ASPECT;
-  const minUniformity = opts.minUniformity ?? SPLIT_BAND_MIN_UNIFORMITY;
+  const limits: Limits = {
+    minWidth: opts.minWidthMm ?? SPLIT_BAND_MIN_WIDTH_MM,
+    minAspect: opts.minAspect ?? SPLIT_BAND_MIN_ASPECT,
+    minUniformity: opts.minUniformity ?? SPLIT_BAND_MIN_UNIFORMITY,
+  };
   const bulkMin = opts.bulkMinMm2 ?? SPLIT_BULK_MIN_MM2;
   const bulkRatio = opts.bulkMinRatio ?? SPLIT_BULK_MIN_RATIO;
   const tuck = opts.tuckMm ?? SPLIT_TUCK_MM;
@@ -327,27 +370,30 @@ export function splitNarrowWide(shape: Polygon, opts: SplitOptions): SplitPlan {
 
   if (polygonArea(shape) < bulkMin) return whole;
   // The wide part: every disc of the satin limit that fits (module doc).
-  const wide = offsetAll(offsetAll([shape], -SPLIT_BULK_RADIUS_MM), SPLIT_BULK_RADIUS_MM);
+  let wide = offsetAll(offsetAll([shape], -SPLIT_BULK_RADIUS_MM), SPLIT_BULK_RADIUS_MM);
   if (wide.length === 0) return whole;
+  let found = candidatePieces(shape, wide, limits);
 
-  // What is left of the shape: corners of the wide part, slivers, and the narrow parts. A piece
-  // thinner than `SLIVER_MM` goes (an opening by half of it); a piece too small for the smallest
-  // band is not looked at.
-  const leftover = difference([shape], wide);
-  const smallest = CANDIDATE_AREA_SHARE * minWidth * minWidth * minAspect;
-  const pieces = offsetAll(offsetAll(leftover, -SLIVER_MM / 2), SLIVER_MM / 2)
-    .filter((p) => p.holes.length === 0 && polygonArea(p) >= smallest)
-    .sort(readingOrder);
+  // A spot of it is a head only if it stands out from the bands it meets: a disc of `bulkRatio`
+  // band widths across fits in it (module doc). One that does not is the widening of a band — the
+  // tip of a bend, a cap — and the band runs through it: the pieces are then taken again, the spot
+  // among them. A spot that no band meets stays: nothing is decided on it.
+  const heads = wide.filter((spot) => {
+    const widths = found
+      .filter((c) => contactsWith(c.piece, [spot]) > 0)
+      .map((c) => c.profile.widthMm);
+    return widths.length === 0 || fitsDisc(spot, (bulkRatio * Math.max(...widths)) / 2);
+  });
+  if (heads.length < wide.length) {
+    if (heads.length === 0) return whole;
+    wide = heads;
+    found = candidatePieces(shape, wide, limits);
+  }
 
   const bands: SplitBand[] = [];
   const kept: SplitKept[] = [];
   let index = 0;
-  for (const piece of pieces) {
-    const profile = bandProfile(piece);
-    if (profile === undefined) continue;
-    if (profile.widthMm < minWidth) continue;
-    if (profile.lengthMm < minAspect * profile.widthMm) continue;
-    if (profile.uniformity < minUniformity) continue;
+  for (const { piece, profile } of found) {
     if (contactsWith(piece, wide) !== 1) continue;
     // The head has to stand out from the band: a disc of `bulkRatio` band widths across fits in it.
     if (!fitsDisc(shape, (bulkRatio * profile.widthMm) / 2)) continue;

@@ -52,13 +52,17 @@ export const hairStick = (): Polygon => stickWithHead(12, 0.9, 40);
 /**
  * A strip along a centre line, `widthAt(t)` wide at the fraction `t` of the line's points, the ends
  * cut square across the line. Not for lines that turn tighter than half the width.
+ *
+ * At a corner the edges meet where the offset lines cross only with `mitre` (the corner point travels
+ * `1 / cos(half the turn)` times the half width, `offsetPolyline` caps it at 4); without it the
+ * corner point stays one half width from the line and the strip is thinner there.
  */
-export function stripAlong(line: Polyline, widthAt: (t: number) => number): Polygon {
+export function stripAlong(line: Polyline, widthAt: (t: number) => number, mitre = false): Polygon {
   const shifted = offsetPolyline(line, 1);
   const normals = line.map((o, i) => {
     const dx = shifted[i]!.x - o.x;
     const dy = shifted[i]!.y - o.y;
-    const l = Math.hypot(dx, dy) || 1;
+    const l = mitre ? 1 : Math.hypot(dx, dy) || 1;
     return pt(dx / l, dy / l);
   });
   const half = (i: number): number => widthAt(i / Math.max(1, line.length - 1)) / 2;
@@ -116,18 +120,51 @@ export function plateWithHole(sideMm = 40, holeMm = 36.5): Polygon {
  * and runs back beneath it, 40 mm to the right. The plug is 121 mm², the bar about 60 mm long.
  */
 export function plugAndCable(): Polygon {
+  return union([plugDome(), stripAlong([...cableToRun(), pt(27, 12)], () => 2.4)])[0]!;
+}
+
+/** The plug of `plugAndCable`: a half ellipse of 11 x 14 mm, flat side to the right, tip at x = -11. */
+function plugDome(): Polygon {
   const dome: Polyline = [];
   for (let i = 0; i <= 80; i++) {
     const a = Math.PI / 2 + (Math.PI * i) / 80; // bottom, round the left tip, to the top
     dome.push(pt(11 * Math.cos(a), 7 * Math.sin(a)));
   }
-  const head = polygonOf(orient(dome, true));
-  // From inside the plug, so that bar and plug are one shape.
+  return polygonOf(orient(dome, true));
+}
+
+/**
+ * The centre line of the cable up to the start of its run: from inside the plug (so that bar and
+ * plug are one shape), out of its tip to the left, round a half circle of radius 6, to (7, 12).
+ */
+function cableToRun(): Polyline {
   const line: Polyline = [pt(-9.5, 0), pt(-13, 0)];
   for (let i = 1; i <= 24; i++) {
     const a = -Math.PI / 2 - (Math.PI * i) / 24;
     line.push(pt(-13 + 6 * Math.cos(a), 6 + 6 * Math.sin(a)));
   }
-  line.push(pt(7, 12), pt(27, 12));
-  return union([head, stripAlong(line, () => 2.4)])[0]!;
+  line.push(pt(7, 12));
+  return line;
 }
+
+/** The centre line of `plugAndDippedCable`: the run of `plugAndCable` with a V in it, to x = 55. */
+const dippedRun = (): Polyline => [
+  ...cableToRun(),
+  pt(20, 12),
+  pt(25, 30.66),
+  pt(30, 12),
+  pt(55, 12),
+];
+
+/**
+ * `plugAndCable` with a dip in the run (the cable of the Yer logo has one): after 13 mm the bar goes
+ * down 18.7 mm and up again in a V of 30 degrees, mitred, and runs on to the right. At 3.2 mm wide
+ * a disc of 2.54 mm radius fits at the tip of the V — one disc, 20.9 mm², beside a plug of 121 mm²:
+ * the widening of a bend, no second head (spec §7.8.7). The bar is about 115 mm long.
+ */
+export function plugAndDippedCable(cableMm = 3.2): Polygon {
+  return union([plugDome(), stripAlong(dippedRun(), () => cableMm, true)])[0]!;
+}
+
+/** The cable of `plugAndDippedCable` without its plug: a bar with a dip, and no wide part but the tip of the V. */
+export const dippedCable = (cableMm = 3.2): Polygon => stripAlong(dippedRun(), () => cableMm, true);
