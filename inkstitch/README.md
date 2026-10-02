@@ -73,6 +73,7 @@ pnpm inkstitch <svg> [preset] --ueberlappung 20   # Variante: Überlappungen unt
 pnpm inkstitch <svg> [preset] --aussparen   # Variante: Satin spart die Tatami-Fläche darunter aus (Spec §4.2 Regel 1, verworfen)
 pnpm inkstitch <svg> [preset] --naht 0.3   # Variante: angrenzende Flächen greifen 0,3 mm statt 0,8 mm (Spec §4.2 Regel 2, verworfen)
 pnpm inkstitch <svg> [preset] --zug-symmetrisch   # Variante: Zugausgleich beider Rails jeder Säule wie in §7.2 (Standard: je Rail, §7.8.3)
+pnpm inkstitch <svg> [preset] --ohne-teilung   # Variante: breite Form mit schmalem Band bleibt ein Tatami (Standard: geteilt, §7.8.7)
 ```
 
 `--breite` schreibt `width` und `height` der SVG um (die viewBox bleibt) und liest das Motiv erst dann
@@ -93,6 +94,11 @@ zweite. Eine Rail zu einem Stoffspalt unter 1,0 mm (bis zur nächsten anderen Fo
 entlang der Sprossen nach außen, Median über die Säule) bekommt 0; eine Säule unter 1,0 mm mit einer
 solchen Rail bekommt auf beiden Rails 0, die übrigen schmalen Säulen behalten den Ausgleich aus §7.2.
 Die Ausgabe listet beides. `--zug-symmetrisch` gibt beiden Rails wieder den Wert aus §7.2.
+
+Eine Form, die nach ihrer Breite Tatami ist und ein langes, gleichmäßig schmales Band trägt (Stecker mit
+Kabel, Stab mit Kopf), wird geteilt (Spec §7.8.7, `packages/engine/src/inkstitch/split.ts`): der breite
+Teil bleibt Tatami (`<Kennung>_bulk`), das Band wird Satin (`<Kennung>_band<n>`). Die Ausgabe nennt jede
+Teilung im Block „Geteilt"; `--ohne-teilung` stickt die Form wie vorher als ein Tatami.
 
 Für einzelne Ink/Stitch-Erweiterungen direkt (z. B. zum Verketten mehrerer Schritte):
 

@@ -1,12 +1,14 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { Polygon, Polyline } from "@texma-stitch/geometry";
 import {
+  difference,
   initGeometry,
   offset,
   offsetDirectional,
   pointInPolygon,
   polygonArea,
 } from "@texma-stitch/geometry";
+import { plugAndCable, stickWithHead } from "../../test/fixtures/bands.js";
 import { GLYPHS } from "../../test/fixtures/glyphs.js";
 import {
   annulus,
@@ -22,6 +24,7 @@ import type { ImportedShape } from "../import/svg.js";
 import { bestFillAngle } from "../fill.js";
 import { DEFAULT_ANGLE_DEG } from "../import/svg.js";
 import { PRESETS } from "../presets.js";
+import * as columnsModule from "./columns.js";
 import { satinColumns } from "./columns.js";
 import { inkstitchAngleDeg, tatamiAttributes } from "./tatami.js";
 import {
@@ -958,5 +961,186 @@ describe("minOverlapMm2 option: what a threshold on the overlaps changes in the 
     const t = buildInkstitchTemplate([a, b, c], pique, { ...PAGE, minOverlapMm2: 20 });
     expect(t.objects.map((o) => o.id)).toEqual(["a", "b", "c"]);
     expect(t.orderSwaps).toBeUndefined();
+  });
+});
+
+describe("a wide shape with a narrow band is split (spec §7.8.7)", () => {
+  const orange = "#d25c1c";
+  /** The shape moved by (dx, dy). */
+  const at = (poly: Polygon, dx: number, dy: number): Polygon => ({
+    outer: poly.outer.map((p) => pt(p.x + dx, p.y + dy)),
+    holes: poly.holes.map((h) => h.map((p) => pt(p.x + dx, p.y + dy))),
+  });
+  let lolli: ImportedShape;
+  beforeAll(() => {
+    lolli = area("lolli", at(stickWithHead(), 10, 12), orange);
+  });
+  const flat = { ...pique, pullCompMm: 0, pushCompMm: 0 };
+  /** The polygon a path of the template draws. */
+  const drawn = (svg: string, id: string): Polygon => {
+    const d = new RegExp(`<path id="${id}" d="([^"]*)"`).exec(svg)![1]!;
+    const rings: Polyline[] = d
+      .split("Z")
+      .map((r) => r.trim())
+      .filter(Boolean)
+      .map((r) =>
+        r
+          .replace(/^M /, "")
+          .split(" L ")
+          .map((q) => {
+            const [x, y] = q.split(",").map(Number);
+            return pt(x!, y!);
+          }),
+      );
+    return { outer: rings[0]!, holes: rings.slice(1) };
+  };
+  const ids = (t: TemplateResult): string[] => t.objects.map((o) => o.id);
+
+  it("sets the head as tatami and the stick as satin columns, and says so", () => {
+    const t = buildInkstitchTemplate([lolli], pique, PAGE);
+    expect(t.objects.map((o) => [o.id, o.kind, o.shapeId])).toEqual([
+      ["lolli_bulk", "tatami", "lolli"],
+      ["lolli_band0", "satin", "lolli"],
+    ]);
+    const band = t.objects[1]!;
+    if (band.kind !== "satin") throw new Error("the band is satin");
+    expect(band.columnIds.length).toBeGreaterThan(0);
+    expect(band.columnIds.every((c) => c.startsWith("lolli_band0-"))).toBe(true);
+    expect(band.coverage).toBeGreaterThanOrEqual(0.85);
+    expect(t.satinRuns).toEqual([band.columnIds]);
+
+    // The head is a path with the preset's tatami values, the band a group of native satin columns.
+    expect(t.svg).toMatch(
+      /<path id="lolli_bulk"[^>]*fill:#d25c1c[^>]*inkstitch:row_spacing_mm="0.4"/,
+    );
+    expect(t.svg).toContain('<g id="lolli_band0">');
+    expect(t.svg.match(/inkstitch:satin_column="true"/g)).toHaveLength(band.columnIds.length);
+
+    // The report says what was split, and the notes carry it: nothing is cut without a word (rule 8).
+    expect(t.split.kept).toEqual([]);
+    expect(t.split.shapes).toHaveLength(1);
+    const s = t.split.shapes[0]!;
+    expect(s).toMatchObject({ shapeId: "lolli", bulkIds: ["lolli_bulk"] });
+    expect(s.bulkMm2).toBeGreaterThan(100);
+    expect(s.bands).toHaveLength(1);
+    expect(s.bands[0]).toMatchObject({ id: "lolli_band0", columns: band.columnIds.length });
+    expect(s.bands[0]!.lengthMm).toBeGreaterThan(30);
+    expect(s.bands[0]!.widthMm).toBeCloseTo(2.4, 1);
+    const notes = t.warnings.filter((w) => w.code === "SHAPE_SPLIT" && w.objectId === "lolli");
+    expect(notes).toHaveLength(1);
+    expect(notes[0]!.severity).toBe("info");
+    expect(notes[0]!.message).toContain("satin");
+  });
+
+  it("stitches the head first and the band over its edge, in either order of the document", () => {
+    for (const order of ["document", "colour"] as const) {
+      const t = buildInkstitchTemplate([lolli], pique, { ...PAGE, order });
+      expect(ids(t), order).toEqual(["lolli_bulk", "lolli_band0"]);
+    }
+  });
+
+  it("keeps the stacking order of the shape against everything else (spec §10.1)", () => {
+    // `under` is drawn first and lies under the stick; `over` is drawn last and lies over the head.
+    const under = area("under", polygonOf(rect(30, 10, 12, 4)), "#1f3a93");
+    const over = area("over", polygonOf(rect(8, 6, 4, 12)), "#c8102e");
+    const t = buildInkstitchTemplate([under, lolli, over], pique, { ...PAGE, order: "colour" });
+    const place = (id: string): number => ids(t).indexOf(id);
+    expect(place("under")).toBeLessThan(place("lolli_bulk"));
+    expect(place("under")).toBeLessThan(place("lolli_band0"));
+    expect(place("over")).toBeGreaterThan(place("lolli_bulk"));
+    expect(place("over")).toBeGreaterThan(place("lolli_band0"));
+  });
+
+  it("tucks the head under the band, and never draws it outside the shape", () => {
+    const t = buildInkstitchTemplate([lolli], flat, PAGE);
+    const head = drawn(t.svg, "lolli_bulk");
+    // A disc of 12 mm is 113.1 mm²; the tuck adds about 2 mm² (0.8 mm into a bar of 2.4 mm).
+    expect(polygonArea(head)).toBeGreaterThan(114);
+    expect(polygonArea(head)).toBeLessThan(118.5);
+    const shape = lolli.kind === "area" ? lolli.polygon : head;
+    expect(difference([head], [shape]).reduce((n, p) => n + polygonArea(p), 0)).toBeLessThan(1e-3);
+  });
+
+  it("cuts the head like any tatami area: a later area still takes its place out of it", () => {
+    // 6 mm wide: a tatami area itself, so that it cuts (a satin shape cuts nothing, spec §4.1 rule 1).
+    const post = area("post", polygonOf(rect(7, 4, 6, 16)), "#c8102e");
+    const t = buildInkstitchTemplate([lolli, post], pique, { ...PAGE, knockdown: true });
+    expect(ids(t)).toEqual(["lolli_bulk_p0", "lolli_bulk_p1", "lolli_band0", "post"]);
+    expect(t.objects.filter((o) => o.shapeId === "lolli").map((o) => o.kind)).toEqual([
+      "tatami",
+      "tatami",
+      "satin",
+    ]);
+  });
+
+  it("puts a trim after the shape on the last part of the head, as for any tatami", () => {
+    const trimmed: ImportedShape = { ...lolli, trimAfter: "always" };
+    const t = buildInkstitchTemplate([trimmed], pique, PAGE);
+    expect(t.svg).toMatch(/<path id="lolli_bulk"[^>]*inkstitch:trim_after="true"/);
+    expect(t.svg.match(/trim_after/g)).toHaveLength(1);
+  });
+
+  it("splits the cable off the plug the way the Yer logo has it", () => {
+    const plug = area("plug", at(plugAndCable(), 24, 6), orange);
+    const t = buildInkstitchTemplate([plug], pique, { ...PAGE, heightMm: 40 });
+    expect(t.objects.map((o) => [o.id, o.kind])).toEqual([
+      ["plug_bulk", "tatami"],
+      ["plug_band0", "satin"],
+    ]);
+    const band = t.objects[1]!;
+    if (band.kind !== "satin") throw new Error("the band is satin");
+    expect(band.columnIds.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("leaves a shape without a narrow band as it was: same ids, nothing reported", () => {
+    const block = area("block", polygonOf(rect(60, 2, 20, 20)));
+    const t = buildInkstitchTemplate([block, area("letter", moved(GLYPHS.T!, 0))], pique, PAGE);
+    expect(ids(t)).toEqual(["block", "letter"]);
+    expect(t.split).toEqual({ shapes: [], kept: [] });
+    expect(t.warnings.some((w) => w.code === "SHAPE_SPLIT")).toBe(false);
+  });
+
+  it("is switched off by splitBands: false — the shape as one tatami, as before", () => {
+    const t = buildInkstitchTemplate([lolli], pique, { ...PAGE, splitBands: false });
+    expect(t.objects).toEqual([{ id: "lolli", kind: "tatami", shapeId: "lolli", color: orange }]);
+    expect(t.split).toEqual({ shapes: [], kept: [] });
+  });
+
+  it("leaves a band whose columns do not hold in the head, as one tatami with the reason", () => {
+    const refused = {
+      ok: false,
+      columns: [],
+      coverage: 0.5,
+      reason: "stroke 1: its rails cross",
+      smoothedMm: 0,
+      graphs: [],
+      warnings: [],
+    };
+    const spy = vi.spyOn(columnsModule, "satinColumns").mockReturnValueOnce(refused);
+    let t: TemplateResult;
+    try {
+      t = buildInkstitchTemplate([lolli], pique, PAGE);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(t.objects).toEqual([
+      {
+        id: "lolli",
+        kind: "tatami",
+        shapeId: "lolli",
+        color: orange,
+        reason: expect.stringContaining("its rails cross"),
+      },
+    ]);
+    expect(t.satinRuns).toEqual([]);
+    expect(t.split.shapes).toEqual([]);
+    expect(t.split.kept).toHaveLength(1);
+    expect(t.split.kept[0]).toMatchObject({
+      shapeId: "lolli",
+      reason: "stroke 1: its rails cross",
+    });
+    const note = t.warnings.find((w) => w.objectId === "lolli" && w.code === "AUTOSATIN_MIXED");
+    expect(note?.severity).toBe("info");
+    expect(note?.message).toContain("its rails cross");
   });
 });

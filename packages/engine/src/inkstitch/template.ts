@@ -21,7 +21,10 @@
  *   attributes and the stitch angle of the area (`tatami.ts`, spec §14, §5.1, §8.2);
  *   the grid underlay only where it holds (`gridUnderlay`), and the outline itself
  *   compensated for pull along the rows and push across them (`compensateArea`,
- *   spec §8.1.1).
+ *   spec §8.1.1). A shape the width makes tatami that carries a long, even, narrow
+ *   band — the cable of a plug, the stick of a lollipop — is split first (`split.ts`,
+ *   spec §7.8.7): the wide part is a tatami `<id>_bulk`, the band satin columns
+ *   `<id>_band<n>`, both lying where the shape lay in the order.
  *
  * Objects keep the document order of their source shapes (the stacking order,
  * spec §5.1); the columns of one shape come in their stitch order (what ends
@@ -47,7 +50,7 @@ import {
   polygonArea,
   simplify,
 } from "@texma-stitch/geometry";
-import type { ImportedShape } from "../import/svg.js";
+import type { ImportedAreaShape, ImportedShape } from "../import/svg.js";
 import { DEFAULT_ANGLE_DEG } from "../import/svg.js";
 import type { Preset } from "../presets.js";
 import type { Warning } from "../types.js";
@@ -60,6 +63,7 @@ import { formIndex, isFabricGap, railPull, satinPullCompMm } from "./rail-pull.j
 import type { Form, RailPull } from "./rail-pull.js";
 import { colourBlockCount, orderSwaps, sequenceByColour } from "./sequence.js";
 import type { SwapBox } from "./sequence.js";
+import { splitNarrowWide } from "./split.js";
 import { compensateArea, fillAngles, gridUnderlay, tatamiAttributes } from "./tatami.js";
 import { strokeGraph } from "./strokes.js";
 
@@ -180,6 +184,34 @@ export type RailPullReport = {
   gaps: { id: string; side: "A" | "B"; gapMm: number }[];
 };
 
+/**
+ * What the split of wide shapes with a narrow band did (spec §7.8.7). Nothing is cut without being
+ * listed here, and each split also goes into the warnings as `SHAPE_SPLIT`.
+ */
+export type SplitReport = {
+  /** Shapes split into a wide part (tatami) and bands (satin), in design order. */
+  shapes: {
+    shapeId: string;
+    /** The tatami objects of the wide part, as planned — the knockdown may cut them further (`<id>_p<n>`). */
+    bulkIds: string[];
+    /** The area of the wide part, mm², the tuck under the bands included. */
+    bulkMm2: number;
+    /** The satin objects, in reading order. */
+    bands: {
+      id: string;
+      lengthMm: number;
+      widthMm: number;
+      /** Width at the 20th over the 80th percentile along the band (`bandProfile`). */
+      uniformity: number;
+      /** Satin columns the band is set as, and the share of the band they cover (spec §5.1). */
+      columns: number;
+      coverage: number;
+    }[];
+  }[];
+  /** Narrow parts that met the rule and whose columns do not hold: left in the wide part, with the reason. */
+  kept: { shapeId: string; lengthMm: number; widthMm: number; reason: string }[];
+};
+
 /** What the pull and push compensation did to the tatami areas (spec §8.1.1). */
 export type CompensationReport = {
   /** Areas the push would have cut apart, compensated by the pull alone, with the parts it would have made. */
@@ -207,6 +239,8 @@ export type TemplateResult = {
   knockdown?: KnockdownReport;
   /** The pull compensation per rail, unless `TemplateOptions.railPullBySide` is off. */
   railPull?: RailPullReport;
+  /** The shapes split into a wide part and bands, and the bands that stayed in the wide part. */
+  split: SplitReport;
   compensation: CompensationReport;
   underlay: UnderlayReport;
 };
@@ -245,6 +279,12 @@ export type TemplateOptions = {
    * of every column get the compensation of §7.2, as before.
    */
   railPullBySide?: boolean;
+  /**
+   * Split a shape the width makes tatami into its wide part and a long, even, narrow band
+   * (spec §7.8.7). Default: on. Off: every such shape is one tatami, as before — for comparison
+   * runs.
+   */
+  splitBands?: boolean;
 };
 
 const num = (n: number): string => (Math.round(n * 1e4) / 1e4).toString();
@@ -426,8 +466,109 @@ type PlannedSatin = PlannedBase & {
 };
 type Planned = PlannedTatami | PlannedRunning | PlannedSatin;
 
+/**
+ * A tatami shape with a long, even, narrow band, set as its wide part and the band (spec §7.8.7,
+ * `split.ts`): the wide part as tatami, the band as satin columns, both in the place of the shape —
+ * with the shape's own outline as what they lie on, so that what lay over or under it lies over or
+ * under both, and the wide part before the band. Returns whether it split. A band whose columns do
+ * not hold is not split off: it goes into `split.kept` and the notes, and `kept` is the reason the
+ * shape is stitched whole (or, where another band did split, the head carries it).
+ */
+function planSplit(
+  shape: ImportedAreaShape,
+  preset: Preset,
+  planned: Planned[],
+  warnings: Warning[],
+  report: SplitReport,
+): { split: boolean; kept?: string } {
+  const id = xmlId(shape.id);
+  const cut = splitNarrowWide(shape.polygon, { underlapMm: preset.underlapMm, idPrefix: id });
+  const dims = (b: { lengthMm: number; widthMm: number }): string =>
+    `${b.lengthMm.toFixed(1)} × ${b.widthMm.toFixed(2)} mm`;
+  const keptNotes = cut.kept.map((k) => {
+    const note = `narrow part ${dims(k)} would be split off as satin, but its columns do not hold (${k.reason})`;
+    report.kept.push({
+      shapeId: shape.id,
+      lengthMm: k.lengthMm,
+      widthMm: k.widthMm,
+      reason: k.reason,
+    });
+    warnings.push(
+      warn(
+        WARNING.AUTOSATIN_MIXED,
+        `"${id}": ${note} — it stays in the wide part, stitched as tatami.`,
+        "info",
+        id,
+      ),
+    );
+    return note;
+  });
+  const kept = keptNotes.length > 0 ? keptNotes.join("; ") : undefined;
+  if (cut.bands.length === 0) return kept === undefined ? { split: false } : { split: false, kept };
+
+  const bulkIds = cut.bulk.map((_, i) => (cut.bulk.length === 1 ? `${id}_bulk` : `${id}_bulk${i}`));
+  cut.bulk.forEach((polygon, i) =>
+    planned.push({
+      kind: "tatami",
+      id: bulkIds[i]!,
+      shapeId: shape.id,
+      color: shape.color,
+      cover: shape.polygon,
+      // The shape ends with its last part in stitch order; a satin column carries no trim of its own.
+      trimAfter: shape.trimAfter === "always" && i === cut.bulk.length - 1,
+      polygon,
+      ...(kept === undefined ? {} : { reason: kept }),
+    }),
+  );
+  for (const band of cut.bands) {
+    planned.push({
+      kind: "satin",
+      id: `${id}_band${band.index}`,
+      shapeId: shape.id,
+      color: shape.color,
+      cover: shape.polygon,
+      trimAfter: false,
+      columns: band.columns.columns,
+      coverage: band.columns.coverage,
+      smoothedMm: band.columns.smoothedMm,
+    });
+    warnings.push(...band.columns.warnings);
+  }
+  const bulkMm2 = cut.bulk.reduce((sum, p) => sum + polygonArea(p), 0);
+  report.shapes.push({
+    shapeId: shape.id,
+    bulkIds,
+    bulkMm2,
+    bands: cut.bands.map((b) => ({
+      id: `${id}_band${b.index}`,
+      lengthMm: b.lengthMm,
+      widthMm: b.widthMm,
+      uniformity: b.uniformity,
+      columns: b.columns.columns.length,
+      coverage: b.columns.coverage,
+    })),
+  });
+  warnings.push(
+    warn(
+      WARNING.SHAPE_SPLIT,
+      `"${id}" is wide with ${cut.bands.length === 1 ? "a narrow band" : `${cut.bands.length} narrow bands`}: ` +
+        `${cut.bands.map((b) => `${dims(b)} (${b.columns.columns.length} column${b.columns.columns.length === 1 ? "" : "s"})`).join(", ")} ` +
+        `set as satin, the wide part (${bulkMm2.toFixed(0)} mm²) stays tatami.`,
+      "info",
+      id,
+    ),
+  );
+  return { split: true };
+}
+
 /** Decides what every shape becomes (module doc), in document order. */
-function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]): Planned[] {
+function planShapes(
+  shapes: ImportedShape[],
+  preset: Preset,
+  warnings: Warning[],
+  report: SplitReport,
+  splitBands: boolean,
+): Planned[] {
   const planned: Planned[] = [];
   const tatami = (shape: ImportedShape, color: string, polygon: Polygon, reason?: string): void => {
     planned.push({
@@ -472,7 +613,12 @@ function planShapes(shapes: ImportedShape[], preset: Preset, warnings: Warning[]
     // "tight column" note would describe a column that is never set.
     if (cls.shapeClass !== "satin") warnings.push(...cls.warnings);
     if (cls.shapeClass === "tatami") {
-      tatami(shape, shape.color, shape.polygon);
+      // A wide shape may carry a long, even, narrow band: split it first (spec §7.8.7).
+      const cut = splitBands
+        ? planSplit(shape, preset, planned, warnings, report)
+        : { split: false };
+      if (cut.split) continue;
+      tatami(shape, shape.color, shape.polygon, "kept" in cut ? cut.kept : undefined);
       continue;
     }
     if (cls.shapeClass === "running") {
@@ -870,7 +1016,8 @@ export function buildInkstitchTemplate(
   opts: TemplateOptions,
 ): TemplateResult {
   const warnings: Warning[] = [];
-  let planned = planShapes(shapes, preset, warnings);
+  const split: SplitReport = { shapes: [], kept: [] };
+  let planned = planShapes(shapes, preset, warnings, split, opts.splitBands !== false);
   let lowerBound: number | undefined;
   let standard: { blocks: number; swaps: TemplateOrderSwap[] } | undefined;
   if (opts.order === "colour") {
@@ -918,6 +1065,7 @@ export function buildInkstitchTemplate(
       : { colourBlocksStandard: standard.blocks, orderSwaps: standard.swaps }),
     ...(knockdown ? { knockdown } : {}),
     ...(pulls ? { railPull: pulls.report } : {}),
+    split,
     compensation: compensated.report,
     underlay: underlayReport,
   };
