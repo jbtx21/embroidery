@@ -46,7 +46,9 @@ Schwelle „dieselbe Nadel".
 wie die Profi-Dateien. §5.3 neu: Textur in der Vorlage erkennen und bereinigen. Beleg sind mindestens
 3 Körner (Löcher von 0,001 bis unter 0,05 mm²) in einer Form. Dann werden Löcher unter 0,5 mm²
 gefüllt und Splitter bis 4 mm² im Abstand bis 0,4 mm angeschlossen. Staub unter 0,05 mm² wird
-überall verworfen. Alle Schwellen gelten in der bestellten Größe.
+überall verworfen. Alle Schwellen gelten in der bestellten Größe. §7.8.7 neu: Eine breite Form
+mit schmalem Band wird geteilt, der breite Teil bleibt Tatami, das Band wird Satin. Ein Band ist
+mindestens 1,3 mm breit, 15 Breiten lang, gleichmäßig breit und hängt an einem Kopf ab 20 mm².
 
 ---
 
