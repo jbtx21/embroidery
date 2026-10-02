@@ -43,7 +43,10 @@ Schwelle „dieselbe Nadel".
 
 **Änderung 02.10.2026** — §11: Die Ink/Stitch-Vorlage setzt die Mindeststichlänge auf 0,4 mm
 (Ink/Stitch-Standard 0,1 mm). Unsere DSTs hatten sechs- bis zehnmal so viele Stiche unter 0,4 mm
-wie die Profi-Dateien.
+wie die Profi-Dateien. §5.3 neu: Textur in der Vorlage erkennen und bereinigen. Beleg sind mindestens
+3 Körner (Löcher von 0,001 bis unter 0,05 mm²) in einer Form. Dann werden Löcher unter 0,5 mm²
+gefüllt und Splitter bis 4 mm² im Abstand bis 0,4 mm angeschlossen. Staub unter 0,05 mm² wird
+überall verworfen. Alle Schwellen gelten in der bestellten Größe.
 
 ---
 

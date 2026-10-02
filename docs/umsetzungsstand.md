@@ -794,3 +794,27 @@ Farbwechsel zählt nicht. Die Mindestgrößen bleiben gleich, die Stichzahl sink
   Kanten weg. Das muss vor einer Dichteänderung gemessen werden.
 - **Tests:** 1.204 → 1.205, dazu der Rauchtest 14 → 15, alle grün. Neu ist eine Tatami-Scheibe von
   30 mm: Mit 0,1 mm hat sie 10 Stiche unter 0,3 mm, mit der Vorlage keinen.
+
+**Textur der Vorlage (02.10.2026, Spec §5.3).** `importShapes` erkennt Textur und bereinigt sie vor
+der Einteilung, dem Tor und der Vorlage (`import/texture.ts`, Warnung `IMPORT_TEXTURE_CLEANED`, Abschnitt
+„Textur" in `pnpm inkstitch` und `pnpm mindestgroesse`). Beleg sind mindestens 3 Körner in einer Form.
+Dann werden Löcher unter 0,5 mm² gefüllt, Splitter bis 4 mm² im Abstand bis 0,4 mm angeschlossen und
+Staub unter 0,05 mm² verworfen. Die Schwellen gelten in der bestellten Größe, das Tor gibt sie
+an jede geprüfte Größe weiter. Anlass war der Profi-Vergleich der Christlichen Gemeindereitschule:
+Die Abriebschrift ließ die Breitenmessung 0,4–0,6 mm zu schmal lesen.
+
+Die sechs Logos ohne Textur bleiben unverändert: Vorlage, DST und PES sind in allen zwölf Läufen
+(mit Tor und `--ohne-tor`) Byte für Byte gleich. Die beiden Logos mit Textur:
+
+|                                          | Christliche 90,2 mm (Jersey) |  Eislingen 200 mm |
+| ---------------------------------------- | ---------------------------: | ----------------: |
+| Mindestgröße (Tor)                       |                 138 → 126 mm |      286 → 274 mm |
+| Objekte Satin / Lauf / Tatami (ohne Tor) |     57/239/2.224 → 63/219/18 | 59/63/14 → 60/9/6 |
+| Rückfälle auf Tatami (mit Tor)           |                      527 → 5 |            14 → 6 |
+| Schriftstiche (ohne Tor; Puncher 6.546)  |                5.552 → 6.418 |                 – |
+| Fadenschnitte (ohne Tor)                 |                    111 → 111 |          146 → 97 |
+| Prüfstellen (ohne Tor)                   |                  3.264 → 528 |       1.310 → 720 |
+
+Die vier Buchstaben, die vorher auf Laufstich fielen, sind jetzt Satin. Das Tor der Christlichen
+bestimmt nun ein braunes Pferdeteil von 0,77 mm, also die Zeichnung. Tests 1.205 → 1.255. Grenzen
+stehen in `docs/backlog.md`.
