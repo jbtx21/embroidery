@@ -493,7 +493,7 @@ Tor sucht 286 mm.
 Einteilung nach Breite, **vor** dem Tor und **vor** der Vorlage. Das Tor und der Lauf lesen die SVG
 je Größe neu über `importShapes` (`tools/tor.mjs`, `tools/inkstitch.mjs`) und sehen deshalb in jeder
 Größe dieselben Formen. Abschaltbar über `importShapes(text, { texture: false })`, nur für
-Vergleichsmessungen.
+Vergleichsmessungen; `pnpm inkstitch --tatami` liest die Quelle wie gezeichnet, ohne Bereinigung.
 
 **Die Regeln.** Vier Schritte, in dieser Reihenfolge; jede Schwelle steht für eine Grenze, die der
 Faden setzt, und ist an den acht Referenzlogos gemessen (Tabelle unten):
@@ -553,8 +553,8 @@ inkstitch` und `pnpm mindestgroesse` nennen sie unter „Textur“. Wo nichts zu
 keine Warnung. Die Bereinigung ist deterministisch und idempotent: ein zweiter Lauf findet an den
 Ergebnisformen keinen Beleg mehr.
 
-**Messung** *(02.10.2026, die acht Referenzlogos in ihrer Größe, Katalog und Skripte unter
-`$S/textur`)*: Löcher je Größenklasse, Beleg je Form, Teile:
+**Messung** *(02.10.2026, die acht Referenzlogos in ihrer Größe; Katalog und Skripte im Scratchpad
+der Sitzung, die Logos selbst bleiben draußen)*: Löcher je Größenklasse, Beleg je Form, Teile:
 
 | Logo | Formen | Löcher | unter 0,001 | 0,001 bis 0,05 | 0,05 bis 0,5 | ab 0,5 | Beleg, größter je Form | Formen mit Beleg | Teile unter 0,05 mm² |
 |---|---|---|---|---|---|---|---|---|---|
@@ -567,9 +567,38 @@ Ergebnisformen keinen Beleg mehr.
 | **Eislingen 200 mm** | 136 | 1.179 | 53 | 808 | 297 | 21 | 45 | **43** | 0 |
 | **Christliche 90,2 mm** | 840 | 6.703 | 0 | 6.567 | 124 | 12 | 278 | **57** | 546 |
 
+**Wirkung** *(02.10.2026, `pnpm inkstitch` mit Ink/Stitch 3.3.0, die acht Logos vor (Stand afe6f5f) und
+nach der Bereinigung, je in der bestellten Größe mit `--ohne-tor` und mit Tor)*. Die sechs Logos ohne
+Textur: Mindestgröße, Vorlage und Stickdatei **unverändert** — in allen zwölf Läufen sind die Vorlage
+(`.inkstitch.svg`), die DST- und die PES-Datei Byte für Byte gleich; die übrigen SVG-Dateien (geroutet,
+mit Fadenschnitten, Nacharbeit) unterscheiden sich nur in den Zufallskennungen und den Orten der
+Befehlsmarken, die Ink/Stitch bei jedem Lauf neu vergibt. Die beiden mit Textur:
+
+| | Christliche 90,2 mm (Jersey) vorher | nachher | Eislingen 200 mm (Pique) vorher | nachher |
+|---|---|---|---|---|
+| Mindestgröße (Tor) | 138 mm | **126 mm** | 286 mm | **274 mm** |
+| Objekte Satin / Laufstich / Tatami (ohne Tor) | 57 / 239 / 2.224 | **63 / 219 / 18** | 59 / 63 / 14 | **60 / 9 / 6** |
+| Rückfall auf Tatami, „als Satin vorgesehen“ (Tor) | 527 | **5** | 14 | **6** |
+| Stiche (ohne Tor) | 9.263 | 10.138 | 31.926 | 31.871 |
+| davon Schrift (ohne Tor; der Puncher stickt 6.546) | 5.552 | **6.418** | – | – |
+| Sprünge / Fadenschnitte (ohne Tor) | 177 / 111 | 161 / 111 | 341 / 146 | **241 / 97** |
+| Prüfstellen der Nacharbeit-Datei (ohne Tor) | 3.264 | **528** | 1.310 | **720** |
+| bereinigt: Formen · Löcher · Teile · Splitter | – | 57 · 6.691 · 546 · 5 | – | 43 · 1.110 · 0 · 61 |
+
+Die Schrift der Christliche besteht jetzt aus Satin-Säulen: die vier Buchstaben, die vorher auf
+Laufstich zurückfielen („rail leaves the letter“), sind Satin. Tatami bleiben 18 Objekte (mit Tor 12),
+davon 10 (mit Tor 5), die als Satin oder Laufstich vorgesehen waren und keine Säule bekommen („no
+stroke found“ und ähnlich) — eine Frage der Einteilung nach Breite, nicht der Textur. Die Mindestgröße
+bestimmt kein Korn mehr, sondern ein braunes Pferdeteil von 0,77 mm (`path1`) — Zeichnung, keine
+Textur. Die Schrift-Stiche sind den Quellformen der Schrift zugeordnet (Stiche der DST, nächste
+Quellform gleicher Farbe).
+
 **Grenzen.** (1) Eine Textur ohne Körner unter 0,05 mm² hat keinen Beleg: zwei „I“ der Kreideschrift
-in Eislingen tragen je 4 Löcher von 0,02 bis 0,12 mm², bleiben, wie sie sind, und bestimmen jetzt
-das Tor (0,78 mm bei 200 mm). (2) Die rauhe Kontur bleibt; beim Satin glättet sie §7.8.4. (3) Die
+in Eislingen tragen je 4 Löcher von 0,02 bis 0,12 mm² (nur eines unter 0,05 mm²), bleiben, wie sie
+sind, und bestimmen das Tor (0,78 mm bei 200 mm). Füllte man ihre Löcher mit — im Versuch alle Löcher
+unter 0,5 mm² in allen Formen einer Farbe, die irgendwo Textur trägt —, sänke das Tor nur von 274 auf
+269 mm: der nächste Strich (`z01-000000-077`, 0,83 mm) bestimmt es dann. Ein Beleg aus dem Umfeld der
+Farbe ist darum nicht eingeführt. (2) Die rauhe Kontur bleibt; beim Satin glättet sie §7.8.4. (3) Die
 Fragmente der Pferdekontur sind keine Textur, werden aber je ein eigenes Objekt (rund 200
 Laufstich-Objekte in der Vorlage der Christliche); sie zu einer Linie zu vereinigen wäre ein
 eigener Schritt. (4) Die Schwellen sind an acht Logos gemessen, zwei davon mit Textur; ein Probestick auf
