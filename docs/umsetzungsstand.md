@@ -818,3 +818,26 @@ Die sechs Logos ohne Textur bleiben unverändert: Vorlage, DST und PES sind in a
 Die vier Buchstaben, die vorher auf Laufstich fielen, sind jetzt Satin. Das Tor der Christlichen
 bestimmt nun ein braunes Pferdeteil von 0,77 mm, also die Zeichnung. Tests 1.205 → 1.255. Grenzen
 stehen in `docs/backlog.md`.
+
+**Formen nach Breite teilen (02.10.2026, Spec §7.8.7).** Eine breite Form mit schmalem Band wird in
+der Vorlage geteilt (`inkstitch/split.ts`, `planSplit` in `template.ts`, Block „Geteilt" in
+`pnpm inkstitch`; `--ohne-teilung` für Vergleiche). Der breite Teil bleibt Tatami, wird zuerst
+gestickt und liegt 0,8 mm unter dem Bandende; das Band wird Satin. Ein Band ist:
+
+- mindestens 1,3 mm breit und 15 Breiten lang;
+- gleichmäßig breit (Breite am 20. Perzentil durch die am 80. mindestens 0,7);
+- an einem Ende an einem Kopf von mindestens 20 mm² angehängt, in den eine Scheibe von zwei
+  Bandbreiten passt;
+- und seine Säulen müssen halten.
+
+Anlass war der Profi-Vergleich Elektrotechnik Yer: Stecker und Kabel sind ein Pfad, er wurde bisher
+als ein Tatami gestickt.
+
+Gemessen auf dem Stand mit Texturbereinigung, acht Logos, je mit Tor und `--ohne-tor`: 14 von 16
+DSTs sind Byte für Byte gleich. Nur Elektrotechnik Yer ändert sich:
+
+- Stiche 2.886 → 2.757, Fadenschnitte 14 → 17.
+- Das Kabel ist jetzt ein Satinband von 113 × 2,43 mm: 980 → 823 Stiche, der Puncher hat 788.
+- Der Stecker bleibt Tatami: 162 Stiche gegen 443 beim Puncher, der ihn als breiten Satin stickt.
+
+Tests 1.255 → 1.299. Rauchtest auf dem Branch der Teilung 16/16.
