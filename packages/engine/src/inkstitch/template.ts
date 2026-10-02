@@ -463,6 +463,12 @@ type PlannedSatin = PlannedBase & {
   columns: SatinColumnPlan[];
   coverage: number;
   smoothedMm: number;
+  /**
+   * The band's own polygon where the satin is a band split off a wider shape — its `cover` is the
+   * outline of the whole shape. What the satin cut-out (§4.2 rule 1, off) takes out of the tatami
+   * beneath it: the band, not the head.
+   */
+  outline?: Polygon;
 };
 type Planned = PlannedTatami | PlannedRunning | PlannedSatin;
 
@@ -531,6 +537,7 @@ function planSplit(
       columns: band.columns.columns,
       coverage: band.columns.coverage,
       smoothedMm: band.columns.smoothedMm,
+      outline: band.polygon,
     });
     warnings.push(...band.columns.warnings);
   }
@@ -752,7 +759,7 @@ function applyKnockdown(
     opts.touchUnderlapMm === undefined ? {} : { touchUnderlapMm: opts.touchUnderlapMm },
   );
   warnings.push(...result.warnings);
-  const satinAt = planned.map((p) => (p.kind === "satin" ? p.cover : undefined));
+  const satinAt = planned.map((p) => (p.kind === "satin" ? (p.outline ?? p.cover) : undefined));
 
   const out: Planned[] = [];
   const split: KnockdownReport["split"] = [];

@@ -1073,6 +1073,25 @@ describe("a wide shape with a narrow band is split (spec §7.8.7)", () => {
     ]);
   });
 
+  it("spares the band's own place out of the tatami beneath, not the whole shape's, where the satin cut-out is on (§4.2 rule 1, off by default)", () => {
+    const ground = area("ground", polygonOf(rect(0, 0, 70, 30)), "#1f3a93");
+    const t = buildInkstitchTemplate([ground, lolli], flat, {
+      ...PAGE,
+      knockdown: true,
+      satinCutout: true,
+    });
+    expect(ids(t)).toEqual(["ground", "lolli_bulk", "lolli_band0"]);
+    const left = drawn(t.svg, "ground");
+    // The head cut a hole of its own shrunk by 0.8 mm (§4.1 rule 4): the ground still reaches 0.5 mm
+    // in under the rim of the head, where a cut-out of the whole shape (shrunk by 0.2 mm) would go.
+    expect(pointInPolygon(left, pt(4.5, 12))).toBe(true);
+    // The place of the band is spared: on its axis, 20 mm along, there is no ground.
+    expect(pointInPolygon(left, pt(40, 12))).toBe(false);
+    // Off, the band spares nothing — the ground has the hole of the head and nothing else.
+    const off = buildInkstitchTemplate([ground, lolli], flat, { ...PAGE, knockdown: true });
+    expect(pointInPolygon(drawn(off.svg, "ground"), pt(40, 12))).toBe(true);
+  });
+
   it("puts a trim after the shape on the last part of the head, as for any tatami", () => {
     const trimmed: ImportedShape = { ...lolli, trimAfter: "always" };
     const t = buildInkstitchTemplate([trimmed], pique, PAGE);
