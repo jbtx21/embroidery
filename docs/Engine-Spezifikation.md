@@ -473,6 +473,108 @@ werden, sondern Mindestgröße angeben und daraus das Stickprogramm erstellen.")
   Namen, und die Ausgabe warnt. Stickprogramme für Aufträge entstehen nie mit diesem Schalter.
 - Die Lücken (zweite Zahl) gehen nicht ins Tor; sie stehen in Liste, Bild und Nacharbeit-Datei.
 
+### 5.3 Textur erkennen und bereinigen *(02.10.2026, Entscheidung des Nutzers: „Texturen in Vektor-Vorlagen erkennen und bereinigen, bevor Formen eingeteilt und vermessen werden.“)*
+
+Abriebschrift und Kreidebuchstaben bestehen in der Vorlage aus einem Körper je Buchstabe, Tausenden
+Körnern als Löchern und Splittern daneben. Auf dem Stoff ist davon nichts zu sehen — der Faden ist
+0,4 mm breit —, aber jede Stufe danach liest es als Form: die Breitenmessung (§5.1, §7.8.1), das
+Tor (§5.2) und die Vorlage (§7.8, §8.8).
+
+**Anlass** *(Profi-Vergleich Christliche Gemeindereitschule, Preset Jersey, 90,2 mm, Stand afe6f5f)*.
+Die Schrift besteht aus 48 Buchstabenpfaden mit 600 Teilformen (48 Körper, rund 550 Splitter) und
+6.703 Löchern. Gemessen: die mittlere Breite der Buchstaben liest 0,95 mm (der schmalste 0,61 mm),
+nach der Bereinigung unten 1,28 mm (der schmalste 1,09 mm; der Puncher 1,50 mm je Säule); das Tor
+verlangt 138 mm, wo der Puncher in 90 mm sauber stickt; rund 2.200 Teile werden Tatami-Objekte mit
+eigenem Verriegelungsstich, Sprung und Fadenschnitt; vier Buchstaben fallen auf Laufstich zurück
+(„rail leaves the letter“). Eislingen 200 mm („SEGEN SEIN“, Kreide): 1.179 Löcher, 64 Splitter, das
+Tor sucht 286 mm.
+
+**Wo sie sitzt.** In `importShapes` (§5.1), unmittelbar nach dem Lesen der Pfade — also **vor** der
+Einteilung nach Breite, **vor** dem Tor und **vor** der Vorlage. Das Tor und der Lauf lesen die SVG
+je Größe neu über `importShapes` (`tools/tor.mjs`, `tools/inkstitch.mjs`) und sehen deshalb in jeder
+Größe dieselben Formen. Abschaltbar über `importShapes(text, { texture: false })`, nur für
+Vergleichsmessungen.
+
+**Die Regeln.** Vier Schritte, in dieser Reihenfolge; jede Schwelle steht für eine Grenze, die der
+Faden setzt, und ist an den acht Referenzlogos gemessen (Tabelle unten):
+
+| Größe | Wert | Maß | Herkunft |
+|---|---|---|---|
+| Beleg (`TEXTURE_EVIDENCE_*`) | mindestens **3 Löcher** von 0,001 bis unter 0,05 mm² in **einer** Form | Texturkörner sind Löcher dieser Größe, viele und in einer Form; ein gezeichnetes Loch ist so klein nur selten | die sechs Logos ohne Textur: höchstens 1 je Form; Christliche: 0 oder mindestens 6, 57 Formen; Eislingen: 43 Formen |
+| Löcher (`TEXTURE_HOLE_MAX_MM2`) | unter **0,5 mm²** | ein Loch unter einem Kreis von 0,8 mm bleibt nicht offen (§5.2: Lücke mindestens 0,8 mm) | Christliche: größtes Korn 0,48 mm², kleinstes echtes Loch 1,30 mm² |
+| Staub (`SPECK_MAX_MM2`) | Teile unter **0,05 mm²** | ein Teil, das in einen Kreis von 0,25 mm passt, ist schmaler als ein Faden: es liegt unter jedem Stich | Christliche: 542 weiße Teile unter 0,05 mm², **keines** von 0,05 bis 0,2 mm²; danach die echten (i-Punkte 1,85 mm²) |
+| Splitter (`SPLINTER_MAX_MM2`, `SPLINTER_REACH_MM`) | Teile bis **4 mm²** (`FILL_TINY`, §11) im Abstand bis **0,4 mm** | einen Spalt unter 0,4 mm schließt der Zugausgleich beider Seiten (2 × 0,2 mm, §7.2) | Eislingen: 61 von 64 Teilen unter 3 mm² liegen im Abstand bis 0,4 mm, das nächste bei 0,46 mm, dann 0,77 mm; der i-Punkt der Christliche 0,66 mm |
+
+1. **Beleg.** Eine Form hat Textur, wenn sie mindestens 3 Löcher von 0,001 bis unter 0,05 mm² trägt.
+   Löcher unter 0,001 mm² zählen nicht: das sind Rundungsreste der Pfadumrechnung (Dreiecke von
+   5·10⁻⁷ bis 1,4·10⁻⁵ mm²; Köln 86, STUTTGART 20 bis 22, die Form „z25“ im Köln-Logo allein 51).
+2. **Löcher.** In einer Form mit Beleg werden **alle** Löcher unter `TEXTURE_HOLE_MAX_MM2` gefüllt —
+   die Körner und die größeren Löcher der Kreide —, in keiner anderen Form eins. Größere Löcher
+   bleiben (Gegenräume, Augen, Kronen).
+3. **Staub.** Ein Teil unter `SPECK_MAX_MM2` — gemessen nach dem Füllen der Löcher — wird nicht
+   übernommen, in jeder Form und auf jeder Farbe.
+4. **Splitter.** In eine Form mit Beleg geht ein Teil auf, wenn alles zutrifft: gleiche Farbe;
+   kleiner als die Form; höchstens `SPLINTER_MAX_MM2`; **auf freiem Grund** (keine Fläche einer
+   anderen Farbe schneidet es); im Abstand von höchstens `SPLINTER_REACH_MM` zur Form oder zu einem
+   Splitter, der schon aufgegangen ist. Liegt es im Abstand zu mehreren Formen, geht es in die
+   nächste. Geschlossen wird **nur der Spalt**: die Form und ihre Splitter werden um die halbe
+   Reichweite aufgeweitet, vereinigt und um dasselbe zurückgenommen (wie §7.8.4); von dem, was dabei
+   dazukommt, wird nur übernommen, was Form und Splitter zugleich berührt. Die Kerben der Form
+   selbst bleiben. Der Splitter verliert nichts, seine Fläche geht in die Form; schließt er dabei
+   nicht an, bleibt er eine eigene Form.
+
+Die Formen behalten Kennung und Reihenfolge; die Form, in die Splitter aufgehen, behält ihre Kennung.
+
+**Was nicht bereinigt wird** — gemessen und verworfen:
+
+| Fall | Warum nicht | Gemessen |
+|---|---|---|
+| **Kontur schließen** (Kerben und Schlitze um 0,2 mm, wie es der Versuch im Profi-Vergleich tat) | Echte Schlitze und Texturkerben trennt kein Flächenmaß: die Verteilung der Stücke je Größenklasse fällt stetig (4.100 · 421 · 41 · 18 · 6 · 1 für unter 0,01 · 0,05 · 0,1 · 0,2 · 0,5 · 1 mm²), und 25 Stücke ab 0,1 mm² sind Zeichen der Schrift: der V-Schlitz des „y“ (0,79 mm², Breite des Buchstabens 1,38 → 2,16 mm), die Kerben zwischen den Serifen der „w“ (0,49 × 1,62 mm, 0,26 mm²). Das Tor ändert sich durch das Schließen nicht (126 mm mit und ohne) | Christliche, 57 Texturformen, Schließen um 0,2 mm: 4.587 Stücke |
+| **Löcher in Formen ohne Beleg** | die Kronen im roten Band des Kölner Wappens (26 Löcher von 0,062 bis 0,7 mm², Schlitze von 1,9 × 0,04 mm), die Gegenräume der STUTTGART-Buchstaben (0,26 bis 0,42 mm², 0,5 mm breit) und die Wappentropfen sind gezeichnet; kein Maß für ein Loch trennt sie von Körnern, der Beleg tut es | Köln, STUTTGART: höchstens 1 Loch von 0,001 bis 0,05 mm² je Form |
+| **Kleinstlöcher überall füllen** (unter 0,01 mm², auch in Formen ohne Beleg — der erste Entwurf) | es bringt nichts und verändert die Messung: die Rundungsreste ändern die Abtastung der Mittelachse — in Köln werden drei weitere Formen Tatami („columns cover 36 %“), in STUTTGART 80 mm wächst die Mindestgröße von 91 auf 93 mm | Köln 88, STUTTGART 80 mm 20 Löcher |
+| **Teile ab 0,05 mm²** | die Kontur des Pferdes besteht aus 181 Fragmenten von 0,05 bis 3 mm², die einander überlappen; das Auge aus fünf Stücken von 0,12 bis 0,16 mm². Das ist Zeichnung | Christliche |
+| **Spalte zwischen Formen** | nur ein Splitter bis 4 mm² geht in eine Texturform. Die Bereinigung schließt nie einen Spalt zwischen zwei Formen über 4 mm² und nie einen zwischen Farben; die gewollten Kanäle bleiben (Hofbräu 0,40 und 0,53 mm, STUTTGART 0,25 mm, §5.2, §7.8.3). Köln hat 6 Teile im Abstand bis 0,4 mm auf freiem Grund; ohne Beleg an der Form bleiben sie | die sechs Logos ohne Textur bleiben **Form für Form unverändert** |
+| **i-Punkte und Punkte** | sie liegen ab 0,66 mm von ihrer Form und werden eigene Tatami-Blöcke, wie sie der Puncher stickt; ihre Körner füllt Schritt 2 | Christliche: 5 i-Punkte (1,85 mm²), 4 Punkte (nach dem Füllen 3,3 mm²) |
+
+**Die bestellte Größe legt die Schwellen fest.** Alle Flächen und Längen oben gelten in der bestellten
+Größe R. Liest `importShapes` die Vorlage in einer anderen Größe w (das Tor in jedem Schritt seiner
+Suche, der Lauf in der erzeugten Größe), gelten sie mit dem Verhältnis λ = w ÷ R: Flächen mit λ²,
+Längen mit λ (`importShapes(text, { orderedWidthMm: R })`; ohne die Angabe ist R die Größe der
+Datei). So entscheidet jede Größe wie R, und das Tor und der Lauf sehen dieselben Formen, nur
+größer. Mit Schwellen fest in mm läge ein Korn, das in R unter 0,05 mm² liegt, bei 1,3 R darüber;
+die Löcher kämen zurück, die Breite der Buchstaben bräche ein, und die Suche des Tors (§5.2: ein
+gezählter Strich wird mit der Größe breiter) liefe davon: Eislingen 200 mm → **333 mm** statt
+**274 mm** mit λ (ohne Bereinigung 286 mm).
+
+**Ergebnis** (`ImportShapesResult.texture`; Warnung `IMPORT_TEXTURE_CLEANED` als `warn`, Regel 8):
+die Zahl der Formen mit Textur, der gefüllten Löcher mit ihrer Fläche, der verworfenen Teile mit
+Fläche und dem größten Teil, der aufgegangenen Splitter mit Fläche — mit den Kennungen. `pnpm
+inkstitch` und `pnpm mindestgroesse` nennen sie unter „Textur“. Wo nichts zu bereinigen ist, gibt es
+keine Warnung. Die Bereinigung ist deterministisch und idempotent: ein zweiter Lauf findet an den
+Ergebnisformen keinen Beleg mehr.
+
+**Messung** *(02.10.2026, die acht Referenzlogos in ihrer Größe, Katalog und Skripte unter
+`$S/textur`)*: Löcher je Größenklasse, Beleg je Form, Teile:
+
+| Logo | Formen | Löcher | unter 0,001 | 0,001 bis 0,05 | 0,05 bis 0,5 | ab 0,5 | Beleg, größter je Form | Formen mit Beleg | Teile unter 0,05 mm² |
+|---|---|---|---|---|---|---|---|---|---|
+| STUTTGART 80 mm | 46 | 48 | 20 | 0 | 4 | 24 | 0 | 0 | 0 |
+| STUTTGART 250 mm | 47 | 51 | 22 | 1 | 0 | 28 | 1 | 0 | 0 |
+| Köln 90 mm | 117 | 214 | 86 | 2 | 27 | 99 | 1 | 0 | 0 |
+| Atzensport 80 mm | 113 | 7 | 0 | 0 | 0 | 7 | 0 | 0 | 0 |
+| Hofbräu 110 mm | 79 | 6 | 0 | 0 | 0 | 6 | 0 | 0 | 0 |
+| Elektro Yer 90 mm | 25 | 3 | 0 | 0 | 0 | 3 | 0 | 0 | 0 |
+| **Eislingen 200 mm** | 136 | 1.179 | 53 | 808 | 297 | 21 | 45 | **43** | 0 |
+| **Christliche 90,2 mm** | 840 | 6.703 | 0 | 6.567 | 124 | 12 | 278 | **57** | 546 |
+
+**Grenzen.** (1) Eine Textur ohne Körner unter 0,05 mm² hat keinen Beleg: zwei „I“ der Kreideschrift
+in Eislingen tragen je 4 Löcher von 0,02 bis 0,12 mm², bleiben, wie sie sind, und bestimmen jetzt
+das Tor (0,78 mm bei 200 mm). (2) Die rauhe Kontur bleibt; beim Satin glättet sie §7.8.4. (3) Die
+Fragmente der Pferdekontur sind keine Textur, werden aber je ein eigenes Objekt (rund 200
+Laufstich-Objekte in der Vorlage der Christliche); sie zu einer Linie zu vereinigen wäre ein
+eigener Schritt. (4) Die Schwellen sind an acht Logos gemessen, zwei davon mit Textur; ein Probestick auf
+Jersey bestätigt oder korrigiert sie.
+
 ---
 
 ## 6. Running Stitch
