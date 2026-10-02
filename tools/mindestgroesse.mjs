@@ -50,6 +50,7 @@ import {
   svgZuPng,
   zusammenfassung,
 } from "./feinheit.mjs";
+import { texturZeilen } from "./textur.mjs";
 import { sucheTor, torDetails, torKopf, torKurz } from "./tor.mjs";
 
 const LISTE_MAX = 40;
@@ -151,6 +152,13 @@ console.log(
     `, ${shapes.length} Formen, Preset ${presetArg}`,
 );
 console.log(`Vorschau      out/${name}.feinheit.svg, out/${name}.feinheit.png`);
+
+// Was die Bereinigung an der Zeichnung genommen hat, bevor etwas gemessen wurde (Spec §5.3).
+const texturBlock = texturZeilen(tor.formen.textur(bestelltMm), { bestelltMm });
+if (texturBlock.length > 0) {
+  console.log("");
+  for (const line of texturBlock) console.log(line);
+}
 
 console.log(`\nMindestgröße (Spec §5.2, Tor) · ${torSekunden.toFixed(1)} s`);
 for (const line of torDetails(tor, { alle })) console.log(`  ${line}`);

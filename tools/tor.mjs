@@ -59,16 +59,30 @@ const SCHATTEN_MAX = 5;
  * Größe abhängt (was §5.1 als zu klein weglässt, die Glättung der Kurven), wird in dieser Größe
  * entschieden. Jede Größe wird nur einmal gelesen: die Suche, die Rahmenprüfung und die Prüfstellen
  * fragen nach derselben. Wirft, wo die Datei keine Größe oder keine viewBox hat (`scaleSvgToWidth`).
+ *
+ * `bestelltMm` ist die bestellte Breite, in der die Textur bereinigt wird (Spec §5.3): in jeder anderen
+ * Größe gelten dieselben Schwellen mit dem Verhältnis der Größen, so sehen die Suche und der Lauf in
+ * jeder Größe dieselben Formen. Ohne die Angabe ist es die Breite der Datei. Die Funktion trägt
+ * `.textur(widthMm)`: den Bericht der Bereinigung in dieser Größe, wo sie gelesen wurde.
  */
-export function formenBei(svgText, original) {
+export function formenBei(svgText, original, bestelltMm = original.widthMm) {
   const gelesen = new Map();
-  return (widthMm) => {
-    if (Math.abs(widthMm - original.widthMm) < 1e-9) return original.shapes;
+  const berichte = new Map();
+  const eigene = (widthMm) =>
+    Math.abs(widthMm - original.widthMm) < 1e-9 && Math.abs(bestelltMm - original.widthMm) < 1e-9;
+  const formen = (widthMm) => {
+    if (eigene(widthMm)) return original.shapes;
     if (!gelesen.has(widthMm)) {
-      gelesen.set(widthMm, importShapes(scaleSvgToWidth(svgText, widthMm, original).text).shapes);
+      const imported = importShapes(scaleSvgToWidth(svgText, widthMm, original).text, {
+        ...(bestelltMm > 0 ? { orderedWidthMm: bestelltMm } : {}),
+      });
+      gelesen.set(widthMm, imported.shapes);
+      berichte.set(widthMm, imported.texture);
     }
     return gelesen.get(widthMm);
   };
+  formen.textur = (widthMm) => (eigene(widthMm) ? original.texture : berichte.get(widthMm));
+  return formen;
 }
 
 /** `Prüfung` oder `Prüfungen`, je nach Zahl. */
@@ -131,7 +145,7 @@ export const analysiere = (blocks, preset) =>
  * `suche` reicht `maxSteps` und `maxFactor` an die Suche durch.
  */
 export function sucheTor(svgText, original, { bestelltMm, preset, ohneTor = false, suche = {} }) {
-  const formen = formenBei(svgText, original);
+  const formen = formenBei(svgText, original, bestelltMm);
   const basis = { bestelltMm, ohneTor, formen };
   let search;
   try {

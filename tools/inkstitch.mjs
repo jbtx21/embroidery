@@ -120,6 +120,7 @@ import { zeile } from "./archiv.mjs";
 import { scaleSvgToWidth } from "./breite.mjs";
 import { befundZeilen, zusammenfassung } from "./feinheit.mjs";
 import { isInkstitchReady, runInkstitch, SETUP_HINT } from "./inkstitch-lauf.mjs";
+import { texturZeilen } from "./textur.mjs";
 import { analysiere, dateiname, sucheTor, torDetails, torKopf } from "./tor.mjs";
 
 const INKSTITCH_NS = "http://inkstitch.org/namespace";
@@ -288,6 +289,13 @@ let scaled;
 let tor;
 await initEngine();
 const original = importShapes(originalSvg);
+/**
+ * The ordered width: --breite or the width of the SVG. The texture limits (spec §5.3) are decided in
+ * it, and read in any other size — the gate's steps, the size the program is made in — they apply with
+ * the ratio of the two, so that the gate and the run see the same shapes.
+ */
+const bestelltMm = breiteMm ?? original.widthMm;
+const orderedOptions = bestelltMm > 0 ? { orderedWidthMm: bestelltMm } : {};
 if (breiteMm !== undefined) {
   try {
     scaled = scaleSvgToWidth(originalSvg, breiteMm, original);
@@ -344,6 +352,8 @@ let orderVariant;
 let underlay;
 let compensation;
 let feinheit;
+/** What the texture cleaning did to the shapes of the template (spec §5.3); not with --tatami. */
+let textur;
 let templateMs = 0;
 let outputInput = templatePath;
 
@@ -354,11 +364,13 @@ if (tatamiOnly) {
   writeFileSync(templatePath, text);
   summary = [`Tatami-Lauf (--tatami): ${pathCount} Pfade wie gezeichnet`];
   await initEngine();
-  feinheit = pruefeFeinheit(importShapes(sourceSvg), preset);
+  // The source as drawn: no texture cleaning either.
+  feinheit = pruefeFeinheit(importShapes(sourceSvg, { texture: false }), preset);
 } else {
   await initEngine();
   const started = performance.now();
-  const imported = importShapes(sourceSvg);
+  const imported = importShapes(sourceSvg, orderedOptions);
+  textur = imported.texture;
   const template = buildInkstitchTemplate(imported.shapes, preset, {
     widthMm: imported.widthMm,
     heightMm: imported.heightMm,
@@ -532,6 +544,13 @@ if (!tatamiOnly && outputInput !== templatePath) {
 console.log(`DST         out/${name}.dst`);
 console.log(`Vorschau    out/${name}.png`);
 for (const line of summary) console.log(`            ${line}`);
+
+// What the cleaning took off the drawing before anything was set (spec §5.3) — not silent.
+const texturBlock = texturZeilen(textur, { bestelltMm });
+if (texturBlock.length > 0) {
+  console.log("");
+  for (const line of texturBlock) console.log(line);
+}
 
 console.log(
   `\nFeinheit (Spec §5.2${feinheit ? `, in ${Number(feinheit.widthMm.toFixed(1))} mm` : ""})`,
@@ -733,6 +752,7 @@ if (tatamiOnly) {
       svgPath: outputInput,
       templatePath,
       sourceSvg,
+      orderedWidthMm: bestelltMm > 0 ? bestelltMm : undefined,
       presetName: presetArg,
       stitches: foreignStitches,
       blocks,
