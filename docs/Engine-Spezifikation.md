@@ -782,10 +782,12 @@ ohnehin bekäme. Gemessen im Köln-Logo: Dichtespitze 34 → 30.
 
 Die Säulen einer Form kommen in Stichfolge (was unter einem Strich endet, zuerst). Satinformen
 gleicher Farbe, die in der Vorlage aufeinander folgen, bilden eine **Folge**; je Folge ein
-Aufruf von Ink/Stitchs „Satinsäulen automatisch führen" (`auto_satin --preserve_order --trim`).
-Der Weg zwischen den Säulen läuft verdeckt unter späteren Säulen, und nie über eine andere
-Farbe oder ein dazwischen gesticktes Objekt; wo das nicht geht, setzt Ink/Stitch einen
-Fadenschnitt.
+Aufruf von Ink/Stitchs „Satinsäulen automatisch führen" (`auto_satin --preserve_order`, **ohne**
+`--trim`, seit 02.10.2026). Der Weg zwischen den Säulen läuft verdeckt unter späteren Säulen, und
+nie über eine andere Farbe oder ein dazwischen gesticktes Objekt. Ob zwischen zwei Säulen
+oder am Ende der Folge ein Fadenschnitt steht, entscheidet nicht `auto_satin`, sondern
+§10.2.1 — `--trim` schnitt an jedem Sprung über 1 mm außerhalb der beiden Säulen und am Ende
+jeder Folge, gleich was folgt.
 
 ---
 
@@ -1214,6 +1216,112 @@ Drei Feinheiten, alle gemessen:
    nach dem Sprung wieder sichern.
 3. **Der erste und der letzte Stich an einem Sprung sind Anker** und werden von §11 nicht
    als zu kurz entfernt — sonst verschmelzen zwei erlaubte Sprünge zu einem unerlaubten.
+
+### 10.2.1 Fadenschnitte in der Ink/Stitch-Vorlage *(02.10.2026, Entscheidung des Nutzers)*
+
+Die Tabelle oben gehört zur eingefrorenen eigenen Engine. In der Ink/Stitch-Vorlage (ADR 0001)
+schneidet Ink/Stitch von sich aus nie: ein Fadenschnitt entsteht nur, wo ein Objekt
+`inkstitch:trim_after` trägt oder ein Trim-Befehl an ihm hängt (`inkstitch/README.md`). Bis
+02.10.2026 setzten ihn zwei Erweiterungen, und keine von beiden fragte, ob der Faden sichtbar
+läge.
+
+**Woher die Schnitte kamen** *(gemessen am Stand `afe6f5f`, acht Läufe; jeder Trim der DST ist
+einer Quelle zugeordnet, die Zählung geht in jedem Lauf auf)*:
+
+1. **`auto_satin --trim`, im Weg** (`JumpStitch.should_trim`, `lib/stitches/auto_satin.py`):
+   jeder Sprung zwischen zwei Säulen einer Folge (§7.8.6), dessen Strecke **außerhalb der
+   beiden Säulen** länger als 1 mm ist, bekommt einen Schnitt — ohne Längenschwelle. Das ist die
+   Antwort auf die Frage, warum zwischen zwei Buchstaben derselben Farbe geschnitten wird, die nur
+   wenige Millimeter auseinander liegen: die Lücke zwischen ihnen liegt fast ganz außerhalb der
+   Säulen, und die 5 mm aus §10.2 kommen an dieser Stelle gar nicht vor. Ein Faden unter einem
+   später gestickten Objekt oder auf einer Fläche derselben Farbe zählt dort nicht als verdeckt:
+   `auto_satin` kennt nur die beiden Säulen.
+2. **`auto_satin --trim`, am Ende** (`add_trims`): die letzte Säule **jedes Aufrufs**, also jeder
+   Satin-Folge, bekommt einen Schnitt, gleich was folgt — auch vor einem Farbwechsel oder am Ende
+   der Datei, wo die Maschine ohnehin schneidet.
+3. **`jump_to_trim` ab 5 mm** (§10.2, `CONNECT_DEFAULTS.jumpTrimMm`): jede Verbindung ab 5 mm
+   zwischen gleichfarbigen Objekten, ohne Blick darauf, ob eine spätere Fläche den Faden deckt.
+4. **Die Vorlage selbst** (`trim_after`, wo die Quelle es verlangt): in keinem der acht Läufe.
+
+| Motiv | Stiche | Trims | im Weg | am Ende der Folge *(davon vor Farbwechsel oder Ende)* | `jump_to_trim` |
+|---|--:|--:|--:|--:|--:|
+| Elektrotechnik Yer 90 mm | 2.886 | 14 | 11 | 2 *(2)* | 1 |
+| STUTTGART 91 mm | 16.157 | 49 | 29 | 4 *(2)* | 16 |
+| Hofbräu (cap) 110 mm | 9.253 | 92 | 80 | 2 *(1)* | 10 |
+| Köln 134 mm | 33.797 | 120 | 89 | 8 *(5)* | 23 |
+| Atzensport 107 mm | 18.755 | 132 | 120 | 6 *(3)* | 6 |
+| Eislingen 286 mm | 53.348 | 173 | 117 | 4 *(3)* | 52 |
+| Christliche Gemeindereitschule (Original) | 9.263 | 111 | 50 | 22 *(0)* | 39 |
+| Christliche Gemeindereitschule (glatt) | 9.761 | 104 | 78 | 5 *(0)* | 21 |
+| **Summe** | | **795** | **574 (72 %)** | **53 (7 %)** *(16)* | **168 (21 %)** |
+
+Von den Schnitten im Weg ist die Hälfte kürzer als 5 mm (Median des Abstands vom letzten zum
+ersten Stich je Motiv zwischen 4 und 9 mm, in den Schriftmotiven 4 bis 6 mm): es sind die
+Lücken zwischen Buchstaben und zwischen den Säulen eines Buchstabens.
+
+**Was der Puncher macht** *(24 Profi-DSTs, Schritt 6 in §16)*: zwischen zwei Stichläufen stehen
+384 Lücken, 378 davon mit Schnitt und nur 6 als Sprung ohne Schnitt. Nur 22 der Lücken sind
+kürzer als 3 mm. Was näher beieinander liegt, taucht in der DST gar nicht als Lücke auf: er
+stickt es durch, mit einem Verbindungsstich (Christliche Gemeindereitschule: in der ganzen
+Datei 2 Verbindungsstiche über 3,5 mm, 11 Fadenschnitte; wir 104 bis 111). Ink/Stitch stickt bis
+`collapse_len_mm` (Metadaten, Vorgabe **3 mm**) ebenso durch, ohne Sprung und ohne Verriegelung
+(`stitch_groups_to_stitch_plan`).
+
+**Die Regel.** Eine Verbindung zwischen zwei aufeinanderfolgenden Objekten **derselben Farbe**
+bleibt bis 3 mm ein gewöhnlicher Stich, bleibt bis 5 mm ungeschnitten, wo der Faden
+verdeckt unter später Gesticktem oder auf gleichfarbigen Stichen liegt (höchstens 1 mm davon
+auf blankem Stoff), und wird sonst geschnitten. Länge und Verdeckung werden an den Stichen
+gemessen, die Ink/Stitch schreibt, nicht an der Vorlage: wo eine Füllung endet und das nächste
+Objekt beginnt, steht erst dort fest.
+
+| Verbindung vom letzten Stich des einen zum ersten des nächsten Objekts | Entscheidung | gestickt als |
+|---|---|---|
+| bis `PLAIN_STITCH_MM` = 3 mm | **kurz**, kein Schnitt | gewöhnlicher Stich (Ink/Stitchs `collapse_len_mm`), ohne Sprung und ohne Verriegelung |
+| über 3 bis `HIDDEN_JUMP_MAX_MM` = 5 mm, davon höchstens `VISIBLE_MAX_MM` = 1 mm auf blankem Stoff | **verdeckt**, kein Schnitt | Sprung mit Verriegelung (§10.3); der Faden liegt unter später Gesticktem oder auf gleichfarbigen Stichen |
+| über 3 bis 5 mm, mehr als 1 mm auf blankem Stoff | **sichtbar**, Schnitt | verriegeln, schneiden, springen, verriegeln |
+| über 5 mm | **lang**, Schnitt | wie oben, auch wo die Strecke verdeckt wäre |
+
+- **Auf blankem Stoff** liegt von der geraden Linie vom letzten zum ersten Stich, was weder
+  innerhalb von `THREAD_REACH_MM` = 0,3 mm eines Stichs liegt, der **nach** ihr gestickt wird
+  (gleich welche Farbe: der Faden liegt darunter), noch eines Stichs, der **vor** ihr in
+  **derselben Farbe** gestickt wurde (Faden auf gleichfarbigem Grund fällt nicht auf; auf
+  anderer Farbe schon). Jeder Stich zählt als Streifen von 0,6 mm; Satinsäule und Fläche
+  schließen sich dabei zur Fläche (Zickzack und Reihen liegen 0,3 bis 0,45 mm auseinander).
+- **Die Grenzen:** 3 mm sind Ink/Stitchs eigene Grenze und die des Puncher (oben). 5 mm sind
+  `CONNECT_DEFAULTS.jumpTrimMm`; ein Sprung darüber ohne Schnitt zählt `untrimmedJumps`
+  (§10.2) als Faden auf dem Stoff — die Ausnahme „ein späteres Objekt derselben Farbe stickt
+  darüber" aus §10.2 gibt es hier nicht. 1 mm sind das, was `auto_satin` außerhalb der beiden
+  Säulen duldet, bevor es schneidet.
+- **Gegenüber §10.2 strenger** ist die Regel an einer Stelle: ein Sprung von 3 bis 5 mm bleibt nur,
+  wo er verdeckt ist (§10.2 lässt ihn immer stehen).
+- Ein Schnitt, den die Quelle verlangt (`trimAfter: always`, §10.2), bleibt, was die Regel
+  auch sagt.
+
+**Umsetzung** (`packages/engine/src/inkstitch/trims.ts`, `tools/fadenschnitt.mjs`):
+
+1. `auto_satin` läuft ohne `--trim` (§7.8.6). Ink/Stitch entfernt Laufstiche, die hinter einem
+   Schnitt stehen (`add_trims`); ohne Schnitt bleiben sie, und der Weg zwischen den Säulen läuft
+   wieder verdeckt unter ihnen.
+2. **Sonde:** `jump_to_trim` mit 3 mm (der Länge, ab der Ink/Stitch einen Sprung schreibt) setzt
+   einen Schnitt hinter jedes Objekt, auf das ein Sprung folgt; das Dokument wird gestickt
+   (`output`). Der k-te Trim der DST ist der Schnitt hinter dem k-ten Objekt mit `trim_after`;
+   jede Verbindung steht damit mit Anfang und Ende in der DST (`threadMoves`).
+3. `planTrims` entscheidet nach der Tabelle, welche Schnitte bleiben. Hat die Sonde nicht ebenso
+   viele Trims wie Objekte mit `trim_after`, wird nicht geraten: alle Schnitte der Sonde bleiben,
+   und die Ausgabe sagt es.
+4. `withoutTrimAfter` nimmt die übrigen Schnitte aus dem Dokument der Sonde. Das Ergebnis
+   (`<name>.trimmed.svg`) ist das Dokument, das `output` stickt und aus dem die Nacharbeit-Datei
+   (§13.4) entsteht — `output` auf ihr gibt dieselbe DST, Byte für Byte (Rauchtest).
+
+Kosten: ein Ink/Stitch-Lauf mehr je Motiv (die Sonde: `jump_to_trim` und `output`).
+
+**Was sich nicht ändert:** `untrimmedJumps` bleibt 0 (kein Sprung über 5 mm ohne Schnitt), die
+Grenze `CONNECT_DEFAULTS.jumpTrimMm`, die Verriegelung vor und nach jedem Schnitt (§10.3).
+
+**Gemessen** *(vorher: Stand `afe6f5f`; nachher: dieser Stand; je Lauf ein frischer Ink/Stitch-
+Cache)*: ‹Tabelle folgt›
+
+**Offen.** ‹folgt›
 
 ### 10.3 Verriegelung
 - Nach jedem `trim`/`color` und am Anfang: drei Stiche 0,3 mm vor/zurück entlang der ersten Stichrichtung.

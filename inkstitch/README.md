@@ -66,7 +66,7 @@ weist beim Umstieg darauf hin, löscht aber nichts außerhalb von `INKSTITCH_HOM
 ## Aufruf
 
 ```bash
-pnpm inkstitch <svg> [preset]        # Vorlage (Satin/Laufstich/Tatami) -> auto_satin -> DST + PNG + Kennzahlen nach ./out/
+pnpm inkstitch <svg> [preset]        # Vorlage (Satin/Laufstich/Tatami) -> auto_satin -> Fadenschnitte (Sonde, Spec §10.2.1) -> DST + PNG + Kennzahlen nach ./out/
 pnpm inkstitch <svg> [preset] --tatami   # reiner Tatami-Lauf: die Quelle wie gezeichnet, nur Reihenabstand gesetzt
 pnpm inkstitch <svg> [preset] --breite 120   # das Motiv proportional auf 120 mm Breite skalieren, dann wie sonst (Ausgabe <name>-120mm.*)
 pnpm inkstitch <svg> [preset] --ueberlappung 20   # Variante: Überlappungen unter 20 mm² binden die Farbfolge nicht (Standard: jede, §10.1)
@@ -212,16 +212,28 @@ sein `DstWriter` schreibt wie der von 1.0.0, neu sind nur Typannotationen):
   im STUTTGART-Lauf vom 28.09. kommen als Trims zurück, und der Rauchtest
   (`RUN_INKSTITCH_TESTS=1`) setzt einen Trim und liest ihn wieder.
 - **`auto_satin --trim`** setzt Trims nur innerhalb seiner Folge und **am Ende jeder Folge**,
-  unabhängig davon, wie weit das nächste Objekt entfernt ist.
+  unabhängig davon, wie weit das nächste Objekt entfernt ist (`add_trims`,
+  `lib/stitches/auto_satin.py`). Innerhalb der Folge schneidet es an jedem Sprung, dessen Strecke
+  **außerhalb der Quell- und der Zielsäule** länger als `PIXELS_PER_MM` (1 mm) ist
+  (`JumpStitch.should_trim`) — ohne Längenschwelle; Laufstiche, die hinter einem Schnitt stehen,
+  entfernt es (`add_trims`). `pnpm inkstitch` ruft es seit 02.10.2026 **ohne** `--trim` auf (Spec
+  §7.8.6, §10.2.1): in acht Läufen kamen 72 % der Schnitte aus dem Weg, 7 % vom Ende der Folge
+  (ein Drittel davon direkt vor einem Farbwechsel oder dem Ende), 21 % von `jump_to_trim`.
 - **`jump_to_trim`** (Erweiterung, `--minimum-jump-length=<mm>`) läuft die Stichgruppen aller
   Objekte in Dokumentreihenfolge ab und setzt `trim_after="True"` an das Objekt _vor_ jedem
   Sprung von mindestens dieser Länge zwischen gleichfarbigen Objekten. Gemessen wird zwischen
   dem tatsächlich letzten und dem tatsächlich ersten Stich — die Vorlage kennt beides nicht,
   weil eine Füllung nur ungefähr in Richtung des nächsten Objekts endet. `pnpm inkstitch`
-  ruft sie mit der Schwelle aus Spec §10.2 (`CONNECT_DEFAULTS.jumpTrimMm`, 5 mm) nach dem
-  letzten `auto_satin` auf. Grenzen: Sprünge **innerhalb** eines Objekts (etwa zwischen den
-  Teilpolygonen eines Pfads) sieht sie nicht, und ein Objekt, das schon `trim_after` oder einen
-  Trim-Befehl trägt, bleibt unverändert.
+  ruft sie nicht mehr mit der Schwelle aus Spec §10.2 (5 mm) als Schnitt auf, sondern mit 3 mm
+  (`PLAIN_STITCH_MM`) als **Sonde**: sie setzt hinter jedes Objekt, auf das ein Sprung folgt,
+  einen Schnitt, das Dokument wird gestickt, und aus der DST entscheidet
+  `packages/engine/src/inkstitch/trims.ts` nach Spec §10.2.1, welche Schnitte bleiben
+  (`tools/fadenschnitt.mjs`; die anderen nimmt `withoutTrimAfter` aus dem Dokument der Sonde
+  wieder heraus). Der k-te Trim der Sonden-DST ist der Schnitt hinter dem k-ten Objekt mit
+  `trim_after` im Dokument der Sonde; stimmen die Zahlen nicht, bleiben alle Schnitte der Sonde.
+  Grenzen: Sprünge **innerhalb** eines Objekts (etwa zwischen den Teilpolygonen eines Pfads) sieht
+  sie nicht, und ein Objekt, das schon `trim_after` oder einen Trim-Befehl trägt, bleibt
+  unverändert (ein von der Quelle verlangter Schnitt bleibt also immer).
 
 ## Tatami-Flächen der Vorlage: Attribute, Unterlage, Zugausgleich (gelesen an Version 3.3.0, 30.09.2026)
 
@@ -257,8 +269,8 @@ sind an 3.3.0 nicht wiederholt worden — es ist derselbe Code.
 - **Zugausgleich.** `pull_compensation_mm` gibt es, und es wirkt (die Reihen werden an beiden Enden
   um den Betrag länger). Ink/Stitch baut dafür aber bei **jedem** Stichplan die Fläche aus ihren
   Reihen neu (`adjust_shape_for_pull_compensation`: jede Reihe gepuffert, alle vereinigt, die Kontur
-  in Python Punkt für Punkt geglättet), `pnpm inkstitch` rechnet zwei Stichpläne (`jump_to_trim`,
-  `output`), und für den Schub (`pushCompMm`, Spec §8.1.1) gibt es kein Attribut. Gemessen mit
+  in Python Punkt für Punkt geglättet), `pnpm inkstitch` rechnet drei Stichpläne (`jump_to_trim` und
+  `output` der Sonde, §10.2.1, dann `output`), und für den Schub (`pushCompMm`, Spec §8.1.1) gibt es kein Attribut. Gemessen mit
   `pique`: STUTTGART 80 mm 64 s → 325 s, Köln 90 mm 245 s → 989 s, STUTTGART 250 mm nach 40 Minuten
   noch im ersten Stichplan (ohne das Attribut 6 Minuten für den ganzen Lauf). Die Vorlage rechnet
   Zug und Schub deshalb selbst in den Umriss (`offsetDirectional`, derselbe Versatz wie in `fill.ts`)
