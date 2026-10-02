@@ -3,6 +3,36 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Formen nach Breite teilen (02.10.2026)
+
+- **Köln ab 160 mm:** Die Federzungen im Flügel werden Satin, bei 200 mm drei Paare von vieren; das
+  Bild ist dann gemischt. Am Probestick entscheiden. Die Schwellen liegen in einem Kontinuum (Länge 6
+  bis 33 Breiten bei Zungen und Federn, Yer-Kabel 46,6).
+- **Elektrotechnik Yer:**
+  - Der Stecker bleibt Tatami (162 Stiche, der Puncher stickt ihn als breiten Satin mit 443).
+  - Das Kabel läuft unter dem Y durch.
+  - Das abgespaltene Band ist eine Insel in seiner Farbe: 3 Fadenschnitte und 10 Sprünge mehr.
+    Gehört zu den Fadenschnitten (§10.2).
+- **Grenze Satin/Tatami:** Die Christliche stickt der Puncher bei 3,6–4,7 mm breiten Pferdeteilen als
+  Tatami, wir als Satin, weil sie unter 5 mm liegen. Elektrotechnik Yer hat Satin bis 6,6 und
+  10,5 mm. Das ist widersprüchlich, deshalb keine Änderung ohne weitere Paare.
+- **Schalter `--ohne-teilung`** für Vergleichsmessungen in `pnpm inkstitch`.
+
+## Textur der Vorlage (02.10.2026)
+
+- **Textur ohne Körner.** Zwei „I" der Kreideschrift in Eislingen tragen je 4 Löcher von 0,02 bis
+  0,12 mm², nur eines davon unter 0,05 mm². Sie haben damit keinen Beleg, bleiben roh und bestimmen das Tor
+  (0,78 mm bei 200 mm). Ein Beleg aus dem Umfeld der Farbe senkte das Tor im Versuch nur von 274 auf
+  269 mm und ist deshalb nicht eingeführt.
+- **Pferdekontur aus Fragmenten** (Christliche): 181 überlappende Teile von 0,05 bis 3 mm² werden
+  je ein eigenes Laufstich-Objekt, rund 200 in der Vorlage. Das ist Zeichnung, keine Textur. Sie zu
+  einer Linie zu vereinen wäre ein eigener Schritt.
+- **Schalter:** `importShapes(text, { texture: false })` gibt es nur in der Engine, kein CLI-Schalter.
+  `--tatami` liest unbereinigt.
+- **Nacharbeit-Datei:** Bereinigte Formen sind dort nicht eigens markiert.
+- **Schwellen** sind an acht Logos gemessen, nur zwei davon mit Textur. Ein Probestick auf Jersey
+  bestätigt oder korrigiert sie.
+
 ## StitchPencil als Ideenquelle (02.10.2026)
 
 StitchPencil ist eine iPad-App zum Digitalisieren von Hand (Handbuch 0.9.1 vom 01.10.2026,

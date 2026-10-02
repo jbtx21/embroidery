@@ -37,6 +37,8 @@ import { PRESETS } from "../presets.js";
 import { warn, WARNING } from "../warnings.js";
 import type { Matrix } from "./matrix.js";
 import { applyMatrix, IDENTITY, multiply, parseTransform } from "./matrix.js";
+import type { TextureReport } from "./texture.js";
+import { cleanTexture } from "./texture.js";
 
 /** CSS reference: 96 user units per inch. */
 const MM_PER_PX = 25.4 / 96;
@@ -547,6 +549,20 @@ export type ImportShapesResult = {
   widthMm: number;
   heightMm: number;
   warnings: Warning[];
+  /** What the texture cleaning did (spec §5.3); absent where it was switched off. */
+  texture?: TextureReport;
+};
+
+export type ImportShapesOptions = {
+  /** Clean texture off the shapes (spec §5.3). Default: yes. Off only for comparison measurements. */
+  texture?: boolean;
+  /**
+   * The ordered logo width, mm — the size the texture limits are decided in (spec §5.3). The file may
+   * be read in another size (the gate reads it at every step of its search, the run at the size it
+   * makes): the limits then apply with the ratio of the two, areas by its square, lengths by itself.
+   * Default: the width of the file, which is then the ordered size.
+   */
+  orderedWidthMm?: number;
 };
 
 /** One `<path>` as read, before `importSvg` decides fill, satin or running for it. */
@@ -645,11 +661,20 @@ function readPaths(text: string): { root: Attrs; mmPerUnit: number; paths: PathR
  * one (spec §5.1). The Ink/Stitch preparation (`packages/engine/src/inkstitch/`)
  * reads the same shapes and decides by its own rules.
  *
- * Decides nothing and drops nothing: the tiny-area drop and the stitch type
- * belong to whoever reads the shapes, each with its own thresholds. Paths that
- * yield no shape are reported, not skipped silently.
+ * Decides nothing about the stitch type and drops nothing for being small: the
+ * tiny-area drop and the stitch type belong to whoever reads the shapes, each
+ * with its own thresholds. Paths that yield no shape are reported, not skipped
+ * silently. The one thing it does is the texture cleaning of spec §5.3
+ * (`cleanTexture`), here and nowhere later, so that the gate, the fineness check
+ * and the template read the same shapes; it reports what it did in `texture` and
+ * as a warning. Where a file has texture, the cleaning unites and offsets polygons:
+ * `await initEngine()` first, as for every geometry function.
  */
-export function importShapes(text: string): ImportShapesResult {
+export function importShapes(text: string, opts: ImportShapesOptions = {}): ImportShapesResult {
+  const ordered = opts.orderedWidthMm;
+  if (ordered !== undefined && (!Number.isFinite(ordered) || ordered <= 0)) {
+    throw new RangeError(`orderedWidthMm must be a positive number, got ${ordered}`);
+  }
   const { root, mmPerUnit, paths } = readPaths(text);
   const shapes: ImportedShape[] = [];
   const warnings: Warning[] = [];
@@ -682,12 +707,19 @@ export function importShapes(text: string): ImportShapesResult {
       });
     }
   }
+  const widthMm = lengthToMm(root["width"]) ?? 0;
+  const heightMm = lengthToMm(root["height"]) ?? 0;
+  if (opts.texture === false) return { shapes, mmPerUnit, widthMm, heightMm, warnings };
+  // The ordered size decides what is texture; read in another size, the limits carry by the ratio.
+  const scale = ordered !== undefined && widthMm > 0 ? widthMm / ordered : 1;
+  const cleaned = cleanTexture(shapes, { scale });
   return {
-    shapes,
+    shapes: cleaned.shapes,
     mmPerUnit,
-    widthMm: lengthToMm(root["width"]) ?? 0,
-    heightMm: lengthToMm(root["height"]) ?? 0,
-    warnings,
+    widthMm,
+    heightMm,
+    warnings: [...warnings, ...cleaned.warnings],
+    texture: cleaned.report,
   };
 }
 

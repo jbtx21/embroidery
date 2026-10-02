@@ -473,6 +473,8 @@ export async function settleUpdate(path) {
  * @param {string} run.svgPath the SVG the DST was made from (after auto_satin and jump_to_trim)
  * @param {string} run.templatePath the template the run wrote (ids and places of its objects)
  * @param {string} run.sourceSvg the source SVG as the run read it
+ * @param {number} [run.orderedWidthMm] the ordered width, mm: the size the texture limits are decided
+ *   in (spec §5.3), so that the shapes are read as the run read them
  * @param {string} run.presetName
  * @param {object[]} run.stitches the DST read back, in mm
  * @param {object[]} run.blocks the colour blocks of those stitches
@@ -511,7 +513,10 @@ export async function writeRework(run) {
     : { needle: [], density: [], jumps: [] };
 
   const areaIds = new Set(
-    importShapes(run.sourceSvg)
+    importShapes(
+      run.sourceSvg,
+      run.orderedWidthMm > 0 ? { orderedWidthMm: run.orderedWidthMm } : {},
+    )
       .shapes.filter((s) => s.kind === "area")
       .map((s) => xmlId(s.id)),
   );

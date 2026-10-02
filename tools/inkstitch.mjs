@@ -4,6 +4,7 @@
  *
  *   pnpm inkstitch <svg> [preset] [--tatami] [--breite <mm>] [--ueberlappung <mm2>]
  *                        [--aussparen] [--naht <mm>] [--zug-symmetrisch] [--ohne-tor]
+ *                        [--ohne-teilung]
  *
  * --breite <mm> scales the motif proportionally to that width before anything is
  * imported (tools/breite.mjs); the output names the factor and the new size, and
@@ -44,6 +45,11 @@
  * of spec §7.2 again. The standard is §7.8.3: none on the rail towards a fabric gap
  * under 1.0 mm, and none on either rail for a column under 1.0 mm at such a gap (the
  * output lists them).
+ *
+ * --ohne-teilung stitches a wide shape that carries a long, even, narrow band as one
+ * tatami again. The standard is spec §7.8.7: the band becomes satin columns, the wide
+ * part stays tatami, and the block "Geteilt" of the output lists every shape it split
+ * (and every band that stayed in the wide part because its columns do not hold).
  *
  * Satin (default) — lettering and narrow shapes set the way a puncher sets
  * them:
@@ -126,6 +132,7 @@ import { scaleSvgToWidth } from "./breite.mjs";
 import { befundZeilen, zusammenfassung } from "./feinheit.mjs";
 import { setTrims, trimLines } from "./fadenschnitt.mjs";
 import { isInkstitchReady, runInkstitch, SETUP_HINT } from "./inkstitch-lauf.mjs";
+import { texturZeilen } from "./textur.mjs";
 import { analysiere, dateiname, sucheTor, torDetails, torKopf } from "./tor.mjs";
 
 const INKSTITCH_NS = "http://inkstitch.org/namespace";
@@ -233,6 +240,7 @@ const tatamiOnly = args.includes("--tatami");
 const satinCutout = args.includes("--aussparen");
 const railPullSymmetric = args.includes("--zug-symmetrisch");
 const ohneTor = args.includes("--ohne-tor");
+const ohneTeilung = args.includes("--ohne-teilung");
 const [svgArg, presetArg = "pique"] = args.filter(
   (a, i) => !a.startsWith("--") && !VALUE_FLAGS.includes(args[i - 1]),
 );
@@ -257,7 +265,7 @@ const touchUnderlapMm = numberFlag("--naht", { min: 0 });
 if (!svgArg) {
   console.error(
     "Aufruf: pnpm inkstitch <svg> [preset] [--tatami] [--breite <mm>] [--ueberlappung <mm2>] " +
-      "[--aussparen] [--naht <mm>] [--zug-symmetrisch] [--ohne-tor]",
+      "[--aussparen] [--naht <mm>] [--zug-symmetrisch] [--ohne-tor] [--ohne-teilung]",
   );
   console.error(`Presets: ${Object.keys(PRESETS).join(", ")}`);
   process.exit(1);
@@ -272,11 +280,12 @@ if (
     satinCutout ||
     touchUnderlapMm !== undefined ||
     railPullSymmetric ||
-    ohneTor)
+    ohneTor ||
+    ohneTeilung)
 ) {
   console.error(
-    "--ueberlappung, --aussparen, --naht, --zug-symmetrisch und --ohne-tor gelten für die Vorlage " +
-      "und nicht mit --tatami",
+    "--ueberlappung, --aussparen, --naht, --zug-symmetrisch, --ohne-tor und --ohne-teilung gelten " +
+      "für die Vorlage und nicht mit --tatami",
   );
   process.exit(1);
 }
@@ -294,6 +303,13 @@ let scaled;
 let tor;
 await initEngine();
 const original = importShapes(originalSvg);
+/**
+ * The ordered width: --breite or the width of the SVG. The texture limits (spec §5.3) are decided in
+ * it, and read in any other size — the gate's steps, the size the program is made in — they apply with
+ * the ratio of the two, so that the gate and the run see the same shapes.
+ */
+const bestelltMm = breiteMm ?? original.widthMm;
+const orderedOptions = bestelltMm > 0 ? { orderedWidthMm: bestelltMm } : {};
 if (breiteMm !== undefined) {
   try {
     scaled = scaleSvgToWidth(originalSvg, breiteMm, original);
@@ -346,12 +362,15 @@ let narrowLines = [];
 let smoothed = [];
 let knockdown;
 let railPull;
+let split;
 let orderVariant;
 let underlay;
 let compensation;
 /** The colour of every object of the template in stitch order — the colour blocks of the DST. */
 let objectColours;
 let feinheit;
+/** What the texture cleaning did to the shapes of the template (spec §5.3); not with --tatami. */
+let textur;
 let templateMs = 0;
 let outputInput = templatePath;
 
@@ -362,11 +381,13 @@ if (tatamiOnly) {
   writeFileSync(templatePath, text);
   summary = [`Tatami-Lauf (--tatami): ${pathCount} Pfade wie gezeichnet`];
   await initEngine();
-  feinheit = pruefeFeinheit(importShapes(sourceSvg), preset);
+  // The source as drawn: no texture cleaning either.
+  feinheit = pruefeFeinheit(importShapes(sourceSvg, { texture: false }), preset);
 } else {
   await initEngine();
   const started = performance.now();
-  const imported = importShapes(sourceSvg);
+  const imported = importShapes(sourceSvg, orderedOptions);
+  textur = imported.texture;
   const template = buildInkstitchTemplate(imported.shapes, preset, {
     widthMm: imported.widthMm,
     heightMm: imported.heightMm,
@@ -375,6 +396,7 @@ if (tatamiOnly) {
     ...(satinCutout ? { satinCutout: true } : {}),
     ...(touchUnderlapMm === undefined ? {} : { touchUnderlapMm }),
     ...(railPullSymmetric ? { railPullBySide: false } : {}),
+    ...(ohneTeilung ? { splitBands: false } : {}),
     ...(minOverlapMm2 === undefined ? {} : { minOverlapMm2 }),
   });
   templateMs = performance.now() - started;
@@ -401,6 +423,7 @@ if (tatamiOnly) {
   smoothed = template.objects.filter((o) => o.kind === "satin" && o.smoothedMm > 0);
   knockdown = template.knockdown;
   railPull = template.railPull;
+  split = template.split;
   if (template.orderSwaps !== undefined) {
     orderVariant = {
       minOverlapMm2,
@@ -546,6 +569,13 @@ console.log(`DST         out/${name}.dst`);
 console.log(`Vorschau    out/${name}.png`);
 for (const line of summary) console.log(`            ${line}`);
 
+// What the cleaning took off the drawing before anything was set (spec §5.3) — not silent.
+const texturBlock = texturZeilen(textur, { bestelltMm });
+if (texturBlock.length > 0) {
+  console.log("");
+  for (const line of texturBlock) console.log(line);
+}
+
 console.log(
   `\nFeinheit (Spec §5.2${feinheit ? `, in ${Number(feinheit.widthMm.toFixed(1))} mm` : ""})`,
 );
@@ -567,6 +597,34 @@ if (!feinheit) {
 if (fallbacks.length > 0) {
   console.log(`\nBleibt Tatami (als Satin oder Laufstich vorgesehen, ${fallbacks.length})`);
   for (const f of fallbacks) console.log(`  ${f.shapeId}: ${f.reason}`);
+}
+if (split && split.shapes.length > 0) {
+  // Spec §7.8.7: every split is said here, and in the template's notes (SHAPE_SPLIT).
+  console.log(
+    `\nGeteilt (Spec §7.8.7, breiter Teil Tatami, schmaler Teil Satin, ${split.shapes.length})`,
+  );
+  for (const s of split.shapes) {
+    console.log(
+      `  ${s.shapeId}: breiter Teil ${s.bulkIds.join(", ")} (${s.bulkMm2.toFixed(0)} mm²)`,
+    );
+    for (const b of s.bands) {
+      console.log(
+        `    Band ${b.id}: ${b.lengthMm.toFixed(1)} × ${b.widthMm.toFixed(2)} mm, ${b.columns} ` +
+          `Säule${b.columns === 1 ? "" : "n"}, Deckung ${(b.coverage * 100).toFixed(0)} %, ` +
+          `gleichmäßig ${b.uniformity.toFixed(2)}`,
+      );
+    }
+  }
+}
+if (split && split.kept.length > 0) {
+  console.log(
+    `\nBand bleibt im breiten Teil (Spec §7.8.7, Säulen halten nicht, ${split.kept.length})`,
+  );
+  for (const k of split.kept) {
+    console.log(
+      `  ${k.shapeId}: ${k.lengthMm.toFixed(1)} × ${k.widthMm.toFixed(2)} mm — ${k.reason}`,
+    );
+  }
 }
 if (knockdown) {
   console.log(
@@ -751,6 +809,7 @@ if (tatamiOnly) {
       svgPath: outputInput,
       templatePath,
       sourceSvg,
+      orderedWidthMm: bestelltMm > 0 ? bestelltMm : undefined,
       presetName: presetArg,
       stitches: foreignStitches,
       blocks,
