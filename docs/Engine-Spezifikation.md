@@ -813,6 +813,10 @@ Breitenmessung überschätzt dünne Ringe (§7.4). Die 0,45-mm-Ränder der Bandr
 STUTTGART-Logo messen 0,61–0,62 mm und bleiben so Laufstich; der „/" in „NotSan 01/24"
 (0,73 mm) und „CYS SPORTS" (0,88–1,24 mm) werden Satin.
 
+Die Einteilung liest **eine** Breite je Form. Hat eine Form einen breiten und einen schmalen Teil,
+gehört die Breite dem breiten (§7.8.7): ein Tatami-Teil und ein Satin-Band in einer Form werden
+dort getrennt.
+
 #### 7.8.2 Strichplan
 
 Aus der Mittelachse (§5) entsteht der Plan, den ein Puncher vor dem Setzen macht
@@ -920,6 +924,161 @@ Aufruf von Ink/Stitchs „Satinsäulen automatisch führen" (`auto_satin --prese
 Der Weg zwischen den Säulen läuft verdeckt unter späteren Säulen, und nie über eine andere
 Farbe oder ein dazwischen gesticktes Objekt; wo das nicht geht, setzt Ink/Stitch einen
 Fadenschnitt.
+
+#### 7.8.7 Breite Form mit schmalem Band: teilen *(02.10.2026, Entscheidung des Nutzers: „Eine Form, die einen schmalen und einen breiten Teil hat, wird an der Übergangsstelle geteilt. Der schmale Teil wird Satin, der breite Tatami, wie ein Puncher es macht.")*
+
+**Anlass** (Profi-Vergleich Elektrotechnik Yer, Piqué, 89,8 mm). Stecker und Kabel sind **ein** Pfad
+(398 mm²). Die Einteilung (§7.8.1) liest dafür eine Breite — den Median über das Rückgrat der
+Mittelachse, und das Rückgrat ist der Stecker (§5.1: nur was mindestens halb so breit ist wie die
+breiteste Stelle): 7,2 mm, also Tatami. Das Kabel, 2,4 mm breit und 113 mm lang, wurde mit 45°-Reihen
+von 3,5 mm gestickt: 1.020 Stiche, davon 399 Wegstiche und 292 der Gitterunterlage,
+und es lief unter dem Y weiter. Der Puncher setzt das Kabel als zwei Satinsäulen (788 Stiche, unter dem
+Y unterbrochen) und den Stecker als breiten Satin; das ganze Logo hat bei ihm 2.905 Stiche, bei uns
+2.937. Von Hand getrennt und das Kabel unter dem Y ausgespart: Kabel 718, gesamt 2.659. (Das ist der Stand
+des Vergleichs; mit der Mindeststichlänge von 0,4 mm, §11, sind es vor der Teilung 2.886 Stiche und 980 im
+Kabel — die Messungen unten laufen gegen diesen Stand, `afe6f5f`.)
+
+**Die Regel in drei Sätzen.** Der **breite Teil** ist, wo eine Scheibe von 5 mm — die Satingrenze,
+`AUTOSATIN_MAX_WIDTH_MM` — in die Form passt: die Form um 2,5 mm geöffnet (nach innen und zurück);
+geschnitten wird an seinem Rand, am Bogen der letzten Scheibe, die noch passt, und was jenseits liegt und
+ein **Band** ist, wird Satin (`split.ts`). Ein Rest ist ein Band, wenn er mindestens 1,3 mm breit und
+15 Breiten lang ist, seine Breite gleichmäßig bleibt (Breite am 20. Perzentil durch die am 80.
+mindestens 0,7), er an **einem** Ende am breiten Teil hängt, der breite Teil mindestens 20 mm² hat und
+in jeden seiner Flecken, an denen das Band hängt, eine Scheibe von zwei Bandbreiten passt (ein Fleck,
+in den sie nicht passt, ist kein Kopf, sondern eine Verbreiterung des Bandes, und das Band läuft
+hindurch) — und wenn seine Säulen halten (§7.8.5). Der breite Teil
+wird zuerst gestickt (§10.1: Flächen vor Satin) und liegt 0,8 mm unter dem Ende des Bandes (§4.1
+Regel 5), damit der Zug des Satins keine Lücke aufreißt; die Unterlappung liegt im Band, nie außerhalb
+der Form.
+
+**Wo geschnitten wird.** Der Schnitt ist der Rand der Öffnung und braucht weder eine Achse, der er
+folgt, noch eine Ecke: er ist derselbe für ein Band an der Spitze wie an der Flanke. Was die Öffnung
+von der Form übrig lässt, sind Ecken des breiten Teils, Späne an seinem Rand und die Bänder; Späne
+unter 0,1 mm Dicke werden vorher abgetragen (Öffnung um 0,05 mm: der Bogen eines Offsets weicht bis
+0,04 mm ab, §5), und Stücke unter 12,7 mm² — die Hälfte des kleinsten Bandes, 1,3 mm breit und 15 Breiten
+lang — werden nicht angesehen. Die Ecken und Späne, die am breiten Teil hängen, bleiben bei ihm; was
+beim Putzen von den Bändern abfiel, kommt zu ihnen zurück. Nichts geht verloren: breiter
+Teil und Bänder zusammen sind die Form (Test). Gemessen am Yer-Logo gegen einen geraden Schnitt (Kasten
+quer zum Kabel): 2.744–2.746 gegen 2.753 Stiche — der Schnitt macht keinen Unterschied, der Bogen ist
+der einfachere.
+
+**Köpfe und Verbreiterungen.** Ein Band biegt sich. An der Spitze eines scharfen Knicks lassen die
+beiden Arme Platz für eine Scheibe der Satingrenze, obwohl das Band schmaler ist (bei einem V von 30°
+passt in ein Band von 3,2 mm eine Scheibe von 2,54 mm Radius), und eine Kappe am freien Ende kann breiter
+sein als der Schaft. Die Öffnung hat dort einen Fleck, der kein Kopf ist. Zählte er als breiter Teil,
+schnitte er das Band in zwei Stücke, von denen das eine zwei Anschlüsse hat und ausfällt: das Yer-Kabel
+bei 120 mm Breite wurde so zur Hälfte Satin (69 mm) und zur Hälfte Tatami — ein Bild, das kein Puncher
+macht. Ein Fleck ist ein Kopf, wenn eine Scheibe von zwei Bandbreiten Durchmesser hineinpasst (Radius =
+Breite des Bandes; hängen mehrere Bänder an ihm, des breitesten) — die Prüfung der Zeile „Breitensprung",
+nur je Fleck und nicht an der Form im Ganzen. Besteht ein Fleck sie nicht, gehört er zum Band, und die
+Stücke werden ohne ihn neu gebildet. Eine Mindestfläche leistet das nicht, weil der Fleck mit dem Band
+wächst: Kabel 3,25 mm (120 mm Breite), Fleck an der Spitze des V 20,2 mm² und 2,5 mm Radius, knapp über
+der Mindestfläche von 20 mm²; bei 150 mm (Kabel 4,08 mm) 45,9 mm² mit der Kappe am Ende 43,8 mm²,
+beide mehr als zwei Scheiben der Satingrenze (39,3 mm²); bei 180 mm (Kabel 4,93 mm) 291 mm² und 67 mm² — und
+keiner fasst eine Scheibe der Bandbreite (3,8 und 3,6 mm Radius gegen 4,9; der Stecker 10,3). Mit der
+Prüfung je Fleck teilt sich das Kabel von 80 bis 180 mm Breite ganz, als ein Band (`split.test.ts`:
+Kabel mit Knick bei 3,2 und 4,2 mm).
+
+**Die Prüfungen und ihre Schwellen.** Gemessen an den acht Referenz-Vorlagen in der Größe, in der die
+Pipeline sie stickt — nach dem Tor (§5.2): STUTTGART 80 mm → 91 mm, STUTTGART 250 mm, Köln 90 mm → 134 mm,
+Eislingen 200 mm → 286 mm, Atzensport 80 mm → 107 mm, Hofbräu 110,8 mm, Yer 89,8 mm, Christliche
+90,2 mm (`--ohne-tor`): 390 Stücke der Formen, die §7.8.1 Tatami nennt, bleiben nach der Öffnung neben einem
+breiten Teil von mindestens 20 mm² liegen; 310 davon sind kleiner als 12,7 mm² (Ecken, Späne). Die Größe
+zählt: die Öffnung hat einen festen Radius in Millimetern, die Breite eines Stücks wächst mit dem Logo,
+das Verhältnis von Länge zu Breite nicht — was in der Dateigröße zu schmal ist, besteht die Breitenprüfung
+in der erzeugten Größe (zwei Streifen im Köln-Logo: 0,89 mm bei 90, 1,32 mm bei 134). Jede Prüfung wirft
+Stücke hinaus, die kein Band sind; wie knapp es dabei zugeht, steht in der Tabelle:
+
+| Prüfung | Schwelle | Warum, und was die Messung sagt |
+|---|---|---|
+| Breite des Bandes (`medianShapeWidthMm`) | mindestens **1,3 mm** (`SPLIT_BAND_MIN_WIDTH_MM`) | Die typische Archivsäule (`SATIN_TYPICAL_MM`, §5.2). Das Tor hält Satin ab 1,0 mm und meldet 1,0–1,3 mm als Prüfstelle; ein Band ist nie eins von beiden, das Tor hat über Bänder nichts zu entscheiden (unten). 6 Stücke scheitern zuerst hieran, vier davon nur hieran: im Köln-Logo (134 mm) Linien von 0,94 bis 1,15 mm, 19 bis 33 Breiten lang und gleichmäßig — dünner als die typische Säule, sie bleiben im Tatami |
+| Länge (längster Weg durch die Mittelachse) | mindestens **15 Breiten** (`SPLIT_BAND_MIN_ASPECT`) | Ein Band ist lang gegen seine Breite; kürzere Stücke sind Glieder, Beine, Zacken. Yer: 46,6 (113,0 mm bei 2,43 mm). 68 Stücke scheitern zuerst hieran. Die längsten Nicht-Bänder: zwei Federn des Köln-Adlers (8,5 in 90 mm, 6,9 in 134 mm; 2,8 bis 4,2 mm breit, gleichmäßig 0,8 und mehr), ein Pferdebein im STUTTGART-Logo 8,1. Die kürzesten, die sonst alles bestehen: zwei Streifen am Flügelende des Adlers in 134 mm, 16,7 mm lang und 1,32 und 1,34 mm breit, **12,7 und 12,4** Breiten — bei der Schwelle 12, die zuerst an den Dateigrößen gemessen war, wären sie Satin geworden (+88 Stiche, +3 Fadenschnitte in einem Logo, das die Regel nichts angeht). 15 liegt über ihnen und unter dem nächsten Stück, das besteht (18,5; Köln ab 160 mm) |
+| Gleichmäßigkeit (Breite p20 durch p80 entlang des Wegs, die Enden ausgenommen) | mindestens **0,7** (`SPLIT_BAND_MIN_UNIFORMITY`) | Satin hält ein Verjüngen auf etwas über die Hälfte (3,0 auf 1,6 mm liest 0,70), ein Bein, das auf ein Drittel läuft (3,0 auf 1,0 mm), liest 0,54. Yer 0,83. 5 Stücke scheitern hieran (nach Breite und Länge geprüft): die vier Streifen des Rahmens im Köln-Logo (0,30–0,32) und ein Stück des Adlers (0,48); in der Dateigröße von Atzensport (80 mm) ist es allein hieran die Mähne des Pferds (0,44 bei 15,2 Breiten Länge). Die mittleren 60 % statt 80 %: eine Ecke im Band (Gehrung von 110°) liest sonst 0,68 statt 0,75 |
+| Anschlüsse am breiten Teil | genau **1** | Ein Band, das an beiden Enden am breiten Teil hängt (Henkel, Hantel, Streifen zwischen Loch und Rand), ist kein Stab mit Kopf; das Schnittbild wäre ein anderes. Sicherung: an keinem der Logos entscheidend, im Test an der Hantel |
+| Breiter Teil, Fläche | mindestens **20 mm²** (`KNOCKDOWN_MIN_MM2`, §4.1 Regel 3) | Die Grenze, unter der das Repo einen Schnitt für teurer hält als den doppelten Stich. Yer: 114 mm² |
+| Breitensprung | in jeden Fleck des breiten Teils, an dem das Band hängt, passt eine Scheibe von **zwei Bandbreiten** Durchmesser (`SPLIT_BULK_MIN_RATIO`); hängen mehrere Bänder an ihm, gilt das breiteste | Der Kopf muss sich abheben. Yer: größte Scheibe im Stecker 10,3 mm, 4,3 Bandbreiten. Entscheidend nur an Flecken, die kein Kopf sind (nächster Absatz); an den Köpfen der acht Logos nirgends |
+| Säulen | `satinColumns` hält (§7.8.5: Schiene in der Form, keine Kreuzung, Deckung ab 0,85) | Ein Band, das als Satin nicht hält, ist keins |
+
+Der Trichter an den acht Logos in der erzeugten Größe: von 390 Stücken scheitern 310 an der Mindestfläche
+von 12,7 mm², 6 an der Breite, 68 an der Länge, 5 an der Gleichmäßigkeit, keins an Anschluss, Breitensprung
+oder Säulen; **eins** wird geteilt — das Kabel im Yer-Logo. Mit den Formen, die §7.8.1 Satin nennt,
+dazugenommen, ändert sich das Ergebnis nicht (354, 6, 117, 5, 0, 0, 0, 1). Alle anderen Logos bleiben, wie
+sie sind (Messung nachher unten); in anderen Größen ändert sich das: das Köln-Logo teilt ab 160 mm zwei
+Zungen im Flügel (ab etwa 155 mm sind sie 1,3 mm breit), bei 200 mm sechs (Offen 4).
+
+**Was nicht geteilt wird.** Nur Formen, die §7.8.1 Tatami nennt, werden angesehen. Eine Form unter
+5 mm, deren Säulen nicht halten (der Adler im Köln-Logo: „a rail leaves the letter by 0.44 mm"), fällt
+auf Tatami zurück wie bisher; teilen würde dort auch nach der Messung nur das Yer-Logo, und zwei Federn
+eines Flügels als Satin neben Tatami-Federn wäre kein Puncher-Bild. Auch nicht: Bänder, die an
+beiden Enden hängen, Bänder, die zum Kopf hin trichterförmig breiter werden (die Breite ist dort nicht
+gleichmäßig; der Trichter müsste an der Stelle abgeschnitten werden, an der die Breite zu wachsen
+beginnt), und Bänder mit scharfen Knicken, deren Breite `medianShapeWidthMm` unterschätzt (ein
+Zickzack mit 90°-Ecken liest 1,77 statt 2,4 mm).
+
+**Rückfall und Meldung** (Regel 8). Hält ein Band als Säule nicht, bleibt es im breiten Teil, die Form
+kommt ganz als Tatami in die Vorlage, mit dem Grund (`reason`, `AUTOSATIN_MIXED` als `info`) — wie
+jede Form, die als Satin gedacht war und nicht hielt (§7.8.5); die Nacharbeit-Datei (§13.4) führt sie
+unter „Rückfall Tatami". Jede Teilung steht im Ergebnis der Vorlage: `TemplateResult.split` nennt Form,
+Band (Länge, Breite, Säulen, Deckung) und Kopf (Fläche), `SHAPE_SPLIT` als `info` je Form, und
+`pnpm inkstitch` druckt den Block „Geteilt". Die Objekte heißen `<Kennung>_bulk` (breiter Teil, Tatami;
+bei mehreren `_bulk0`, `_bulk1`) und `<Kennung>_band<n>` (Satin, `n` in Lesefolge); `shapeId` bleibt die
+Kennung der Quellform, und für die Reihenfolge (§10.1) gilt die ganze Form: was über oder unter ihr
+lag, liegt über oder unter beiden Teilen. Schalter: `splitBands: false` in den Optionen der Vorlage,
+`--ohne-teilung` im Werkzeug — für Vergleichsmessungen, nicht für Aufträge.
+
+**Das Tor (§5.2) wirkt nicht auf geteilte Teile — und muss es nicht.** Das Tor misst Formen
+(`classifyShape`, `measureShapes`) in der bestellten Größe; die Einteilung ändert sich nicht: die
+ganze Form bleibt Tatami, die Menge der Satinstriche der bestellten Größe (`orderedStrokes`) ist vor und
+nach der Teilung dieselbe (Test). Ein Band ist nie schmaler als 1,3 mm, also nie unter der Grenze von
+1,0 mm und nie eine Prüfstelle von 1,0 bis 1,3 mm (zwei Konstanten, die ein Test zusammenhält): wo die
+Teilung in der erzeugten Größe greift und in der bestellten nicht, ist das Band dort nur breiter.
+
+**Messung nachher** *(02.10.2026)*. Die acht Referenz-Logos durch die Pipeline (`pnpm inkstitch`, Tor an,
+Christliche `--ohne-tor`, je Lauf ein eigener Ink/Stitch-Cache), vorher = `afe6f5f`, nachher = sauberer Build
+von `340baca`:
+
+| Logo (bestellt → erzeugt) | Stiche | Farbblöcke | Fadenschnitte | Prüfstellen | geteilt |
+|---|---:|---:|---:|---:|---|
+| STUTTGART 80 → 91 mm | 16.157 → 16.157 | 6 | 49 | 78 | – |
+| STUTTGART 250 mm | 73.088 → 73.088 | 6 | 57 | 152 | – |
+| Köln 90 → 134 mm | 33.797 → 33.797 | 15 | 120 | 321 | – |
+| Eislingen 200 → 286 mm | 53.348 → 53.348 | 6 | 173 | 1.735 | – |
+| Atzensport 80 → 107 mm | 18.755 → 18.755 | 8 | 132 | 206 | – |
+| Hofbräu 110,8 mm | 9.253 → 9.253 | 2 | 92 | 134 | – |
+| Christliche 90,2 mm (`--ohne-tor`) | 9.263 → 9.263 | 9 | 111 | 3.264 | – |
+| **Yer 89,8 mm** | **2.886 → 2.757** | 3 | **14 → 17** | 20 | path22: Band 113,0 × 2,43 mm, 2 Säulen; Kopf 116 mm² |
+| Yer 120 → 143 mm | 5.307 → 5.174 | 3 | 23 → 26 | 13 | path22: Band 179,4 × 3,89 mm, 2 Säulen; Kopf 293 mm² |
+
+Die Tor-Zeile (bestellt, stickbar ab, erzeugt) ist bei allen acht Logos dieselbe, und die DST der sieben
+Logos ohne Teilung sind Byte für Byte dieselben wie vorher — auch das Köln-Logo in 134 mm, das bei der
+Schwelle 12 für die Länge zwei Streifen geteilt hätte (+88 Stiche). Das Yer-Logo je Element (Stiche,
+nach Lage zugeordnet, Puncher in Klammern): Kabel 980 → 823 (788), Stecker 155 → 162 (443), Birne 78 → 80 (70),
+Strahlen 47 → 34 (91); gesamt 2.886 → 2.757 (2.905), Sprünge 21 → 31 (30), Fadenschnitte 14 → 17 (13). Der
+Block Orange (Stecker, Kabel, das E) gewinnt drei Fadenschnitte und zehn Sprünge: das Band ist eine
+Insel in der Farbe, und die Satinfolge der Farbe läuft mit ihm neu (§7.8.6) — das E, 248 → 280, liegt in dieser
+Folge und nicht an seiner Form. Der Block Gold (Birne, Strahlen) verliert 11 Stiche, 125 → 114: die Birne wächst nicht
+mehr 0,8 mm unter das Kabel, denn die Unterlappung gilt zwischen Tatami-Flächen (§4.1 Regel 5), und das Kabel ist
+Satin. Kosten der Prüfung in der Vorlage: 0 bis 0,6 s je Logo (Summe über alle Tatami-Formen in der erzeugten
+Größe; Yer 0,4 s mit den Säulen des Bandes), gegen 1 bis 60 s Vorlagenzeit.
+
+**Offen.** (1) Der breite Teil ist Tatami; der Puncher setzt den Stecker als breiten Satin (443 Stiche
+gegen unsere 162 im Yer-Logo): bewusst, nach der Entscheidung. (2) Der Puncher unterbricht das Kabel
+unter dem Y; bei uns läuft es durch, weil Satin nicht ausspart (§4.2 Regel 1, zurückgenommen) — ein
+Teil des Abstands zum Profi (Kabel 823 Stiche gegen 788). (3) Die Pferdebeine im STUTTGART-Logo
+(2,1–2,5 mm breit, 12 bis 19 mm lang) bleiben Tatami; im Logo der Christlichen Gemeindereitschule setzt der
+Puncher Beine, Mähne und Schweif des Pferds (3,6–4,7 mm breit) als Tatami, wir machen sie zu Satin, weil
+sie unter 5 mm liegen (die drei Formen: 4,62 mm / 96 mm², 3,72 mm / 54 mm², 3,57 mm / 66 mm²) — das ist die
+Frage nach der Satin/Tatami-Grenze und kein Teil dieser Regel. (4) Die Linien zwischen den Federn im
+Flügel des Köln-Adlers — schwarze Zungen, die in das weiße Loch ragen — sind Bänder im Sinn der Regel und
+werden Satin, sobald sie 1,3 mm breit sind: ab 160 mm Breite ein Paar, bei 200 mm drei Paare von vieren
+(18,6 bis 32,7 Breiten lang), das vierte Paar (12,3 und 12,6 Breiten) bleibt Tatami. Breite und Länge
+entscheiden Zunge für Zunge, das Bild im Flügel ist dann gemischt; ein Puncher setzt sie gleich. Die
+Schwellen sind Schnitte in einem Kontinuum der Stücke (Länge 6 bis 33 Breiten bei Zungen und Federn, das
+Yer-Kabel 46,6), kein Sprung in den Daten; ob solche Zungen Satin werden sollen, ist am Probestick zu
+entscheiden. (5) Ein Band im Tatami-Logo ist
+eine Insel in der Farbe: im Yer-Logo +3 Fadenschnitte und +10 Sprünge (14 → 17 und 21 → 31; der Puncher
+13 und 30). Wie Ende des breiten Teils und Anfang des Bandes zusammenkommen (Lage des Bandanfangs, Reihenfolge,
+`trim_after`), ist Sache von §10.2.
 
 ---
 

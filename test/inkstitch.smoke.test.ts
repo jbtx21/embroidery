@@ -33,6 +33,7 @@ import {
   tatamiAttributes,
   untrimmedJumps,
 } from "@texma-stitch/engine";
+import { stickWithHead } from "../packages/engine/test/fixtures/bands.js";
 import { circle, polygonOf, rect } from "../packages/engine/test/fixtures/shapes.js";
 import { readDst, unitsToMm } from "@texma-stitch/formats";
 import { GLYPHS } from "../packages/engine/test/fixtures/glyphs.js";
@@ -907,6 +908,80 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
         expect(counts.setUnder03).toBe(0);
         expect(counts.setUnder04).toBeLessThan(counts.plainUnder04);
         expect(set.length).toBeLessThan(plain.length);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 2,
+  );
+
+  it(
+    "geteilte Form (§7.8.7): der Stab wird Satin quer zu seiner Achse, der Kopf bleibt Tatami — dieselbe Form als ein Tatami stickt ihn in 45°-Reihen",
+    async () => {
+      // A lollipop: a head of 12 mm and a stick of 2.4 mm and 40 mm along the x axis. The width makes
+      // the whole shape tatami (the head carries the median); the split sets the stick as satin.
+      await initEngine();
+      const lolli = {
+        kind: "area" as const,
+        id: "lolli",
+        polygon: stickWithHead(),
+        color: "#d25c1c",
+        attrs: {},
+        trimAfter: "auto" as const,
+      };
+      const page = { widthMm: 60, heightMm: 24 };
+      const dir = mkdtempSync(join(tmpdir(), "texma-teilung-"));
+      try {
+        // The shape is centred on the head, so move the page's origin to it: both templates are
+        // written from the same polygon, the one with the split and the one without.
+        const run = async (name: string, splitBands: boolean) => {
+          const shifted = {
+            ...lolli,
+            polygon: {
+              outer: lolli.polygon.outer.map((p) => ({ x: p.x + 10, y: p.y + 12 })),
+              holes: [],
+            },
+          };
+          const template = buildInkstitchTemplate([shifted], PRESETS.pique, {
+            ...page,
+            splitBands,
+          });
+          const svg = join(dir, `${name}.svg`);
+          writeFileSync(svg, template.svg);
+          const dst = await inFreshCache(dir, name, () => dstOf(svg));
+          const stitches = unitsToMm(readDst(new Uint8Array(dst)).stitches).filter(
+            (s) => s.cmd === "stitch",
+          );
+          return { template, stitches };
+        };
+        const split = await run("geteilt", true);
+        const whole = await run("ganz", false);
+        expect(split.template.objects.map((o) => [o.id, o.kind])).toEqual([
+          ["lolli_bulk", "tatami"],
+          ["lolli_band0", "satin"],
+        ]);
+        expect(whole.template.objects.map((o) => o.kind)).toEqual(["tatami"]);
+
+        // Its stitches lie across the stick (steps along y), not at 45°: in the stretch of the stick
+        // beyond the head, the long steps of the split run are near vertical, those of the whole one are
+        // diagonal. The DST is centred on the shape's box: the stick starts about 18 mm from its left
+        // end (head rim at 16 mm, page 4 to 56 mm), so take what lies 6 mm beyond the rim.
+        const slope = (st: typeof split.stitches): number => {
+          const minX = Math.min(...st.map((s) => s.x));
+          const ratios: number[] = [];
+          for (let i = 1; i < st.length; i++) {
+            const a = st[i - 1]!;
+            const b = st[i]!;
+            const len = Math.hypot(b.x - a.x, b.y - a.y);
+            if (len < 1.5 || a.x < minX + 24 || b.x < minX + 24) continue;
+            ratios.push(Math.abs(b.x - a.x) / Math.max(Math.abs(b.y - a.y), 1e-9));
+          }
+          ratios.sort((p, q) => p - q);
+          expect(ratios.length).toBeGreaterThan(20);
+          return ratios[Math.floor(ratios.length / 2)]!;
+        };
+        expect(slope(split.stitches)).toBeLessThan(0.3);
+        expect(slope(whole.stitches)).toBeGreaterThan(0.6);
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
