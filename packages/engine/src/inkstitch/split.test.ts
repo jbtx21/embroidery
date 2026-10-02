@@ -264,8 +264,17 @@ describe("splitNarrowWide: what stays whole (spec §7.8.7)", () => {
     expect(plan.bulk).toEqual([shape]);
   };
 
-  it("a stub: a stick shorter than twelve widths is part of its head", () => {
+  it("a stub: a stick shorter than fifteen widths is part of its head", () => {
     whole(stubbyStick());
+  });
+
+  it("a short strip: a stick of fourteen widths stays in its head, one of sixteen is a band", () => {
+    // 34 mm of stick on a head of 12 mm read 14.3 widths of band, 38 mm read 16.0 (the cut is at
+    // the head's arc, a little beyond its rim): the minimum lies between.
+    expect(SPLIT_BAND_MIN_ASPECT).toBeGreaterThan(14.3);
+    expect(SPLIT_BAND_MIN_ASPECT).toBeLessThan(16);
+    whole(stickWithHead(12, 2.4, 34));
+    expect(split(stickWithHead(12, 2.4, 38)).bands).toHaveLength(1);
   });
 
   it("a hairline: a bar under 1.3 mm is no column", () => {

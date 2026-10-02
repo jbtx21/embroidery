@@ -69,11 +69,13 @@ export const SPLIT_BULK_RADIUS_MM = AUTOSATIN_MAX_WIDTH_MM / 2;
  */
 export const SPLIT_BAND_MIN_WIDTH_MM = 1.3;
 /**
- * A band is at least this many of its own widths long (spec §7.8.7: the cable of the Yer logo reads
- * 46.6, the nearest pieces that are no band 8.5 — two feathers of the Köln eagle — and 8.1, a leg of
- * the STUTTGART horse).
+ * A band is at least this many of its own widths long (spec §7.8.7). The cable of the Yer logo reads
+ * 46.6. Of the pieces that are no band the longest read 8.6 (two feathers of the Köln eagle, even
+ * and 3.5 mm wide) and 8.1 (a leg of the STUTTGART horse); the shortest that pass every other check
+ * read 12.4 and 12.7 — two strips of 16.7 × 1.3 mm at the wing tips of the Köln logo, in the size
+ * the gate makes of it (134 mm). 15 lies above those two and below the next piece that passes (18.5).
  */
-export const SPLIT_BAND_MIN_ASPECT = 12;
+export const SPLIT_BAND_MIN_ASPECT = 15;
 /**
  * Evenness of the width along a band, at least (`bandProfile`): 0.7 lets a band narrow to a little
  * over half from one end to the other (3.0 to 1.6 mm reads 0.70) — a satin column takes that — and
