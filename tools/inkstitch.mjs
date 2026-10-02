@@ -485,7 +485,7 @@ if (tatamiOnly) {
       routedPath: current,
       probePath: resolve(outDir, `${name}.probe.svg`),
       outPath: resolve(outDir, `${name}.trimmed.svg`),
-      colours: template.objects.map((o) => o.color),
+      colours: objectColours,
     });
   } catch (err) {
     console.error(`FEHLER: ${err.message}`);
