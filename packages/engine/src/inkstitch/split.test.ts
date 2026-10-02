@@ -360,6 +360,57 @@ describe("splitNarrowWide: a band that does not hold (spec §7.8.7, §7.8.5)", (
   });
 });
 
+describe("splitNarrowWide: what holds for any head with sticks (spec §7.8.7)", () => {
+  // A seeded generator: no Math.random (rule 3), the same cases every run.
+  const seeded = (seed: number): (() => number) => {
+    let state = seed;
+    return () => {
+      state = (state * 1664525 + 1013904223) >>> 0;
+      return state / 2 ** 32;
+    };
+  };
+  const between = (rnd: () => number, lo: number, hi: number): number => lo + (hi - lo) * rnd();
+
+  it("loses nothing and adds nothing, whether it cuts or not; bands are columns that hold and do not overlap", () => {
+    const rnd = seeded(20261002);
+    let cut = 0;
+    let whole = 0;
+    for (let i = 0; i < 10; i++) {
+      const sticks = Array.from({ length: 1 + Math.floor(rnd() * 3) }, (_, k) => ({
+        centreY: (k - 1) * 7,
+        widthMm: between(rnd, 1.0, 4.8),
+        lengthMm: between(rnd, 10, 70),
+      }));
+      const shape = headWithSticks(between(rnd, 8, 16), sticks);
+      const plan = split(shape);
+      if (plan.bands.length === 0) {
+        whole++;
+        expect(plan.bulk).toEqual([shape]);
+        continue;
+      }
+      cut++;
+      const polygons = plan.bands.map((b) => b.polygon);
+      const all = union([...plan.bulk, ...polygons]);
+      expect(all).toHaveLength(1);
+      expect(polygonArea(all[0]!)).toBeCloseTo(polygonArea(shape), 1);
+      expect(total(difference([...plan.bulk, ...polygons], [shape]))).toBeLessThan(1e-3);
+      polygons.forEach((a, k) =>
+        polygons.slice(k + 1).forEach((b) => expect(total(intersect([a], [b]))).toBeLessThan(1e-3)),
+      );
+      for (const band of plan.bands) {
+        expect(band.columns.ok).toBe(true);
+        expect(band.columns.coverage).toBeGreaterThanOrEqual(0.85);
+        expect(band.widthMm).toBeGreaterThanOrEqual(SPLIT_BAND_MIN_WIDTH_MM);
+        expect(band.lengthMm).toBeGreaterThanOrEqual(SPLIT_BAND_MIN_ASPECT * band.widthMm);
+      }
+      expect(total(plan.bulk)).toBeGreaterThanOrEqual(SPLIT_BULK_MIN_MM2);
+    }
+    // The family has both kinds, or the test says nothing.
+    expect(cut).toBeGreaterThan(0);
+    expect(whole).toBeGreaterThan(0);
+  });
+});
+
 describe("the gate (spec §5.2): the split does not change what it classifies", () => {
   it("still calls the whole shape tatami, so no satin stroke of the ordered size comes of it", () => {
     const measures = measureShapes([areaShape("lolli", stickWithHead())]);
