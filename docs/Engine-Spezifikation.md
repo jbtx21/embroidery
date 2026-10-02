@@ -899,6 +899,34 @@ nach der Teilung dieselbe (Test). Ein Band ist nie schmaler als 1,3 mm, also nie
 1,0 mm und nie eine Prüfstelle von 1,0 bis 1,3 mm (zwei Konstanten, die ein Test zusammenhält): wo die
 Teilung in der erzeugten Größe greift und in der bestellten nicht, ist das Band dort nur breiter.
 
+**Messung nachher** *(02.10.2026)*. Die acht Referenz-Logos durch die Pipeline (`pnpm inkstitch`, Tor an,
+Christliche `--ohne-tor`, je Lauf ein eigener Ink/Stitch-Cache), vorher = `afe6f5f`, nachher = sauberer Build
+von `340baca`:
+
+| Logo (bestellt → erzeugt) | Stiche | Farbblöcke | Fadenschnitte | Prüfstellen | geteilt |
+|---|---:|---:|---:|---:|---|
+| STUTTGART 80 → 91 mm | 16.157 → 16.157 | 6 | 49 | 78 | – |
+| STUTTGART 250 mm | 73.088 → 73.088 | 6 | 57 | 152 | – |
+| Köln 90 → 134 mm | 33.797 → 33.797 | 15 | 120 | 321 | – |
+| Eislingen 200 → 286 mm | 53.348 → 53.348 | 6 | 173 | 1.735 | – |
+| Atzensport 80 → 107 mm | 18.755 → 18.755 | 8 | 132 | 206 | – |
+| Hofbräu 110,8 mm | 9.253 → 9.253 | 2 | 92 | 134 | – |
+| Christliche 90,2 mm (`--ohne-tor`) | 9.263 → 9.263 | 9 | 111 | 3.264 | – |
+| **Yer 89,8 mm** | **2.886 → 2.757** | 3 | **14 → 17** | 20 | path22: Band 113,0 × 2,43 mm, 2 Säulen; Kopf 116 mm² |
+| Yer 120 → 143 mm | 5.307 → 5.174 | 3 | 23 → 26 | 13 | path22: Band 179,4 × 3,89 mm, 2 Säulen; Kopf 293 mm² |
+
+Die Tor-Zeile (bestellt, stickbar ab, erzeugt) ist bei allen acht Logos dieselbe, und die DST der sieben
+Logos ohne Teilung sind Byte für Byte dieselben wie vorher — auch das Köln-Logo in 134 mm, das bei der
+Schwelle 12 für die Länge zwei Streifen geteilt hätte (+88 Stiche). Das Yer-Logo je Element (Stiche,
+nach Lage zugeordnet, Puncher in Klammern): Kabel 980 → 823 (788), Stecker 155 → 162 (443), Birne 78 → 80 (70),
+Strahlen 47 → 34 (91); gesamt 2.886 → 2.757 (2.905), Sprünge 21 → 31 (30), Fadenschnitte 14 → 17 (13). Der
+Block Orange (Stecker, Kabel, das E) gewinnt drei Fadenschnitte und zehn Sprünge: das Band ist eine
+Insel in der Farbe, und die Satinfolge der Farbe läuft mit ihm neu (§7.8.6) — das E, 248 → 280, liegt in dieser
+Folge und nicht an seiner Form. Der Block Gold (Birne, Strahlen) verliert 11 Stiche, 125 → 114: die Birne wächst nicht
+mehr 0,8 mm unter das Kabel, denn die Unterlappung gilt zwischen Tatami-Flächen (§4.1 Regel 5), und das Kabel ist
+Satin. Kosten der Prüfung in der Vorlage: 0 bis 0,6 s je Logo (Summe über alle Tatami-Formen in der erzeugten
+Größe; Yer 0,4 s mit den Säulen des Bandes), gegen 1 bis 60 s Vorlagenzeit.
+
 **Offen.** (1) Der breite Teil ist Tatami; der Puncher setzt den Stecker als breiten Satin (443 Stiche
 gegen unsere 162 im Yer-Logo): bewusst, nach der Entscheidung. (2) Der Puncher unterbricht das Kabel
 unter dem Y; bei uns läuft es durch, weil Satin nicht ausspart (§4.2 Regel 1, zurückgenommen) — ein
