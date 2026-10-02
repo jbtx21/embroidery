@@ -63,18 +63,20 @@
  *    packages/engine/src/inkstitch/tatami.ts says why not everywhere.
  * 2. Routes every run of neighbouring same-coloured satin columns with
  *    Ink/Stitch's auto_satin (--preserve_order=true: what ends under a
- *    stroke is stitched first; --trim=true), one call per run, each call on
- *    the previous call's result -> out/<name>.routed.svg.
- * 3. Sets the thread cuts with Ink/Stitch's jump_to_trim
- *    -> out/<name>.trimmed.svg. Without `inkstitch:trim_after` a jump between
- *    two objects of one colour stays a jump (Ink/Stitch ties off and on around
- *    it, but the thread lies on top of the fabric); with it the DST carries a
- *    trim (three jump records, +2/+2, -4/-4, +2/+2, which readDst reads back as
- *    one trim). Where a fill ends and the next object begins is known only to
- *    Ink/Stitch — a fill ends towards the next object, but not exactly — so the
- *    extension measures it on the real stitches and sets `trim_after` where the
- *    jump is at least the threshold of spec §10.2 (CONNECT_DEFAULTS.jumpTrimMm,
- *    5 mm). Up to 3 mm (its collapse length) Ink/Stitch does not even jump.
+ *    stroke is stitched first), one call per run, each call on the previous call's
+ *    result -> out/<name>.routed.svg. Without --trim: that one cuts at every jump of a run whose
+ *    part outside both columns is over 1 mm and at the end of every run, whatever follows (spec §10.2.1).
+ * 3. Sets the thread cuts by the rule of spec §10.2.1 (tools/fadenschnitt.mjs,
+ *    packages/engine/src/inkstitch/trims.ts) -> out/<name>.trimmed.svg. Without
+ *    `inkstitch:trim_after` Ink/Stitch writes no cut: up to 3 mm (its collapse length) it stitches
+ *    straight from one object to the next, from there it ties off, jumps and ties on — the thread lies
+ *    on top of the fabric. A probe (jump_to_trim from 3 mm, stitched to a DST: out/<name>.probe.svg)
+ *    cuts after every object that a jump follows; the rule reads the real end and start of every one of
+ *    those moves in that DST (a fill ends towards the next object, but not exactly) and takes out the
+ *    cuts that are not needed: a jump up to 5 mm (CONNECT_DEFAULTS.jumpTrimMm) of which at most 1 mm lies
+ *    on bare fabric — the rest under stitches that come later or on stitches of its own colour — stays
+ *    without a cut. The DST then carries a trim (three jump records, +2/+2, -4/-4, +2/+2, which readDst
+ *    reads back as one trim) only where the rule cuts.
  * 4. output --format=dst -> out/<name>.dst.
  * 5. The Nacharbeit file (spec §13.4, tools/nacharbeit.mjs), once the DST is written and
  *    reported: out/<name>.nacharbeit.svg — the document of step 3 with a layer per colour
@@ -104,6 +106,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import {
+  blockColoursOf,
   buildInkstitchTemplate,
   checkMinimumSize,
   CONNECT_DEFAULTS,
@@ -112,13 +115,16 @@ import {
   initEngine,
   needleClusters,
   PRESETS,
+  threadMoves,
   untrimmedJumps,
+  VISIBLE_MAX_MM,
 } from "@texma-stitch/engine";
 import { readDst, unitsToMm } from "@texma-stitch/formats";
 import { renderPlanPng } from "@texma-stitch/render";
 import { zeile } from "./archiv.mjs";
 import { scaleSvgToWidth } from "./breite.mjs";
 import { befundZeilen, zusammenfassung } from "./feinheit.mjs";
+import { setTrims, trimLines } from "./fadenschnitt.mjs";
 import { isInkstitchReady, runInkstitch, SETUP_HINT } from "./inkstitch-lauf.mjs";
 import { analysiere, dateiname, sucheTor, torDetails, torKopf } from "./tor.mjs";
 
@@ -343,6 +349,8 @@ let railPull;
 let orderVariant;
 let underlay;
 let compensation;
+/** The colour of every object of the template in stitch order — the colour blocks of the DST. */
+let objectColours;
 let feinheit;
 let templateMs = 0;
 let outputInput = templatePath;
@@ -412,6 +420,7 @@ if (tatamiOnly) {
   }
   underlay = template.underlay;
   compensation = template.compensation;
+  objectColours = template.objects.map((o) => o.color);
   if (underlay.grid + underlay.without.length > 0) {
     summary.push(
       `Gitterunterlage bei ${underlay.grid} von ${underlay.grid + underlay.without.length} ` +
@@ -424,7 +433,9 @@ if (tatamiOnly) {
     const { stdout, stderr, ms } = await inkstitch({
       extension: "auto_satin",
       ids,
-      options: { preserve_order: true, trim: true },
+      // Without --trim: the cuts are set below, by the rule of spec §10.2.1 (`--trim` cuts at every
+      // jump over 1 mm outside the two columns and at the end of every run, whatever follows).
+      options: { preserve_order: true, trim: false },
       svg: current,
     });
     calls.push({
@@ -443,30 +454,24 @@ if (tatamiOnly) {
   }
   outputInput = current;
 
-  // The thread cuts (module doc, step 3): the extension sets trim_after where the
-  // jump to the next object is at least the trim threshold of spec §10.2.
-  const trimmed = await inkstitch({
-    extension: "jump_to_trim",
-    options: { "minimum-jump-length": CONNECT_DEFAULTS.jumpTrimMm },
-    svg: current,
-  });
-  const before = (readFileSync(current, "utf8").match(/inkstitch:trim_after="/gi) ?? []).length;
-  const after = (trimmed.stdout.toString("utf8").match(/inkstitch:trim_after="/gi) ?? []).length;
-  calls.push({ what: "jump_to_trim", ms: trimmed.ms });
-  if (trimmed.stderr.trim()) {
-    stderrLines.push(
-      ...trimmed.stderr
-        .trim()
-        .split("\n")
-        .map((l) => `jump_to_trim: ${l}`),
-    );
+  // The thread cuts (module doc, step 3; tools/fadenschnitt.mjs, spec §10.2.1): a probe cuts after every
+  // jump, the rule keeps the cuts where the thread would lie on the fabric.
+  let trims;
+  try {
+    trims = await setTrims({
+      routedPath: current,
+      probePath: resolve(outDir, `${name}.probe.svg`),
+      outPath: resolve(outDir, `${name}.trimmed.svg`),
+      colours: template.objects.map((o) => o.color),
+    });
+  } catch (err) {
+    console.error(`FEHLER: ${err.message}`);
+    process.exit(1);
   }
+  calls.push(...trims.calls);
+  stderrLines.push(...trims.stderr);
   outputInput = resolve(outDir, `${name}.trimmed.svg`);
-  writeFileSync(outputInput, trimmed.stdout);
-  summary.push(
-    `${after - before} Fadenschnitte gesetzt (Sprung ab ${CONNECT_DEFAULTS.jumpTrimMm} mm), ` +
-      `${after} Objekte mit trim_after`,
-  );
+  summary.push(...trimLines(trims));
 }
 
 const {
@@ -506,6 +511,13 @@ writeFileSync(
 const dichte = densityProfile(foreignStitches);
 const nadel = needleClusters(foreignStitches);
 const offen = untrimmedJumps(foreignStitches, CONNECT_DEFAULTS.jumpTrimMm);
+// Moves without a cut that leave thread on the bare fabric (spec §10.2.1): the rule leaves none between
+// two objects; what is left is a jump inside one object, which no cut can reach.
+const blockColours = objectColours === undefined ? undefined : blockColoursOf(objectColours);
+const faeden = threadMoves(
+  foreignStitches,
+  blockColours !== undefined && blockColours.length === blocks.length ? { blockColours } : {},
+).filter((c) => !c.trimmed && c.visibleMm > VISIBLE_MAX_MM);
 const flaeche = Math.max(stats.bboxMm.w * stats.bboxMm.h, 1);
 
 console.log(`Datei       ${svgPath}`);
@@ -527,6 +539,7 @@ if (scaled) {
 console.log(`Vorlage     out/${name}.inkstitch.svg`);
 if (!tatamiOnly && outputInput !== templatePath) {
   console.log(`Geroutet    out/${name}.routed.svg`);
+  console.log(`Sonde       out/${name}.probe.svg`);
   console.log(`Fadenschnitte out/${name}.trimmed.svg`);
 }
 console.log(`DST         out/${name}.dst`);
@@ -685,6 +698,11 @@ console.log(
   `  ${"Fäden auf dem Stoff".padEnd(22)} ${String(offen.count).padStart(8)} Sprünge über ` +
     `${CONNECT_DEFAULTS.jumpTrimMm} mm ohne Fadenschnitt` +
     `${offen.count > 0 ? `, längster ${offen.longestMm.toFixed(1)} mm` : ""}`,
+);
+console.log(
+  `  ${"Sichtbare Fäden".padEnd(22)} ${String(faeden.length).padStart(8)} Sprünge ohne Fadenschnitt mit über ` +
+    `${VISIBLE_MAX_MM} mm auf blankem Stoff` +
+    `${faeden.length > 0 ? `, längster ${Math.max(...faeden.map((c) => c.visibleMm)).toFixed(1)} mm` : ""}`,
 );
 console.log(zeile("Stichmenge", (stats.stitches / flaeche).toFixed(2), "je mm²", "stitchesPerMm2"));
 console.log(zeile("Dichtespitze", String(dichte.max), "je mm²", "densityMax"));

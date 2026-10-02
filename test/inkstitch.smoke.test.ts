@@ -21,21 +21,28 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   analyze,
+  blockColoursOf,
   buildInkstitchTemplate,
   buildReworkSvg,
   CONNECT_DEFAULTS,
+  HIDDEN_JUMP_MAX_MM,
   importShapes,
   initEngine,
   INKSTITCH_MIN_STITCH_MM,
   INKSTITCH_SVG_VERSION,
   inkstitchSvgVersion,
+  PLAIN_STITCH_MM,
   PRESETS,
   tatamiAttributes,
+  threadMoves,
+  trimAfterIds,
   untrimmedJumps,
+  VISIBLE_MAX_MM,
 } from "@texma-stitch/engine";
 import { circle, polygonOf, rect } from "../packages/engine/test/fixtures/shapes.js";
 import { readDst, unitsToMm } from "@texma-stitch/formats";
 import { GLYPHS } from "../packages/engine/test/fixtures/glyphs.js";
+import { setTrims } from "../tools/fadenschnitt.mjs";
 import { isInkstitchReady, runInkstitch } from "../tools/inkstitch-lauf.mjs";
 import { settleUpdate, writeRework } from "../tools/nacharbeit.mjs";
 import { BBOX_TOLERANCE_MM, referenceBbox } from "./golden.js";
@@ -116,7 +123,7 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
         const routed = await runInkstitch({
           extension: "auto_satin",
           ids: template.satinRuns[0]!,
-          options: { preserve_order: true, trim: true },
+          options: { preserve_order: true, trim: false },
           svg: templatePath,
         });
         expect(routed.stderr.trim()).toBe("");
@@ -662,7 +669,7 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
     return blocks.filter((b) => b.stitches.length > 0);
   }
 
-  /** The chain `pnpm inkstitch` runs: source, template, auto_satin, jump_to_trim, DST. */
+  /** The chain `pnpm inkstitch` runs: source, template, auto_satin, the cuts (spec §10.2.1), DST. */
   async function logoRun(dir: string) {
     await initEngine();
     const imported = importShapes(NACHARBEIT_SVG);
@@ -679,24 +686,124 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
       const routed = await runInkstitch({
         extension: "auto_satin",
         ids,
-        options: { preserve_order: true, trim: true },
+        options: { preserve_order: true, trim: false },
         svg: current,
       });
       current = join(dir, "logo.routed.svg");
       writeFileSync(current, routed.stdout);
     }
-    const trimmed = await runInkstitch({
-      extension: "jump_to_trim",
-      options: { "minimum-jump-length": CONNECT_DEFAULTS.jumpTrimMm },
-      svg: current,
-    });
     const trimmedPath = join(dir, "logo.trimmed.svg");
-    writeFileSync(trimmedPath, trimmed.stdout);
+    const trims = await setTrims({
+      routedPath: current,
+      probePath: join(dir, "logo.probe.svg"),
+      outPath: trimmedPath,
+      colours: template.objects.map((o) => o.color),
+    });
+    expect(trims.fallback).toBeUndefined();
     const dst = await inFreshCache(dir, "lauf", () => dstOf(trimmedPath));
     const stitches = unitsToMm(readDst(new Uint8Array(dst)).stitches);
     const blocks = blocksOf(stitches);
-    return { imported, template, templatePath, trimmedPath, dst, stitches, blocks };
+    return { imported, template, templatePath, trimmedPath, dst, stitches, blocks, trims };
   }
+
+  it(
+    "Fadenschnitte (Spec §10.2.1): kurz, verdeckt, durchgestickt, lang, sichtbar — jede Verbindung ab 3 mm wird entschieden, die DST trägt nur die Schnitte, die bleiben",
+    async () => {
+      // Six lines of one colour in a row, the ends of every one exact: a–b 2 mm (Ink/Stitch stitches straight
+      // on, nothing to decide), b–c 4 mm over bare fabric (cut), c–d 4 mm and d–e 6.5 mm under a square of
+      // another colour that is stitched later (a jump that stays, a stitch across), e–f 33.5 mm (cut).
+      await initEngine();
+      const line = (id: string, x0: number, x1: number) => ({
+        kind: "line" as const,
+        id,
+        polyline: [
+          { x: x0, y: 10 },
+          { x: x1, y: 10 },
+        ],
+        closed: false,
+        color: "#1f3a93",
+        attrs: {},
+        trimAfter: "auto" as const,
+      });
+      const cover = {
+        kind: "area" as const,
+        id: "decke",
+        polygon: polygonOf(rect(34, 3, 24, 14)),
+        color: "#d2060d",
+        attrs: {},
+        trimAfter: "auto" as const,
+      };
+      const template = buildInkstitchTemplate(
+        [
+          line("a", 0, 10),
+          line("b", 12, 22),
+          line("c", 26, 36),
+          line("d", 40, 50),
+          line("e", 56.5, 66.5),
+          line("f", 100, 110),
+          cover,
+        ],
+        PRESETS.pique,
+        { widthMm: 120, heightMm: 20 },
+      );
+      expect(template.satinRuns).toEqual([]);
+      const dir = mkdtempSync(join(tmpdir(), "texma-schnitt-"));
+      try {
+        const templatePath = join(dir, "t.svg");
+        writeFileSync(templatePath, template.svg);
+        const trimmedPath = join(dir, "t.trimmed.svg");
+        const trims = await setTrims({
+          routedPath: templatePath,
+          probePath: join(dir, "t.probe.svg"),
+          outPath: trimmedPath,
+          colours: template.objects.map((o) => o.color),
+        });
+        expect(trims.fallback).toBeUndefined();
+        // The cut sits after the object BEFORE the move: after b, after c, after d, after e.
+        expect(trims.plan!.decisions.map((d) => [d.id, d.reason])).toEqual([
+          ["b", "visible"],
+          ["c", "hidden"],
+          ["d", "stitched"],
+          ["e", "long"],
+        ]);
+        const trimmed = readFileSync(trimmedPath, "utf8");
+        expect(trimAfterIds(trimmed)).toEqual(["b", "e"]);
+        expect(trimmed).toMatch(/<path id="d"[^>]*inkstitch:min_jump_stitch_length_mm="[\d.]+"/);
+
+        const dst = await inFreshCache(dir, "schnitt", () => dstOf(trimmedPath));
+        const stitches = unitsToMm(readDst(new Uint8Array(dst)).stitches);
+        expect(stitches.filter((st) => st.cmd === "trim")).toHaveLength(2);
+        expect(untrimmedJumps(stitches, CONNECT_DEFAULTS.jumpTrimMm).count).toBe(0);
+        // Three moves: b–c and e–f with a cut, c–d the jump that stays with next to nothing bare. d–e is no
+        // move at all but one long stitch: Ink/Stitch stitched across, with no jump and no lock stitches.
+        const moves = threadMoves(stitches, {
+          blockColours: blockColoursOf(template.objects.map((o) => o.color)),
+        });
+        expect(moves.map((m) => m.trimmed)).toEqual([true, false, true]);
+        expect(moves[1]!.lengthMm).toBeGreaterThan(PLAIN_STITCH_MM);
+        expect(moves[1]!.lengthMm).toBeLessThanOrEqual(HIDDEN_JUMP_MAX_MM);
+        expect(moves[1]!.visibleMm).toBeLessThanOrEqual(VISIBLE_MAX_MM);
+        const across = stitches.filter(
+          (st, i) =>
+            i > 0 &&
+            st.cmd === "stitch" &&
+            stitches[i - 1]!.cmd === "stitch" &&
+            Math.hypot(st.x - stitches[i - 1]!.x, st.y - stitches[i - 1]!.y) > HIDDEN_JUMP_MAX_MM,
+        );
+        expect(across).toHaveLength(1);
+        // The probe of the same scene, a cut after every jump: four trims, one for each move.
+        const probe = unitsToMm(
+          readDst(
+            new Uint8Array(await inFreshCache(dir, "sonde", () => dstOf(join(dir, "t.probe.svg")))),
+          ).stitches,
+        );
+        expect(probe.filter((st) => st.cmd === "trim")).toHaveLength(4);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 6,
+  );
 
   it(
     "Nacharbeit-Datei: dieselbe DST Byte für Byte, trägt die Dokumentversion, Ink/Stitch ändert sie beim Öffnen nicht — und eine eingeblendete Prüfstellen-Ebene stickt nichts",
