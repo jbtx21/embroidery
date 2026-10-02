@@ -3,6 +3,45 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## StitchPencil als Ideenquelle (02.10.2026)
+
+StitchPencil ist eine iPad-App zum Digitalisieren von Hand (Handbuch 0.9.1 vom 01.10.2026,
+`.hoop`-Format Version 1 vom 26.09.2026, beides vom Nutzer, nicht im Repo). Sie hat einen eigenen
+Stichgenerator, nicht Ink/Stitch. **Entscheidung des Nutzers vom 02.10.2026: nur Ideenquelle**,
+kein Weg über das iPad und kein `.hoop`-Export. Übernommen ist bisher nur die Mindeststichlänge
+(Spec §11). Die übrigen Kandidaten, jeweils erst gegen die Profi-Dateien messen (Phase 1b
+Schritt 6):
+
+- **Tatami-Dichte.** StitchPencil: Auf Jersey mit 40er-Garn schließt sich die Fläche erst bei etwa
+  0,20 mm Reihenabstand (0,22 mm sprenkelt noch), Webware 0,25 mm. Unsere Presets: 0,40 mm
+  (Piqué), 0,45 mm (Jersey). Gemessen:
+  - Christliche Gemeindereitschule, Pferdekörper: 0,20 mm.
+  - Elektrotechnik Yer: keine Tatami-Fläche. Die 0,19 mm dort sind ein breiter Satin, also der
+    halbe Abstand Spitze zu Spitze.
+  - Archivtabelle, 121 Dateien mit Füllung: Median 0,43 mm, p10 0,26 mm.
+
+  Offen, bis die 22 Profi-DSTs vom 02.10.2026 mit einem geprüften Schätzer gemessen sind. Vor einer
+  Änderung die Wechselwirkung mit der Mindeststichlänge messen (Spec §11, „Offen").
+
+- **Schmaler Satin als Linie.** Bis 1,5 mm ohne Unterlage, die Ecke dreht mit. Wir legen unter
+  3 mm einen Mittellauf.
+- **Zugausgleich.** Bei StitchPencil stickt eine 1-mm-Säule etwa 1,2 mm breit, bei uns 1,4 mm:
+  Wir geben mindestens 0,2 mm je Seite (§7.2). Gemessen an den Profi-Dateien:
+  - Elektrotechnik Yer: 0,06 mm je Seite, wir 0,26 mm.
+  - Christliche Gemeindereitschule: etwa 0,07 mm, wir 0,13 mm. Die Lage der Puncher-Datei ist dort
+    nur auf etwa 0,2 mm genau angepasst.
+- **Teilen breiter Säulen.** Ab etwa 10 mm, versetzt; wir teilen ab 7 mm (`SATIN_SPLIT_MM`).
+- **Prüfbericht.** Fadenlagen am fertigen Stichplan zählen statt an den Umrissen. Eine Stelle
+  erst ab einigen Nadelbreiten im Quadrat melden, einen Knoten dagegen in jeder Größe. „Faden liegt
+  offen auf dem Stoff" als eigener Befund.
+- **Gleiche Garne zusammenlegen.** StitchPencil legt nur exakt dasselbe Garn zusammen, ähnliche
+  Farben nicht. Das spricht dafür, die Schwelle für „dieselbe Nadel?" in der Farbfolge-Datei bei
+  einem RGB-Abstand von 8 zu lassen (§13.4).
+- Schon da: Garnstärke 60 rechnet mit 80 % des Abstands (`densityFactor`, §14). StitchPencil
+  leitet denselben Wert aus der Wurzel der Garnfeinheit her.
+- Lizenz: StitchPencil liefert Ink/Stitch-Schriften mit und überlässt die Lizenzfrage dem
+  Anwender. Unsere Sperre der neun CC-BY-NC-Schriften für Kundenaufträge gilt dort genauso.
+
 ## Mindestgrößen-Tor (01.10.2026)
 
 - **Zierteile bestimmen die Mindestgröße.** Von sieben vergrößerten Messungen bestimmt nur bei

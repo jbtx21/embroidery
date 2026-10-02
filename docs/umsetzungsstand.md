@@ -762,3 +762,35 @@ Repo). Der Probestick soll zeigen, ob die Grenze von 1,0 mm für tragende Satins
 | Berufsfeuerwehr Köln        |        90 → 134 mm | 134,2 × 134,2 mm | 34.823 |         15 |       3,45 |           25 |            8 |         331 |
 | Atzensport Hofbräu (PDF)    |        80 → 107 mm | 107,0 × 151,4 mm | 19.283 |          8 |       6,85 |           21 |            6 |         208 |
 | Stuttgarter Hofbräu (`cap`) |   110,8 → 110,8 mm |  110,4 × 51,0 mm |  9.420 |          2 |       9,77 |           20 |            6 |         137 |
+
+**Mindeststichlänge 0,4 mm in der Vorlage (02.10.2026, Spec §11).** Die Vorlage schreibt
+`<inkstitch:min_stitch_len_mm>0.4</inkstitch:min_stitch_len_mm>` in ihr `<metadata>`
+(`INKSTITCH_MIN_STITCH_MM`, `template.ts`). Bis dahin galt Ink/Stitchs Standard von 0,1 mm.
+Ink/Stitch lässt jeden Stich bis zu dieser Länge weg, Verriegelungen nie. Die Nacharbeit-Datei trägt
+den Wert weiter: Der Rauchtest zeigt dieselbe DST Byte für Byte.
+
+Anlass war der Vergleich mit den Profi-Dateien: Stiche unter 0,4 mm hatten wir 2,8–6,0 %, die
+Puncher-Dateien Christliche Gemeindereitschule 0,5 % und Elektrotechnik Yer 0,6 %. Neu gerechnet mit
+denselben vier Probestick-Logos (Stand `a62dfca` gegen den neuen Stand):
+
+| Datei                       |          Stiche | unter 0,3 mm | unter 0,4 mm | Dichtespitze | Nadelhäufung |
+| --------------------------- | --------------: | -----------: | -----------: | -----------: | -----------: |
+| STUTTGART 91 mm             | 16.639 → 16.157 |  2,1 → 0,1 % |  3,8 → 1,2 % |      26 → 23 |        7 → 6 |
+| Berufsfeuerwehr Köln 134 mm | 34.823 → 33.797 |  2,4 → 0,2 % |  5,0 → 2,3 % |      25 → 23 |        8 → 7 |
+| Atzensport (PDF) 107 mm     | 19.283 → 18.755 |  2,0 → 0,4 % |  4,5 → 2,3 % |      21 → 18 |        6 → 7 |
+| Stuttgarter Hofbräu (`cap`) |   9.420 → 9.253 |  1,1 → 0,5 % |  2,8 → 1,6 % |      20 → 19 |        6 → 6 |
+
+Kurzstiche zählt das Werkzeug als Zug zwischen zwei Stichen; ein Zug nach Sprung, Schnitt oder
+Farbwechsel zählt nicht. Die Mindestgrößen bleiben gleich, die Stichzahl sinkt um 1,8–2,9 %.
+
+- **Was wegfällt.** Bei STUTTGART fallen 482 Stiche weg:
+  - 8 Reihenwechsel im Tatami, an Kanten quer zu den Reihen;
+  - 110 im Zickzack von Satin oder Unterlage;
+  - 364, die nicht weiter zugeordnet sind.
+- **Der Rest unter 0,4 mm** ist an der Testscheibe des Rauchtests vollständig Rundung: Stiche knapp
+  über 0,4 mm werden auf dem 0,1-mm-Raster der DST zu 0,36 mm. Für die Logos ist er nicht
+  aufgeschlüsselt.
+- **Offen** (Spec §11): Bei einem Reihenabstand unter 0,4 mm fielen die Reihenwechsel an den meisten
+  Kanten weg. Das muss vor einer Dichteänderung gemessen werden.
+- **Tests:** 1.204 → 1.205, dazu der Rauchtest 14 → 15, alle grün. Neu ist eine Tatami-Scheibe von
+  30 mm: Mit 0,1 mm hat sie 10 Stiche unter 0,3 mm, mit der Vorlage keinen.
