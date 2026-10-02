@@ -26,13 +26,14 @@ import {
   CONNECT_DEFAULTS,
   importShapes,
   initEngine,
+  INKSTITCH_MIN_STITCH_MM,
   INKSTITCH_SVG_VERSION,
   inkstitchSvgVersion,
   PRESETS,
   tatamiAttributes,
   untrimmedJumps,
 } from "@texma-stitch/engine";
-import { polygonOf, rect } from "../packages/engine/test/fixtures/shapes.js";
+import { circle, polygonOf, rect } from "../packages/engine/test/fixtures/shapes.js";
 import { readDst, unitsToMm } from "@texma-stitch/formats";
 import { GLYPHS } from "../packages/engine/test/fixtures/glyphs.js";
 import { isInkstitchReady, runInkstitch } from "../tools/inkstitch-lauf.mjs";
@@ -837,5 +838,79 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
       }
     },
     SUBPROCESS_TIMEOUT_MS * 4,
+  );
+
+  it(
+    "Mindeststichlänge (§11): die Vorlage setzt 0,4 mm, Ink/Stitch lässt die kürzeren Stiche weg — mit seinem Standard 0,1 mm stehen sie in der DST",
+    async () => {
+      // A tatami disc of 30 mm: its rows end on a round edge wherever it falls, so the last stitch of
+      // a row is any length from nothing to a full stitch, and some come out shorter than 0.4 mm at
+      // Ink/Stitch's own default (where the short stitches of the logos came from, measured on
+      // STUTTGART 91 mm on 02.10.2026). The second file differs from the template in that one value
+      // of the metadata only, so whatever the two DSTs differ in is the minimum stitch length.
+      await initEngine();
+      const disc = {
+        kind: "area" as const,
+        id: "scheibe",
+        polygon: polygonOf(circle(16, 16, 15, 128)),
+        color: "#1f3a93",
+        attrs: {},
+        trimAfter: "auto" as const,
+      };
+      const template = buildInkstitchTemplate([disc], PRESETS.pique, { widthMm: 32, heightMm: 32 });
+      expect(template.objects.map((o) => o.kind)).toEqual(["tatami"]);
+      const setting = `<inkstitch:min_stitch_len_mm>${INKSTITCH_MIN_STITCH_MM}</inkstitch:min_stitch_len_mm>`;
+      expect(template.svg).toContain(setting);
+      const dir = mkdtempSync(join(tmpdir(), "texma-kurzstich-"));
+      try {
+        const withSetting = join(dir, "vorlage.svg");
+        const withDefault = join(dir, "standard.svg");
+        writeFileSync(withSetting, template.svg);
+        writeFileSync(
+          withDefault,
+          template.svg.replace(
+            setting,
+            "<inkstitch:min_stitch_len_mm>0.1</inkstitch:min_stitch_len_mm>",
+          ),
+        );
+        // One after the other: each run gets a cache of its own through the environment.
+        const set = await inFreshCache(dir, "vorlage", () => dstOf(withSetting));
+        const plain = await inFreshCache(dir, "standard", () => dstOf(withDefault));
+        /** Needle moves between two stitches shorter than `belowMm` (a move after a jump, trim or colour change does not count, Ink/Stitch never drops those). */
+        const shortMoves = (dst: Buffer, belowMm: number): number => {
+          const st = unitsToMm(readDst(new Uint8Array(dst)).stitches);
+          let n = 0;
+          for (let i = 1; i < st.length; i++) {
+            const a = st[i - 1]!;
+            const b = st[i]!;
+            if (
+              a.cmd === "stitch" &&
+              b.cmd === "stitch" &&
+              Math.hypot(b.x - a.x, b.y - a.y) < belowMm
+            )
+              n++;
+          }
+          return n;
+        };
+        const counts = {
+          setUnder03: shortMoves(set, 0.3),
+          setUnder04: shortMoves(set, 0.4),
+          plainUnder03: shortMoves(plain, 0.3),
+          plainUnder04: shortMoves(plain, 0.4),
+        };
+        // Measured 02.10.2026: 10 under 0.3 mm and 19 under 0.4 mm at the default, 0 and 7 with the
+        // template's value. The 7 went in a little over 0.4 mm and came out shorter on the DST's
+        // 0.1-mm grid: each is 0.3 by 0.2 units, 0.36 mm, in the middle of the fill.
+        // The fixture has short stitches at Ink/Stitch's default, or the test would prove nothing.
+        expect(counts.plainUnder03).toBeGreaterThan(5);
+        expect(counts.plainUnder04).toBeGreaterThan(10);
+        expect(counts.setUnder03).toBe(0);
+        expect(counts.setUnder04).toBeLessThan(counts.plainUnder04);
+        expect(set.length).toBeLessThan(plain.length);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 2,
   );
 });

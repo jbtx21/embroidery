@@ -27,6 +27,7 @@ import { inkstitchAngleDeg, tatamiAttributes } from "./tatami.js";
 import {
   buildInkstitchTemplate,
   CENTER_WALK_STITCH_MM,
+  INKSTITCH_MIN_STITCH_MM,
   joinLines,
   SATIN_SPLIT_MM,
   satinColumnAttributes,
@@ -190,6 +191,14 @@ describe("buildInkstitchTemplate", () => {
     expect(t.svg).toMatch(/<path id="hairline"[^>]*inkstitch:stroke_method="running_stitch"/);
     expect(t.svg).toMatch(/<path id="hairline"[^>]*inkstitch:running_stitch_length_mm="2"/);
     expect(t.svg).toMatch(/<path id="rule_1"[^>]*inkstitch:stroke_method="running_stitch"/);
+  });
+
+  it("sets Ink/Stitch's minimum stitch length in the metadata, first thing in the document (spec §11)", () => {
+    expect(INKSTITCH_MIN_STITCH_MM).toBe(0.4);
+    expect(t.svg).toContain(
+      'viewBox="0 0 200 30"><metadata><inkstitch:min_stitch_len_mm>0.4</inkstitch:min_stitch_len_mm></metadata>',
+    );
+    expect(t.svg.match(/<metadata>/g)).toHaveLength(1);
   });
 
   it("makes XML ids of split-path ids and skips unpainted lines", () => {

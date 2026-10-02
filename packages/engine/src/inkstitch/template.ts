@@ -72,6 +72,12 @@ export const CENTER_WALK_STITCH_MM = 2.5;
 /** Running stitch length for hairlines and lines. */
 export const RUNNING_STITCH_MM = 2.0;
 /**
+ * Ink/Stitch drops every stitch up to this long (spec §11, decision 02.10.2026; Ink/Stitch's own
+ * default is 0.1 mm). It reads the value from the document's metadata and only fills in what is
+ * missing there, so the template states it, and the Nacharbeit file carries it on (§13.4).
+ */
+export const INKSTITCH_MIN_STITCH_MM = 0.4;
+/**
  * A hairline's axis is read off a sampled outline and wobbles by about a tenth
  * of a millimetre every few tenths; a running stitch along it would carry the
  * wobble into its needle points. So the line is averaged over this much of its
@@ -897,6 +903,7 @@ export function buildInkstitchTemplate(
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" ` +
     `width="${num(opts.widthMm)}mm" height="${num(opts.heightMm)}mm" ` +
     `viewBox="0 0 ${num(opts.widthMm)} ${num(opts.heightMm)}">` +
+    `<metadata><inkstitch:min_stitch_len_mm>${num(INKSTITCH_MIN_STITCH_MM)}</inkstitch:min_stitch_len_mm></metadata>` +
     body +
     `</svg>\n`;
   return {

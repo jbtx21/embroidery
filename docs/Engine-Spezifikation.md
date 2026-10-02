@@ -41,6 +41,10 @@ ab 1,0 statt 1,3 mm, dazwischen Prüfstellen; passt die Größe nicht in den Rah
 und gewarnt. §13.4: Prüfstellen-Ebene mit `inkstitch:ignore_object`, Dokumentversion 4,
 Schwelle „dieselbe Nadel".
 
+**Änderung 02.10.2026** — §11: Die Ink/Stitch-Vorlage setzt die Mindeststichlänge auf 0,4 mm
+(Ink/Stitch-Standard 0,1 mm). Unsere DSTs hatten sechs- bis zehnmal so viele Stiche unter 0,4 mm
+wie die Profi-Dateien.
+
 ---
 
 ## 1. Zweck und Grundsätze *(28.09.2026 neu gefasst — vorher: die Engine erzeugt die Stiche selbst)*
@@ -1224,6 +1228,10 @@ Drei Feinheiten, alle gemessen:
 - Der Wert ist **konfigurierbar** (`minStitchMm` im Maschinenprofil, §14) — eine Maschine mit anderem Greifer verträgt andere Grenzen.
 - **Verriegelung ist ausgenommen.** Verriegelungsstiche sind per Definition kurz und tragen deshalb `tie: true` (§3), sonst würde genau die Verriegelung aus §10.3 hier verschwinden. *(19.09.2026)*
 - **Die Anker an einem Sprung sind ausgenommen** *(21.09.2026)*. Der Stich vor einem Sprung legt fest, wo der Sprung beginnt, der Stich danach fängt den Faden. Wird einer von beiden als zu kurz entfernt, wächst der Sprung oder zwei Sprünge verschmelzen — und der Faden liegt über eine Strecke oben, die §10.2 geschnitten hätte.
+- **In der Ink/Stitch-Vorlage: 0,4 mm** *(02.10.2026, Entscheidung des Nutzers)*. Die Punkte oben gelten für die eingefrorene eigene Engine. Bei Ink/Stitch entscheidet die Dokument-Einstellung `min_stitch_len_mm` (Ink/Stitch-Standard 0,1 mm): Ink/Stitch lässt beim Erzeugen jeden Stich weg, der **höchstens** so lang ist (`ColorBlock.filter_duplicate_stitches`). Ausgenommen sind Verriegelungsstiche (`lock_stitch`), der erste Stich nach einem Sprung sowie Schnitt-, Stopp- und Farbwechselbefehle. Die Vorlage schreibt deshalb `<inkstitch:min_stitch_len_mm>0.4</inkstitch:min_stitch_len_mm>` in ihr `<metadata>`. Ink/Stitch ergänzt dort nur fehlende Werte. Die Nacharbeit-Datei (§13.4) übernimmt den Wert mit dem Kopf der Datei, am Arbeitsplatz entsteht also dieselbe DST.
+  - **Anlass:** Unsere Probestick-DSTs hatten 2,8–6,0 % Stiche unter 0,4 mm, die beiden Profi-Dateien aus Schritt 6 (§16) nur 0,5 und 0,6 %. Die iPad-App StitchPencil entfernt Stiche unter 0,4 mm beim Import mit der Begründung, dass daran bei hoher Drehzahl der Faden reißt.
+  - **Gemessen** an STUTTGART 91 mm (Piqué): Stiche unter 0,3 mm von 2,1 auf 0,1 %, unter 0,4 mm von 3,8 auf 1,2 %. Es fallen 482 Stiche weg (−2,9 %), davon 8 Reihenwechsel im Tatami; die Maße bleiben gleich. Atzensport 107 mm: unter 0,4 mm von 4,4 auf 2,1 %.
+  - **Offen** (vor jeder Änderung des Reihenabstands messen): Der Reihenwechsel an einer Tatami-Kante ist Reihenabstand / sin α lang, α ist der Winkel zwischen Kante und Reihen. Bei 0,40 mm Reihenabstand ist er nie kürzer als 0,4 mm und fällt nur an Kanten quer zu den Reihen weg (die 8 Stiche oben). Bei 0,2 mm ist er an jeder Kante mit α ≥ 30° höchstens 0,4 mm und fiele weg. So dicht stickt der Puncher den Pferdekörper der Christlichen Gemeindereitschule; ob das die Regel ist, klärt Schritt 6 (§16). Dann braucht Tatami einen eigenen Wert: Ink/Stitch erlaubt `min_stitch_length_mm` je Objekt.
 - Stiche und Sprünge > 12,1 mm in Teilstücke splitten (DST-Limit 121 Einheiten).
 - **Rundung: kaufmännisch-symmetrisch** (`roundHalfEven`, halbe Werte zur geraden Zahl), überall dort, wo Millimeter zu ganzen Formateinheiten werden. Grund: die Kreuzprüfung aus §13.2 läuft gegen Python, dessen `round()` genauso rundet. Bei Reihenabstand 0,25 mm liegt jede zweite Koordinate exakt auf der halben DST-Einheit — mit `Math.round` wäre die Datei nicht byte-identisch. *(19.09.2026)*
 - Stats:
