@@ -8,7 +8,7 @@ import {
   pointInPolygon,
   polygonArea,
 } from "@texma-stitch/geometry";
-import { plugAndCable, stickWithHead } from "../../test/fixtures/bands.js";
+import { plugAndCable, plugAndDippedCable, stickWithHead } from "../../test/fixtures/bands.js";
 import { GLYPHS } from "../../test/fixtures/glyphs.js";
 import {
   annulus,
@@ -1109,6 +1109,22 @@ describe("a wide shape with a narrow band is split (spec §7.8.7)", () => {
     const band = t.objects[1]!;
     if (band.kind !== "satin") throw new Error("the band is satin");
     expect(band.columnIds.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("sets a cable that bends back on itself as one band, not as half a cable (the Yer logo at 120 mm)", () => {
+    const plug = area("plug", at(plugAndDippedCable(), 24, 9), orange);
+    const t = buildInkstitchTemplate([plug], pique, { ...PAGE, widthMm: 100, heightMm: 70 });
+    expect(t.objects.map((o) => [o.id, o.kind])).toEqual([
+      ["plug_bulk", "tatami"],
+      ["plug_band0", "satin"],
+    ]);
+    expect(t.split.kept).toEqual([]);
+    expect(t.split.shapes).toHaveLength(1);
+    // The one band runs from the plug to the far end of the cable, past the dip: 110 mm and more.
+    expect(t.split.shapes[0]!.bands).toHaveLength(1);
+    expect(t.split.shapes[0]!.bands[0]!.lengthMm).toBeGreaterThan(100);
+    // …and the wide part is the plug alone, no half of the cable left in it.
+    expect(t.split.shapes[0]!.bulkMm2).toBeLessThan(135);
   });
 
   it("leaves a shape without a narrow band as it was: same ids, nothing reported", () => {
