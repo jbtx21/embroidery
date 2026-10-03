@@ -1739,7 +1739,8 @@ und 0,7 mm und 17 zwischen 0,7 und 1 mm auf blankem Stoff.
    (Tabelle „Empfindlichkeit“). Bei einer Verbindung mit knapp 1 mm blank bleibt im Bild eine kleine
    Brücke stehen (siehe oben); wer sie nicht will, setzt `VISIBLE_MAX_MM` herunter: 0,5 mm schneidet
    genau die 65 Verbindungen mit mehr als 0,5 mm blank zusätzlich (481 Schnitte, −33 % statt −42 %
-   gegenüber 716), 0,3 mm 80 (496).
+   gegenüber 716), 0,3 mm 80 (496). **Entscheidung des Nutzers vom 03.10.2026: 1 mm bleibt**, die
+   kleinen Brücken werden in Kauf genommen.
 2. **Sprünge ohne Schnitt und lange Verbindungsstiche sind keine Puncher-Gewohnheit** (6 von 384
    Lücken ohne Schnitt): ob eine verdeckte Verbindung von 3 bis 7 mm auf dem Stoff hält, ohne
    Fadenschlingen auf der Rückseite, zeigt der Probestick.

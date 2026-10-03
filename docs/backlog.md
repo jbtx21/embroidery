@@ -12,7 +12,8 @@ Neue Einträge oben in den passenden Abschnitt.
   - STUTTGART 91 mm: eine durchgestickte Verbindung von 6,4 mm, 0,9 mm blank.
 
   Von 1.817 ungeschnittenen Verbindungen liegen 65 über 0,5 mm blank. Mit 0,5 mm wären es 481
-  Schnitte (−33 % statt −42 %), mit 0,3 mm 496. Der Probestick entscheidet.
+  Schnitte (−33 % statt −42 %), mit 0,3 mm 496. _Entschieden 03.10.2026: 1 mm bleibt (Nutzer)._
+  Stören die Hälse auf dem Stoff, ist `VISIBLE_MAX_MM` die eine Stellschraube.
 
 - **Durchsticken von 5 bis 7 mm** unter späteren Stichen ist keine Puncher-Gewohnheit: In den 24
   Profi-DSTs bleiben nur 6 von 384 Lücken ungeschnitten. Probestick.
