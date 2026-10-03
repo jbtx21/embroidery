@@ -3,7 +3,8 @@
  * puncher can open it in Inkscape with Ink/Stitch, find the weak places, rework them by hand and
  * export DST or PES — and so that it is a clean vector template for an outside puncher.
  *
- * It takes the SVG Ink/Stitch left after `auto_satin` and `jump_to_trim` and changes its STRUCTURE,
+ * It takes the SVG a run stitched from — what Ink/Stitch left after `auto_satin` and the thread cuts
+ * (spec §10.2.1: the probe of `jump_to_trim`, reduced to the cuts that stay) — and changes its STRUCTURE,
  * never a stitch:
  *
  * - **One layer per colour block**, in stitch order, named with number, colour name and colour value

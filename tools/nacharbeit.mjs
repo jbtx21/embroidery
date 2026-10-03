@@ -13,9 +13,9 @@
  * its format (`inkstitch_svg_version` in the metadata, `lib/update.py`) for a legacy document and updates it
  * on opening — attributes of fills and strokes change, for an unversioned one Inkscape asks first — so a
  * file without the current version would stitch otherwise than the DST beside it. The document of the run
- * comes out of an Ink/Stitch extension (`jump_to_trim`) and carries the version, updates done; this is
- * checked at the end with Ink/Stitch itself (`settleUpdate`: `update_svg` saves only what it changed) and
- * a file that would still change is replaced by the updated one.
+ * comes out of an Ink/Stitch extension (the probe of `jump_to_trim`, spec §10.2.1) and carries the
+ * version, updates done; this is checked at the end with Ink/Stitch itself (`settleUpdate`: `update_svg`
+ * saves only what it changed) and a file that would still change is replaced by the updated one.
  *
  * The check points are what the run already knows, nothing is measured again: the findings of the
  * fineness check (§5.2) with their place — satin strokes under their limit (only with `--ohne-tor`),
@@ -470,7 +470,7 @@ export async function settleUpdate(path) {
  * @param {object} run what the run knows
  * @param {string} run.name file name of the run, without extension
  * @param {string} run.outDir where the files go
- * @param {string} run.svgPath the SVG the DST was made from (after auto_satin and jump_to_trim)
+ * @param {string} run.svgPath the SVG the DST was made from (after auto_satin and the thread cuts, spec §10.2.1)
  * @param {string} run.templatePath the template the run wrote (ids and places of its objects)
  * @param {string} run.sourceSvg the source SVG as the run read it
  * @param {number} [run.orderedWidthMm] the ordered width, mm: the size the texture limits are decided

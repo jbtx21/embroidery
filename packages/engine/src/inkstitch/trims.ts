@@ -24,6 +24,10 @@
  *
  * Everything is measured on the stitches Ink/Stitch wrote, not on the template: where a fill ends
  * and where the next object begins is only known there (`inkstitch/README.md`).
+ *
+ * What this module knows of Ink/Stitch's behaviour (`jump_to_trim`, `auto_satin`'s cuts, the collapse
+ * length, `inkstitch:min_jump_stitch_length_mm`) was read in its source (GPL-3.0), not copied: the
+ * rule and the code are our own.
  */
 import type { Point } from "@texma-stitch/geometry";
 import { CONNECT_DEFAULTS } from "../connect.js";

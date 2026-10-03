@@ -223,8 +223,9 @@ sein `DstWriter` schreibt wie der von 1.0.0, neu sind nur Typannotationen):
   **außerhalb der Quell- und der Zielsäule** länger als `PIXELS_PER_MM` (1 mm) ist
   (`JumpStitch.should_trim`) — ohne Längenschwelle; Laufstiche, die hinter einem Schnitt stehen,
   entfernt es (`add_trims`). `pnpm inkstitch` ruft es seit 02.10.2026 **ohne** `--trim` auf (Spec
-  §7.8.6, §10.2.1): in acht Läufen kamen 72 % der Schnitte aus dem Weg, 7 % vom Ende der Folge
-  (ein Drittel davon direkt vor einem Farbwechsel oder dem Ende), 21 % von `jump_to_trim`.
+  §7.8.6, §10.2.1): in acht Läufen (Stand `24efdc6`) kamen 566 von 716 Schnitten (79 %) aus dem Weg,
+  35 (5 %) vom Ende der Folge (20 davon direkt vor einem Farbwechsel oder dem Ende), 115 (16 %) von
+  `jump_to_trim`.
 - **`jump_to_trim`** (Erweiterung, `--minimum-jump-length=<mm>`) läuft die Stichgruppen aller
   Objekte in Dokumentreihenfolge ab und setzt `trim_after="True"` an das Objekt _vor_ jedem
   Sprung von mindestens dieser Länge zwischen gleichfarbigen Objekten. Gemessen wird zwischen
@@ -240,6 +241,14 @@ sein `DstWriter` schreibt wie der von 1.0.0, neu sind nur Typannotationen):
   Grenzen: Sprünge **innerhalb** eines Objekts (etwa zwischen den Teilpolygonen eines Pfads) sieht
   sie nicht, und ein Objekt, das schon `trim_after` oder einen Trim-Befehl trägt, bleibt
   unverändert (ein von der Quelle verlangter Schnitt bleibt also immer).
+- **`inkstitch:min_jump_stitch_length_mm`** (Parameter jedes Objekts, `lib/elements/element.py`)
+  überschreibt `collapse_len_mm` für die Verbindung vom Objekt zum nächsten: bis zu dieser Strecke
+  setzt Ink/Stitch keine Verriegelung und keinen Sprung, sondern stickt geradeaus
+  (`stitch_groups_to_stitch_plan`, `previous_stitch_group.min_jump_stitch_length`). `pnpm inkstitch`
+  setzt ihn bei einer verdeckten Verbindung von 5 bis 7 mm (`withMinJumpLength`, Spec §10.2.1): die
+  Länge der Verbindung, auf 0,1 mm aufgerundet, plus 1 mm. Nebenwirkung: bei einer Satinsäule mit
+  `start_at_nearest_point` (Vorgabe) wirkt derselbe Wert auch auf ihren eigenen Anfang
+  (`SatinColumn.start_point`).
 
 ## Tatami-Flächen der Vorlage: Attribute, Unterlage, Zugausgleich (gelesen an Version 3.3.0, 30.09.2026)
 
