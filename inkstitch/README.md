@@ -231,8 +231,9 @@ sein `DstWriter` schreibt wie der von 1.0.0, neu sind nur Typannotationen):
   Sprung von mindestens dieser Länge zwischen gleichfarbigen Objekten. Gemessen wird zwischen
   dem tatsächlich letzten und dem tatsächlich ersten Stich — die Vorlage kennt beides nicht,
   weil eine Füllung nur ungefähr in Richtung des nächsten Objekts endet. `pnpm inkstitch`
-  ruft sie nicht mehr mit der Schwelle aus Spec §10.2 (5 mm) als Schnitt auf, sondern mit 3 mm
-  (`PLAIN_STITCH_MM`) als **Sonde**: sie setzt hinter jedes Objekt, auf das ein Sprung folgt,
+  ruft sie nicht mehr mit der Schwelle aus Spec §10.2 (5 mm) als Schnitt auf, sondern mit 1 mm
+  (`PROBE_MIN_MM`) als **Sonde**: sie setzt hinter jedes Objekt, auf das eine Verbindung von
+  mindestens 1 mm folgt — auch eine, die Ink/Stitch bis 3 mm ohne Sprung durchsticken würde —,
   einen Schnitt, das Dokument wird gestickt, und aus der DST entscheidet
   `packages/engine/src/inkstitch/trims.ts` nach Spec §10.2.1, welche Schnitte bleiben
   (`tools/fadenschnitt.mjs`; die anderen nimmt `withoutTrimAfter` aus dem Dokument der Sonde

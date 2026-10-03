@@ -1562,30 +1562,31 @@ auf blankem Stoff, Maß unten —, bei 184 davon war die Verbindung kürzer als 
 
 **Was der Puncher macht** *(24 Profi-DSTs, Schritt 6 in §16)*: zwischen zwei Stichläufen stehen
 384 Lücken, 378 davon mit Schnitt und nur 6 als Sprung ohne Schnitt. Nur 22 Lücken sind kürzer
-als 3 mm, und **jede davon trägt einen Schnitt**: was näher beieinander liegt, taucht in der DST
-gar nicht als Lücke auf, er stickt es durch. Ink/Stitch stickt bis `collapse_len_mm` (Metadaten,
-Vorgabe **3 mm**) ebenso durch, ohne Sprung und ohne Verriegelung
-(`stitch_groups_to_stitch_plan`). Seine Lücken sind lang: im Christliche-Logo 3,7 bis 10,5 mm (eine
-mit 73,6 mm), im Yer-Logo 6,9 bis 30,5 mm (Median 10,7 mm). Die Zahl der Schnitte je Datei: Christliche
-Gemeindereitschule 11 in 11.120 Stichen (0,99 je 1.000; zehn zwischen Stichläufen, einer am Ende;
-wir hatten 111 in 10.138), Elektrotechnik Yer 13 in 2.905 Stichen (4,5 je 1.000; alle zwischen
-Stichläufen; wir hatten 17 in 2.757).
+als 3 mm, und **jede davon trägt einen Schnitt**: was näher beieinander liegt, steht fast nie als
+Lücke in der DST, er stickt es durch. Ink/Stitch stickt bis `collapse_len_mm` (Metadaten, Vorgabe
+**3 mm**) ebenso durch, ohne Sprung und ohne Verriegelung (`stitch_groups_to_stitch_plan`). Wo bei
+ihm eine Lücke steht, ist sie geschnitten, und sie ist lang: im Christliche-Logo 3,7 bis 10,5 mm
+(eine mit 73,6 mm), im Yer-Logo 6,9 bis 30,5 mm (Median 10,7 mm). Die Zahl der Schnitte je Datei:
+Christliche Gemeindereitschule 11 in 11.120 Stichen (0,99 je 1.000; zehn zwischen Stichläufen,
+einer am Ende; wir hatten 111 in 10.138), Elektrotechnik Yer 13 in 2.905 Stichen (4,5 je 1.000;
+alle zwischen Stichläufen; wir hatten 17 in 2.757).
 
 **Die Regel.** Eine Verbindung zwischen zwei aufeinanderfolgenden Objekten **derselben Farbe**
 wird nicht geschnitten, wo der Faden verdeckt liegt: höchstens 1 mm der Linie vom letzten zum
-ersten Stich auf blankem Stoff. Bis 3 mm stickt Ink/Stitch sie ohnehin als gewöhnlichen Stich, bis
-5 mm bleibt sie ein Sprung mit Verriegelung, bis 7 mm wird sie durchgestickt, damit kein Sprung über
-5 mm offen bleibt; sonst wird geschnitten. Länge und Verdeckung werden an den Stichen gemessen, die
-Ink/Stitch schreibt, nicht an der Vorlage: wo eine Füllung endet und das nächste Objekt beginnt, steht
-erst dort fest.
+ersten Stich auf blankem Stoff. Wo mehr als 1 mm blank liegt, wird geschnitten, wie kurz die
+Verbindung auch ist. Ungeschnitten bleibt eine verdeckte Verbindung bis 3 mm als gewöhnlicher
+Stich (so stickt Ink/Stitch sie), bis 5 mm als Sprung mit Verriegelung, bis 7 mm durchgestickt,
+damit kein Sprung über 5 mm offen bleibt; länger wird sie geschnitten. Länge und Verdeckung werden
+an den Stichen gemessen, die Ink/Stitch schreibt, nicht an der Vorlage: wo eine Füllung endet und
+das nächste Objekt beginnt, steht erst dort fest.
 
 | Verbindung vom letzten Stich des einen zum ersten des nächsten Objekts | Entscheidung (`TrimReason`) | gestickt als |
 |---|---|---|
-| bis `PLAIN_STITCH_MM` = 3 mm | **kurz** (`short`), kein Schnitt | gewöhnlicher Stich (Ink/Stitchs `collapse_len_mm`), ohne Sprung und ohne Verriegelung; nicht auf Sichtbarkeit geprüft |
-| über 3 bis `HIDDEN_JUMP_MAX_MM` = 5 mm, höchstens `VISIBLE_MAX_MM` = 1 mm auf blankem Stoff | **verdeckt** (`hidden`), kein Schnitt | Sprung mit Verriegelung (§10.3); der Faden liegt unter später Gesticktem oder auf gleichfarbigen Stichen |
-| über 5 bis `HIDDEN_STITCH_MAX_MM` = 7 mm, höchstens 1 mm auf blankem Stoff | **durchgestickt** (`stitched`), kein Schnitt | ein Stich von Objekt zu Objekt, ohne Sprung und ohne Verriegelung (`inkstitch:min_jump_stitch_length_mm` am Objekt davor) |
-| über 3 bis 5 mm, mehr als 1 mm auf blankem Stoff | **sichtbar** (`visible`), Schnitt | verriegeln, schneiden, springen, verriegeln |
-| über 5 mm, mehr als 1 mm auf blankem Stoff, oder über 7 mm | **lang** (`long`), Schnitt | wie oben; über 7 mm auch dort, wo die Strecke verdeckt wäre |
+| höchstens `VISIBLE_MAX_MM` = 1 mm auf blankem Stoff, bis `PLAIN_STITCH_MM` = 3 mm lang | **kurz** (`short`), kein Schnitt | gewöhnlicher Stich (Ink/Stitchs `collapse_len_mm`), ohne Sprung und ohne Verriegelung |
+| höchstens 1 mm blank, über 3 bis `HIDDEN_JUMP_MAX_MM` = 5 mm | **verdeckt** (`hidden`), kein Schnitt | Sprung mit Verriegelung (§10.3); der Faden liegt unter später Gesticktem oder auf gleichfarbigen Stichen |
+| höchstens 1 mm blank, über 5 bis `HIDDEN_STITCH_MAX_MM` = 7 mm | **durchgestickt** (`stitched`), kein Schnitt | ein Stich von Objekt zu Objekt, ohne Sprung und ohne Verriegelung (`inkstitch:min_jump_stitch_length_mm` am Objekt davor) |
+| mehr als 1 mm auf blankem Stoff, bis 5 mm lang | **sichtbar** (`visible`), Schnitt | verriegeln, schneiden, springen, verriegeln — auch für eine Verbindung bis 3 mm, die Ink/Stitch durchsticken würde |
+| mehr als 1 mm blank und über 5 mm, oder über 7 mm | **lang** (`long`), Schnitt | wie oben; über 7 mm auch dort, wo die Strecke verdeckt wäre |
 
 - **Auf blankem Stoff** liegt von der geraden Linie vom letzten zum ersten Stich, was weder
   innerhalb von `THREAD_REACH_MM` = 0,3 mm eines Stichs liegt, der **nach** ihr gestickt wird
@@ -1594,27 +1595,29 @@ erst dort fest.
   Farbe schon; zwei Schreibweisen derselben Farbe sind eine Farbe, auch aus einem früheren
   Farbblock). Jeder Stich zählt als Streifen von 0,6 mm mit runden Enden; Satinsäule und Fläche
   schließen sich dabei zur Fläche (Zickzack und Reihen liegen 0,3 bis 0,45 mm auseinander).
-- **Die Grenzen:** 3 mm sind Ink/Stitchs eigene Grenze, nicht die des Puncher: der schneidet auch
-  seine Lücken unter 3 mm (22 von 22). Was Ink/Stitch bis 3 mm durchstickt, wird deshalb nicht auf
-  Sichtbarkeit geprüft — das lässt kurze Fäden stehen (Messung unten, Offen 1). 5 mm sind
+- **Die Grenzen:** 3 mm sind Ink/Stitchs eigene Grenze: bis dahin stickt es ohne Schnitt durch, auch
+  über blankem Stoff (Messung unten: im ersten Stand dieser Regel, der die kurzen Verbindungen nicht
+  prüfte, lagen bei 29 solcher Stiche mehr als 1 mm blank). Der Puncher schneidet jede seiner Lücken
+  unter 3 mm (22 von 22); hier bleibt eine kurze Verbindung nur, wo sie verdeckt liegt. 5 mm sind
   `CONNECT_DEFAULTS.jumpTrimMm`; ein Sprung darüber ohne Schnitt zählt `untrimmedJumps` (§10.2) als
   Faden auf dem Stoff, die Ausnahme „ein späteres Objekt derselben Farbe stickt darüber“ aus §10.2
   gibt es hier nicht — deshalb wird eine verdeckte Verbindung bis 7 mm durchgestickt, statt als
   Sprung offen zu bleiben. 7 mm sind `maxWidthMm` (§7.4), der längste Stich, den eine Satinsäule
   hat. 1 mm sind das, was `auto_satin` außerhalb der beiden Säulen duldet, bevor es schneidet.
-- **Gegenüber §10.2** ist die Regel an einer Stelle strenger: ein Sprung von 3 bis 5 mm bleibt nur,
-  wo er verdeckt ist (§10.2 lässt ihn immer stehen); an einer lockerer: eine verdeckte Verbindung von
-  5 bis 7 mm bleibt ungeschnitten (§10.2 schneidet ab 5 mm immer).
+- **Gegenüber §10.2** ist die Regel strenger bei Verbindungen bis 5 mm: sie bleiben nur, wo sie
+  verdeckt liegen (§10.2 lässt bis 5 mm alles stehen); lockerer bei einer verdeckten Verbindung von 5
+  bis 7 mm, die ungeschnitten bleibt (§10.2 schneidet ab 5 mm immer).
 - Ein Schnitt, den die Quelle verlangt (`trimAfter: always`, §10.2), bleibt, was die Regel auch sagt.
 
 **Umsetzung** (`packages/engine/src/inkstitch/trims.ts`, `tools/fadenschnitt.mjs`):
 
 1. `auto_satin` läuft ohne `--trim` (§7.8.6). Ohne Schnitt bleiben die Laufstiche, die `--trim`
    entfernte, und der Weg zwischen den Säulen läuft wieder verdeckt unter ihnen.
-2. **Sonde:** `jump_to_trim` mit 3 mm (der Länge, ab der Ink/Stitch einen Sprung schreibt) setzt
-   einen Schnitt hinter jedes Objekt, auf das ein Sprung folgt; das Dokument wird gestickt
-   (`output`). Der k-te Trim der DST ist der Schnitt hinter dem k-ten Objekt mit `trim_after`;
-   jede Verbindung steht damit mit Anfang und Ende in der DST (`threadMoves`).
+2. **Sonde:** `jump_to_trim` mit `PROBE_MIN_MM` = 1 mm setzt einen Schnitt hinter jedes Objekt, auf
+   das eine Verbindung von mindestens 1 mm folgt (kürzer als 1 mm kann nichts mehr als 1 mm blank
+   liegen); das Dokument wird gestickt (`output`). Der k-te Trim der DST ist der Schnitt hinter dem
+   k-ten Objekt mit `trim_after`; jede Verbindung steht damit mit Anfang und Ende in der DST,
+   auch eine, die Ink/Stitch ohne Schnitt als gewöhnlichen Stich gestickt hätte (`threadMoves`).
 3. `planTrims` entscheidet nach der Tabelle, welche Schnitte bleiben. Hat die Sonde nicht ebenso
    viele Trims wie Objekte mit `trim_after`, wird nicht geraten: alle Schnitte der Sonde bleiben,
    und die Ausgabe sagt es.
@@ -1628,113 +1631,127 @@ erst dort fest.
 es schneidet und warum, und in der Zeile „Sichtbare Fäden“, wie viele Sprünge ohne Schnitt mehr als
 1 mm auf blankem Stoff liegen lassen. Kosten: ein Ink/Stitch-Aufruf mehr je Motiv (die Sonde:
 `jump_to_trim` und `output`, danach das eigentliche `output`, das zum Teil aus dem Cache kommt);
-gemessen auf ruhiger Maschine, je Lauf ein frischer Cache: Yer 31,5 → 42,0 s, Hofbräu 51,0 → 65,2 s,
-Köln 209 → 230 s.
+gemessen auf ruhiger Maschine, je Lauf ein frischer Cache (Wanduhr von `pnpm inkstitch` insgesamt): Yer 31,5 → 42,9 s,
+Hofbräu 51,0 → 68,0 s, Köln 209 → 236 s.
 
 **Was sich nicht ändert:** `untrimmedJumps` bleibt 0 (kein Sprung über 5 mm ohne Schnitt), die
 Grenze `CONNECT_DEFAULTS.jumpTrimMm`, die Verriegelung vor und nach jedem Schnitt (§10.3).
 
 **Gemessen** *(02.10.2026, die acht Referenzlogos durch `pnpm inkstitch` mit Ink/Stitch 3.3.0, je
-Lauf ein frischer Cache; vorher = `24efdc6`, nachher = dieser Stand; Läufe im Scratchpad der
-Sitzung, die Logos selbst bleiben draußen)*:
+Lauf ein frischer Cache; vorher = `24efdc6`, nachher = dieser Stand; Tor an, Christliche
+`--ohne-tor` wie in §7.8.7; Läufe im Scratchpad der Sitzung, die Logos selbst bleiben draußen)*:
 
 | Motiv (bestellt → erzeugt) | Stiche | Fadenschnitte | je 1.000 Stiche *(Archiv: Median 1,9, p90 5,6)* | Sprünge | Stichweg m |
 |---|--:|--:|--|--:|--:|
-| STUTTGART 80 → 91 mm | 16.157 → 16.107 | **49 → 28** | 3,03 → **1,74** *(bis p90 → bis Median)* | 98 → 80 | 29,99 → 30,09 |
+| STUTTGART 80 → 91 mm | 16.157 → 16.115 | **49 → 29** | 3,03 → **1,80** *(bis p90 → bis Median)* | 98 → 81 | 29,99 → 30,10 |
 | STUTTGART 250 mm | 73.088 → 73.306 | **57 → 42** | 0,78 → **0,57** *(bis Median → bis Median)* | 198 → 178 | 174,75 → 175,29 |
-| Köln 90 → 134 mm | 33.797 → 33.597 | **120 → 58** | 3,55 → **1,73** *(bis p90 → bis Median)* | 216 → 164 | 70,15 → 70,33 |
+| Köln 90 → 134 mm | 33.797 → 33.645 | **120 → 64** | 3,55 → **1,90** *(bis p90 → bis Median)* | 216 → 170 | 70,15 → 70,34 |
 | Eislingen 200 → 274 mm | 50.057 → 49.899 | **138 → 79** | 2,76 → **1,58** *(bis p90 → bis Median)* | 367 → 313 | 119,14 → 119,36 |
-| Atzensport 80 → 107 mm | 18.755 → 18.646 | **132 → 65** | 7,04 → **3,49** *(über p90 → bis p90)* | 230 → 161 | 37,92 → 38,37 |
-| Hofbräu (Cap) 110,8 mm | 9.253 → 9.101 | **92 → 45** | 9,94 → **4,94** *(über p90 → bis p90)* | 133 → 81 | 21,15 → 21,39 |
-| Yer 89,8 mm | 2.757 → 2.765 | **17 → 7** | 6,17 → **2,53** *(über p90 → bis p90)* | 31 → 25 | 6,19 → 6,25 |
-| Christliche 90,2 mm (ohne Tor) | 10.138 → 9.998 | **111 → 63** | 10,95 → **6,30** *(über allem → über p90)* | 161 → 123 | 16,72 → 16,88 |
-| **Summe** | 214.002 → 213.419 | **716 → 387 (−46 %)** | | 1.434 → 1.125 | 476,0 → 478,0 |
+| Atzensport 80 → 107 mm | 18.755 → 18.702 | **132 → 72** | 7,04 → **3,85** *(über p90 → bis p90)* | 230 → 168 | 37,92 → 38,38 |
+| Hofbräu (Cap) 110,8 mm | 9.253 → 9.133 | **92 → 49** | 9,94 → **5,37** *(über p90 → bis p90)* | 133 → 85 | 21,15 → 21,40 |
+| Yer 89,8 mm | 2.757 → 2.813 | **17 → 13** | 6,17 → **4,62** *(über p90 → bis p90)* | 31 → 31 | 6,19 → 6,26 |
+| Christliche 90,2 mm (ohne Tor) | 10.138 → 10.038 | **111 → 68** | 10,95 → **6,77** *(über allem → über p90)* | 161 → 128 | 16,72 → 16,90 |
+| **Summe** | 214.002 → 213.651 | **716 → 416 (−42 %)** | | 1.434 → 1.154 | 476,0 → 478,0 |
 
 Die Zahl der Farbblöcke ändert sich in keinem Lauf. Vier der acht Motive lagen über dem p90 des
-Archivs, jetzt nur noch die Christliche (6,30 je 1.000); vier liegen beim Median oder darunter.
-Die Stiche sinken um 0,3 % (583), der Stichweg steigt um 0,4 % (2,0 m): an den 329 entfallenen
-Schnitten fehlt die Verriegelung, dafür stehen die Wege unter den Säulen wieder da, die `--trim`
-entfernte. Kein Sprung über 5 mm ohne Schnitt, vorher wie nachher (`untrimmedJumps`, jeder Lauf).
+Archivs (die Christliche sogar über dem größten Wert), jetzt nur noch die Christliche; Atzensport,
+Hofbräu und Yer liegen bis zum p90, die übrigen vier beim Median oder darunter. Die Stiche sinken um
+0,2 % (351), der Stichweg steigt um 0,4 % (2,0 m): an den 300 entfallenen Schnitten fehlt die
+Verriegelung, dafür stehen die Wege unter den Säulen wieder da, die `--trim` entfernte. Kein Sprung
+über 5 mm ohne Schnitt, vorher wie nachher (`untrimmedJumps`, jeder Lauf).
 
-Entschieden wurden 508 Verbindungen ab 3 mm, 387 davon bleiben ein Schnitt:
+*Der erste Stand der Regel* (Sonde ab 3 mm, ohne Prüfung der kurzen Verbindungen; Commit `8840917`)
+kam auf 387 Schnitte, Yer auf 7: die Prüfung der Verbindungen bis 3 mm schneidet **29 weitere**
+(STUTTGART 91 mm 1, Köln 6, Atzensport 7, Hofbräu 4, Yer 6, Christliche 5; in Eislingen und im großen
+STUTTGART-Logo keine).
 
-| Motiv | Verbindungen ab 3 mm | geschnitten | ohne Schnitt | lang *(davon verdeckt, über 7 mm)* | sichtbar (3 bis 5 mm) | als Sprung | durchgestickt |
-|---|--:|--:|--:|--:|--:|--:|--:|
-| STUTTGART 91 mm | 37 | 28 | 9 | 24 *(6)* | 4 | 4 | 5 |
-| STUTTGART 250 mm | 47 | 42 | 5 | 39 *(4)* | 3 | 3 | 2 |
-| Köln 134 mm | 80 | 58 | 22 | 50 *(8)* | 8 | 14 | 8 |
-| Eislingen 274 mm | 93 | 79 | 14 | 75 *(16)* | 4 | 11 | 3 |
-| Atzensport 107 mm | 89 | 65 | 24 | 55 *(7)* | 10 | 18 | 6 |
-| Hofbräu 110,8 mm | 63 | 45 | 18 | 41 *(5)* | 4 | 14 | 4 |
-| Yer 89,8 mm | 12 | 7 | 5 | 7 *(0)* | 0 | 4 | 1 |
-| Christliche 90,2 mm | 87 | 63 | 24 | 51 *(6)* | 12 | 16 | 8 |
-| **Summe** | **508** | **387** | **121** | **342 *(52)*** | **45** | **84** | **37** |
+Entschieden wurden 961 Verbindungen ab 1 mm, 416 davon bleiben ein Schnitt:
 
-*Sichtbare Fäden.* Sprünge ohne Schnitt ab 3 mm mit mehr als 1 mm auf blankem Stoff: vorher 5 (je
-einer in fünf Motiven), nachher **0** — in der Zeile „Sichtbare Fäden“ des Werkzeugs und im
-unabhängigen Raster (0,1 mm, Streifen 0,6 mm, runde Enden). Das gilt für Sprünge. Die kurzen
-Verbindungen bis 3 mm, die Ink/Stitch durchstickt, prüft die Regel nicht: legt man Ink/Stitchs
-`collapse_len_mm` im Dokument auf 0, damit auch sie als Verbindung in der DST stehen, haben 29 von
-1.722 solcher Stiche mehr als 1 mm auf blankem Stoff (höchstens 2,2 mm), vorher 9 von 1.160 (Offen 1).
-Die Bilder der Stellen mit den meisten neu ungeschnittenen Verbindungen (je Motiv zwei) zeigen
-es: die Sprünge liegen unter später gestickten Flächen und Buchstaben und nirgends offen auf dem
-Stoff; sichtbar bleiben kurze Brücken von 1 bis 2 mm zwischen Buchstaben und Tupfen (Köln, Hofbräu,
-Atzensport, Christliche) und eine durchgestickte Verbindung von 6,4 mm zwischen zwei Buchstaben
-im STUTTGART-Logo (91 mm), von der 0,9 mm auf blankem Stoff liegen — an der Grenze der Regel.
+| Motiv | Verbindungen ab 1 mm | geschnitten | ohne Schnitt | lang *(davon verdeckt, über 7 mm)* | sichtbar *(davon bis 3 mm)* | kurz | als Sprung | durchgestickt |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|
+| STUTTGART 91 mm | 58 | 29 | 29 | 24 *(6)* | 5 *(1)* | 20 | 4 | 5 |
+| STUTTGART 250 mm | 77 | 42 | 35 | 39 *(4)* | 3 *(0)* | 29 | 4 | 2 |
+| Köln 134 mm | 154 | 64 | 90 | 50 *(8)* | 14 *(6)* | 68 | 14 | 8 |
+| Eislingen 274 mm | 196 | 79 | 117 | 75 *(16)* | 4 *(0)* | 101 | 13 | 3 |
+| Atzensport 107 mm | 158 | 72 | 86 | 55 *(7)* | 17 *(7)* | 62 | 18 | 6 |
+| Hofbräu 110,8 mm | 117 | 49 | 68 | 41 *(5)* | 8 *(4)* | 50 | 14 | 4 |
+| Yer 89,8 mm | 32 | 13 | 19 | 7 *(0)* | 6 *(6)* | 14 | 4 | 1 |
+| Christliche 90,2 mm | 169 | 68 | 101 | 51 *(6)* | 17 *(5)* | 77 | 16 | 8 |
+| **Summe** | **961** | **416** | **545** | **342 *(52)*** | **74 *(29)*** | **421** | **87** | **37** |
 
-*Die Nacharbeit-Datei* gibt durch `output` dieselbe DST, Byte für Byte, in allen 16 Läufen (die
-acht Motive mit und ohne Tor, die Christliche auch in 126 mm). Die Läufe mit Tor und mit `--ohne-tor`
-der drei Motive, deren Größe das Tor nicht ändert (STUTTGART 250 mm, Yer, Hofbräu), geben dieselbe DST,
-Byte für Byte, je Lauf mit frischem Cache.
+*Sichtbare Fäden.* Sprünge ohne Schnitt mit mehr als 1 mm auf blankem Stoff: vorher 5 (je einer in
+fünf Motiven), nachher **0** — in der Zeile „Sichtbare Fäden“ des Werkzeugs und im unabhängigen
+Raster (0,1 mm, Streifen 0,6 mm, runde Enden). Auch die Verbindungen, die Ink/Stitch bis 3 mm als
+gewöhnlichen Stich durchstickt, sind nachgemessen: legt man `collapse_len_mm` im Dokument auf 0 und
+nimmt `min_jump_stitch_length_mm` heraus, damit **jede** Verbindung als Verbindung in der DST steht,
+sind es 2.233 Verbindungen, 416 davon geschnitten; **keine** der übrigen 1.817 liegt mehr als 1 mm
+(höchstens 1,00 mm) auf blankem Stoff, 65 mehr als 0,5 mm. Vorher waren es 14 von 1.183 (bis 2,8 mm),
+im ersten Stand der Regel 29 von 1.846 (bis 2,2 mm). Die Bilder der Stellen mit den meisten neu
+ungeschnittenen Verbindungen (je Motiv zwei, vorher / erster Stand / dieser Stand) zeigen es: die
+Sprünge liegen unter später gestickten Flächen und Buchstaben, die Brücken von 1 bis 2 mm zwischen
+Buchstaben und Tupfen (Köln, Hofbräu, Atzensport, Christliche) sind geschnitten. Was bleibt, sind
+Brücken, die die Regel duldet, weil höchstens 1 mm blank liegt — etwa die durchgestickte Verbindung
+von 6,4 mm zwischen zwei Buchstaben im STUTTGART-Logo (91 mm), von der 0,9 mm blank liegen; im
+Köln-Banner und bei den Tupfen sind einzelne solcher Brücken noch zu sehen (Offen 1).
 
-*Gegen den Puncher.* Christliche: 63 Schnitte gegen seine 11 (6,30 gegen 0,99 je 1.000). Von
-unseren 63 sind 51 länger als 5 mm und 12 sichtbare Verbindungen von 3 bis 5 mm; wir entscheiden
-87 Verbindungen ab 3 mm, er hat 10 Lücken. Der Rest ist eine Frage der Zahl der Objekte und ihrer
-Reihenfolge, nicht der Regel. Yer: 7 gegen 13 (2,53 gegen 4,5 je 1.000): der Puncher schneidet alle
-13 Lücken (6,9 bis 30,5 mm), wir schneiden 7 (alle 5 mm und länger) und lassen 4 verdeckte Sprünge
-(3,4 bis 4,7 mm) und eine durchgestickte Verbindung ungeschnitten.
+*Die Nacharbeit-Datei* gibt durch `output` dieselbe DST, Byte für Byte, in allen acht Läufen; im
+ersten Stand der Regel in allen 16 (die acht Motive mit und ohne Tor, die Christliche auch in
+126 mm). Die Läufe mit Tor und mit `--ohne-tor` der drei Motive, deren Größe das Tor nicht ändert
+(STUTTGART 250 mm, Yer, Hofbräu), gaben dort dieselbe DST, Byte für Byte, je Lauf mit frischem Cache; auch
+in diesem Stand gaben die drei Läufe der Zeitmessung (Yer, Hofbräu, Köln) dieselbe DST wie die der Messreihe.
 
-**Was trotzdem geschnitten wird** *(387 Schnitte)*: 290 (75 %) Verbindungen über 5 mm mit mehr als
+*Gegen den Puncher.* Christliche: 68 Schnitte gegen seine 11 (6,77 gegen 0,99 je 1.000). Von unseren
+68 sind 17 kürzer als 5 mm (5 davon unter 3 mm) und 51 länger; wir entscheiden 169 Verbindungen ab
+1 mm, er hat 10 Lücken. Der Rest ist eine Frage der Zahl der Objekte und ihrer Reihenfolge, nicht
+der Regel. Yer: 13 gegen 13 (4,62 gegen 4,5 je 1.000), aber nicht dieselben: seine 13 Lücken sind
+6,9 bis 30,5 mm lang, von unseren 13 sind sechs 2,6 bis 2,8 mm lang (zwischen den Strahlen der Birne,
+je 2 mm blank) und sieben 5,3 bis 28,3 mm.
+
+**Was trotzdem geschnitten wird** *(416 Schnitte)*: 290 (70 %) Verbindungen über 5 mm mit mehr als
 1 mm auf blankem Stoff — sie sind sichtbar, der Schnitt ist richtig, und die Zahl sinkt nur über die
-Reihenfolge der Objekte (Offen 4); 52 (13 %) Verbindungen über 7 mm, die verdeckt liegen (7,2 bis
-59,7 mm, 35 davon bis 10 mm): länger als ein Stich sein darf; 45 (12 %) Verbindungen von 3 bis 5 mm
-mit mehr als 1 mm auf blankem Stoff.
+Reihenfolge der Objekte (Offen 3); 52 (13 %) Verbindungen über 7 mm, die verdeckt liegen (7,2 bis
+59,7 mm, 35 davon bis 10 mm): länger als ein Stich sein darf; 74 (18 %) Verbindungen bis 5 mm mit
+mehr als 1 mm auf blankem Stoff, 29 davon bis 3 mm.
 
 **Empfindlichkeit** *(dieselben Sonden, `planTrims` mit anderen Schwellen; Summe der acht Motive,
-Standard 387)*:
+Standard 416)*:
 
 | Schwelle | Wert | Schnitte |
 |---|---|--:|
-| `VISIBLE_MAX_MM` (blank, höchstens) | 0 · 0,3 · 0,5 · 0,7 · **1** · 1,5 · 2 mm | 439 · 424 · 418 · 404 · **387** · 365 · 344 |
-| `HIDDEN_STITCH_MAX_MM` (durchsticken bis) | 5 (nie) · **7** · 10 · 12 mm | 424 · **387** · 352 · 348 |
-| `PLAIN_STITCH_MM` (kurz bis) | **3** · 3,5 mm | **387** · 377 |
+| `VISIBLE_MAX_MM` (blank, höchstens) | 0 · 0,3 · 0,5 · 0,7 · **1** · 1,5 · 2 mm | 528 · 496 · 481 · 453 · **416** · 377 · 348 |
+| `HIDDEN_STITCH_MAX_MM` (durchsticken bis) | 5 (nie) · **7** · 10 · 12 mm | 453 · **416** · 381 · 377 |
 
-`HIDDEN_JUMP_MAX_MM` ändert die Zahl der Schnitte nicht, solange bis `HIDDEN_STITCH_MAX_MM` durchgestickt
-wird: es legt nur fest, ob der Faden als Sprung (bis 5 mm) oder als Stich liegt. Von den 121 Verbindungen ohne
-Schnitt liegen 84 höchstens 0,3 mm, 6 zwischen 0,3 und 0,5 mm, 14 zwischen 0,5 und 0,7 mm und 17 zwischen 0,7
-und 1 mm auf blankem Stoff.
+`PLAIN_STITCH_MM` und `HIDDEN_JUMP_MAX_MM` ändern die Zahl der Schnitte nicht: sie legen nur fest, ob
+eine verdeckte Verbindung als Stich, als Sprung oder durchgestickt liegt. Von den 124 verdeckten
+Verbindungen ab 3 mm ohne Schnitt liegen 86 höchstens 0,3 mm, 6 zwischen 0,3 und 0,5 mm, 15 zwischen 0,5
+und 0,7 mm und 17 zwischen 0,7 und 1 mm auf blankem Stoff.
 
 **Offen.**
 
-1. **Kurze Verbindungen bis 3 mm** werden nicht auf Sichtbarkeit geprüft (Messung oben: 29 mit mehr
-   als 1 mm blank, +20 gegenüber vorher). Der Puncher schneidet jede seiner Lücken unter 3 mm. Eine
-   Sonde ab 1 mm statt ab 3 mm (`jump_to_trim`) und der Schnitt bei mehr als 1 mm blank würden diese 29
-   schneiden: 387 → etwa 416 Schnitte.
-2. **Die Schwellen sind Annahmen** (1 mm blank, 0,3 mm Reichweite, 5 mm Sprung, 7 mm Stich), gemessen
+1. **Die Schwellen sind Annahmen** (1 mm blank, 0,3 mm Reichweite, 5 mm Sprung, 7 mm Stich), gemessen
    an den Bildern und an den Profi-Dateien, nicht am Stoff: ein Probestick bestätigt oder korrigiert sie
-   (Tabelle „Empfindlichkeit“).
-3. **Sprünge ohne Schnitt und lange Verbindungsstiche sind keine Puncher-Gewohnheit** (6 von 384
+   (Tabelle „Empfindlichkeit“). Bei einer Verbindung mit knapp 1 mm blank bleibt im Bild eine kleine
+   Brücke stehen (siehe oben); 0,5 mm statt 1 mm kostete 65 Schnitte mehr (481).
+2. **Sprünge ohne Schnitt und lange Verbindungsstiche sind keine Puncher-Gewohnheit** (6 von 384
    Lücken ohne Schnitt): ob eine verdeckte Verbindung von 3 bis 7 mm auf dem Stoff hält, ohne
    Fadenschlingen auf der Rückseite, zeigt der Probestick.
-4. **Die Reihenfolge** ist der größte Rest: drei Viertel der übrigen Schnitte sind Verbindungen über
-   5 mm auf blankem Stoff zwischen Objekten derselben Farbe; weniger gibt es nur, wenn die Objekte
-   einer Farbe anders aufeinander folgen (§10.1).
-5. **Sprünge innerhalb eines Objekts** sieht die Regel nicht (`jump_to_trim` auch nicht); sie sind in der Zeile
-   „Sichtbare Fäden“ gezählt (0 in allen acht Läufen).
-6. `inkstitch:min_jump_stitch_length_mm` am Objekt davor stickt nicht nur die Verbindung durch: bei
+3. **Die Reihenfolge** ist der größte Rest: 70 % der übrigen Schnitte sind Verbindungen über 5 mm
+   auf blankem Stoff zwischen Objekten derselben Farbe; weniger gibt es nur, wenn die Objekte einer
+   Farbe anders aufeinander folgen (§10.1).
+4. **Sprünge innerhalb eines Objekts** sieht die Regel nicht (`jump_to_trim` auch nicht); sie sind in
+   der Zeile „Sichtbare Fäden“ gezählt (0 in allen acht Läufen).
+5. `inkstitch:min_jump_stitch_length_mm` am Objekt davor stickt nicht nur die Verbindung durch: bei
    einer Satinsäule mit `start_at_nearest_point` (Vorgabe) wirkt es auch auf ihren eigenen Anfang
    (`SatinColumn.start_point`). In den acht Läufen ist die Nacharbeit-Datei byte-gleich; ob sich der
    Anfang einer durchgestickten Säule gegenüber einem Lauf ohne das Attribut verschiebt, ist nicht gemessen.
+6. **Verbindungen unter 1 mm** prüft die Regel nicht (die Sonde schneidet erst ab `PROBE_MIN_MM`): sie
+   können nicht mehr als 1 mm blank liegen, und die Messung mit `collapse_len_mm` 0 findet unter allen
+   ungeschnittenen Verbindungen keine mit mehr als 1 mm blank.
+7. Länge und Verdeckung sind an der DST der **Sonde** gemessen (mit Schnitten und Verriegelung), das
+   Ergebnis ist ein anderes Dokument: wo ein Schnitt entfällt, fehlen auch die Verriegelungsstiche an
+   den Enden der beiden Objekte, die Verbindung ändert sich um Zehntelmillimeter. Die Messung am
+   Ergebnis (Zeile „Sichtbare Fäden“, `collapse_len_mm` 0) deckt sich darum nicht auf den
+   Zehntelmillimeter mit der Entscheidung; sie findet keine Verbindung über der Grenze.
 
 ### 10.3 Verriegelung
 - Nach jedem `trim`/`color` und am Anfang: drei Stiche 0,3 mm vor/zurück entlang der ersten Stichrichtung.
