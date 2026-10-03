@@ -1688,11 +1688,17 @@ sind es 2.233 Verbindungen, 416 davon geschnitten; **keine** der übrigen 1.817 
 (höchstens 1,00 mm) auf blankem Stoff, 65 mehr als 0,5 mm. Vorher waren es 14 von 1.183 (bis 2,8 mm),
 im ersten Stand der Regel 29 von 1.846 (bis 2,2 mm). Die Bilder der Stellen mit den meisten neu
 ungeschnittenen Verbindungen (je Motiv zwei, vorher / erster Stand / dieser Stand) zeigen es: die
-Sprünge liegen unter später gestickten Flächen und Buchstaben, die Brücken von 1 bis 2 mm zwischen
-Buchstaben und Tupfen (Köln, Hofbräu, Atzensport, Christliche) sind geschnitten. Was bleibt, sind
-Brücken, die die Regel duldet, weil höchstens 1 mm blank liegt — etwa die durchgestickte Verbindung
-von 6,4 mm zwischen zwei Buchstaben im STUTTGART-Logo (91 mm), von der 0,9 mm blank liegen; im
-Köln-Banner und bei den Tupfen sind einzelne solcher Brücken noch zu sehen (Offen 1).
+Sprünge liegen unter später gestickten Flächen und Buchstaben, die Brücken mit mehr als 1 mm blank
+(im ersten Stand bis 2,2 mm; Köln, Hofbräu, Atzensport, Christliche) sind geschnitten. **Was bleibt,
+sind kurze Brücken, die die Regel duldet**, weil höchstens 1 mm blank liegt: bei 65 der 1.817
+ungeschnittenen Verbindungen mehr als 0,5 mm, bei 37 davon mehr als 0,7 mm. Die 65 verteilen sich auf
+Köln 20, Atzensport 12, Christliche 10, Hofbräu 7, STUTTGART 91 mm 6, Yer 4, Eislingen und STUTTGART
+250 mm je 3. Im Bild sind das kleine Hälse zwischen zwei Teilen derselben Farbe: sieben von 1,3 bis
+1,7 mm Länge (0,7 bis 1,0 mm blank) zwischen den elf Tupfen des Kölner Wappens, ein roter Faden von
+5,2 mm zwischen zwei Buchstaben im Hofbräu-Logo (0,94 mm blank, über einer goldenen Linie), die
+durchgestickte Verbindung von 6,4 mm zwischen zwei Buchstaben im STUTTGART-Logo (91 mm), von der
+0,9 mm blank liegen. Das ist die Toleranz der Regel, kein Versehen — und die Stelle, die der
+Probestick zuerst prüfen soll (Offen 1).
 
 *Die Nacharbeit-Datei* gibt durch `output` dieselbe DST, Byte für Byte, in allen acht Läufen; im
 ersten Stand der Regel in allen 16 (die acht Motive mit und ohne Tor, die Christliche auch in
@@ -1731,7 +1737,9 @@ und 0,7 mm und 17 zwischen 0,7 und 1 mm auf blankem Stoff.
 1. **Die Schwellen sind Annahmen** (1 mm blank, 0,3 mm Reichweite, 5 mm Sprung, 7 mm Stich), gemessen
    an den Bildern und an den Profi-Dateien, nicht am Stoff: ein Probestick bestätigt oder korrigiert sie
    (Tabelle „Empfindlichkeit“). Bei einer Verbindung mit knapp 1 mm blank bleibt im Bild eine kleine
-   Brücke stehen (siehe oben); 0,5 mm statt 1 mm kostete 65 Schnitte mehr (481).
+   Brücke stehen (siehe oben); wer sie nicht will, setzt `VISIBLE_MAX_MM` herunter: 0,5 mm schneidet
+   genau die 65 Verbindungen mit mehr als 0,5 mm blank zusätzlich (481 Schnitte, −33 % statt −42 %
+   gegenüber 716), 0,3 mm 80 (496).
 2. **Sprünge ohne Schnitt und lange Verbindungsstiche sind keine Puncher-Gewohnheit** (6 von 384
    Lücken ohne Schnitt): ob eine verdeckte Verbindung von 3 bis 7 mm auf dem Stoff hält, ohne
    Fadenschlingen auf der Rückseite, zeigt der Probestick.
