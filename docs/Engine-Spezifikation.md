@@ -48,7 +48,7 @@ wie die Profi-Dateien. §5.3 neu: Textur in der Vorlage erkennen und bereinigen.
 gefüllt und Splitter bis 4 mm² im Abstand bis 0,4 mm angeschlossen. Staub unter 0,05 mm² wird
 überall verworfen. Alle Schwellen gelten in der bestellten Größe. §7.8.7 neu: Eine breite Form
 mit schmalem Band wird geteilt, der breite Teil bleibt Tatami, das Band wird Satin. Ein Band ist
-mindestens 1,3 mm breit, 15 Breiten lang, gleichmäßig breit und hängt an einem Kopf ab 20 mm².
+mindestens 1,3 mm breit, 15 Breiten lang, gleichmäßig breit und hängt an einem Kopf ab 20 mm². §10.2.1 neu: Die Fadenschnitte der Ink/Stitch-Vorlage richten sich danach, ob Faden auf blankem Stoff läge. `auto_satin` läuft ohne `--trim`. Geschnitten wird, wo mehr als 1 mm der Verbindung blank läge oder sie länger als 7 mm ist. Über die acht Referenzlogos: 716 → 416 Schnitte.
 
 ---
 

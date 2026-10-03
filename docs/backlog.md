@@ -3,6 +3,28 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Fadenschnitte nach Sichtbarkeit (02.10.2026)
+
+- **Schwelle 1 mm blank (`VISIBLE_MAX_MM`).** Ungeschnitten bleibt eine Verbindung, von der höchstens
+  1 mm auf blankem Stoff liegt. Dabei bleiben kleine Hälse sichtbar:
+  - Köln-Wappen: sieben Hälse von 1,3–1,7 mm zwischen den Tupfen, davon 0,7–1,0 mm blank.
+  - Hofbräu: ein roter Faden von 5,2 mm zwischen zwei Buchstaben, 0,94 mm blank.
+  - STUTTGART 91 mm: eine durchgestickte Verbindung von 6,4 mm, 0,9 mm blank.
+
+  Von 1.817 ungeschnittenen Verbindungen liegen 65 über 0,5 mm blank. Mit 0,5 mm wären es 481
+  Schnitte (−33 % statt −42 %), mit 0,3 mm 496. Der Probestick entscheidet.
+
+- **Durchsticken von 5 bis 7 mm** unter späteren Stichen ist keine Puncher-Gewohnheit: In den 24
+  Profi-DSTs bleiben nur 6 von 384 Lücken ungeschnitten. Probestick.
+- **Größter Rest:** 70 % der verbleibenden Schnitte sind sichtbare Verbindungen über 5 mm zwischen
+  gleichfarbigen Objekten. Senken lässt sich das nur über die Objektreihenfolge (§10.1).
+- **Christliche bleibt über p90** (6,77 je 1000; 68 Schnitte, der Puncher 11).
+- **`min_jump_stitch_length_mm`** wirkt bei einer Satinsäule mit `start_at_nearest_point` auch auf
+  deren Anfang. Die Nacharbeit-Datei bleibt byte-gleich; ob sich der Anfang einer durchgestickten
+  Säule verschiebt, ist nicht gemessen.
+- **Laufzeit:** Die Sonde ist ein zusätzlicher Ink/Stitch-Lauf. Yer 31,5 → 42,9 s, Hofbräu 51 → 68 s,
+  Köln 209 → 236 s.
+
 ## Formen nach Breite teilen (02.10.2026)
 
 - **Köln ab 160 mm:** Die Federzungen im Flügel werden Satin, bei 200 mm drei Paare von vieren; das
@@ -142,6 +164,8 @@ Vektor-PDF des Nutzers (Zahlen in `docs/umsetzungsstand.md`).
   übrigen setzt Ink/Stitch selbst (u. a. `auto_satin --trim`, siehe `inkstitch/README.md`). Dasselbe bei der
   Hofbräu-Mütze (9,76 je 1000, zwei Farben). Offen, wie weit das der Motivart geschuldet ist (viele
   einzelne Buchstaben mit Schatten) — der Probestick zeigt, ob es stört.
+  _Erledigt 02.10.2026 (§10.2.1, Fadenschnitte nach Sichtbarkeit): Atzensport 107 mm 7,04 → 3,85,
+  Hofbräu 9,94 → 5,37 je 1000, beide jetzt unter p90 (5,6)._
 - **STUTTGART 120 mm: Nadelhäufung 9.** Eine Zelle, in der drei Farblagen einstechen (Schwarz 2,
   Grau 4, Schwarz 3 Einstiche); über dem Archiv (Maximum 8, aus nur vier Dateien).
 

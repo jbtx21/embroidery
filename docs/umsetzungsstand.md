@@ -841,3 +841,41 @@ DSTs sind Byte für Byte gleich. Nur Elektrotechnik Yer ändert sich:
 - Der Stecker bleibt Tatami: 162 Stiche gegen 443 beim Puncher, der ihn als breiten Satin stickt.
 
 Tests 1.255 → 1.299. Rauchtest auf dem Branch der Teilung 16/16.
+
+**Fadenschnitte nach Sichtbarkeit (02.10.2026, Spec §10.2.1).** Die Schnitte setzt nicht mehr
+`auto_satin --trim` und `jump_to_trim` ab 5 mm. Das löst die Einträge vom 28.09. (Satin als
+Standard) und 29.09. (Fadenschnitte) ab. Der neue Ablauf:
+
+1. `auto_satin` läuft ohne `--trim`.
+2. Eine Sonde (`jump_to_trim` ab 1 mm, dann `output`) legt jede Verbindung zwischen gleichfarbigen
+   Objekten offen.
+3. `planTrims` (`inkstitch/trims.ts`, `tools/fadenschnitt.mjs`) misst an den gestickten Stichen,
+   wie viel jeder Verbindung auf blankem Stoff läge, und entscheidet:
+   - Liegt höchstens 1 mm blank: kein Schnitt. Bis 3 mm wird das ein gewöhnlicher Stich, bis 5 mm
+     ein Sprung, bis 7 mm wird durchgestickt.
+   - Sonst und über 7 mm: Schnitt.
+
+Herkunft der 716 Schnitte vorher:
+
+- `auto_satin --trim` im Weg: 566. Es schnitt jeden Sprung, der mehr als 1 mm außerhalb der Säulen
+  lief, ohne Längenschwelle.
+- `auto_satin --trim` am Ende jeder Folge: 35.
+- `jump_to_trim` ab 5 mm: 115.
+
+| Motiv                        |          Stiche | Fadenschnitte | je 1.000 (Archiv p90 5,6) |
+| ---------------------------- | --------------: | ------------: | ------------------------: |
+| STUTTGART 91 mm              | 16.157 → 16.115 |       49 → 29 |               3,03 → 1,80 |
+| STUTTGART 250 mm             | 73.088 → 73.306 |       57 → 42 |               0,78 → 0,57 |
+| Köln 134 mm                  | 33.797 → 33.645 |      120 → 64 |               3,55 → 1,90 |
+| Eislingen 274 mm             | 50.057 → 49.899 |      138 → 79 |               2,76 → 1,58 |
+| Atzensport 107 mm            | 18.755 → 18.702 |      132 → 72 |               7,04 → 3,85 |
+| Hofbräu 110,8 mm (`cap`)     |   9.253 → 9.133 |       92 → 49 |               9,94 → 5,37 |
+| Elektrotechnik Yer 89,8 mm   |   2.757 → 2.813 |       17 → 13 |               6,17 → 4,62 |
+| Christliche 90,2 mm (o. Tor) | 10.138 → 10.038 |      111 → 68 |              10,95 → 6,77 |
+
+- **Summe:** 716 → 416 Schnitte (−42 %).
+- **Sichtbare Fäden** (ungeschnitten, über 1 mm blank): 5 → 0. Ungeschnittene Sprünge über 5 mm: 0.
+- **Nacharbeit-Datei:** dieselbe DST, Byte für Byte, in allen Läufen.
+- **Tests:** 1.299 → 1.343, Rauchtest 16 → 17.
+- **Grenzen** (kleine sichtbare Hälse bis 1 mm, Durchsticken bis 7 mm, Laufzeit) stehen in
+  `docs/backlog.md`.
