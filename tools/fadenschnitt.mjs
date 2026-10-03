@@ -7,12 +7,14 @@
  * at the end of every run, whatever follows). So the run is routed without `--trim`, and the cuts are
  * set here, from what Ink/Stitch really stitches:
  *
- * 1. The probe: `jump_to_trim` with the length from which Ink/Stitch writes a jump (3 mm,
- *    `PLAIN_STITCH_MM`) puts a cut after every object that is followed by one. Its document is stitched
- *    (`output`), and every one of those moves is now a trim in the DST with its two ends in place.
+ * 1. The probe: `jump_to_trim` from `PROBE_MIN_MM` (1 mm: a shorter move cannot lie more than that on
+ *    bare fabric) puts a cut after every object that is followed by a move of that length or more —
+ *    those Ink/Stitch writes as a jump (over 3 mm) and those it would stitch straight on. Its document
+ *    is stitched (`output`), and every one of those moves is now a trim in the DST with its two ends
+ *    in place.
  * 2. `planTrims` reads that DST: the k-th trim is the cut after the k-th object that carries
- *    `trim_after` in the probe document, and the rule (spec §10.2.1: short, hidden, long, visible)
- *    says which of them stay.
+ *    `trim_after` in the probe document, and the rule (spec §10.2.1: short, hidden, stitched, visible,
+ *    long) says which of them stay.
  * 3. `withoutTrimAfter` takes the cuts that do not stay out of the probe document again, and
  *    `withMinJumpLength` tells Ink/Stitch to stitch across the hidden connections between 5 and 7 mm
  *    (no jump may stay open). What is left is the document `pnpm inkstitch` stitches, and the one the
@@ -30,6 +32,7 @@ import {
   HIDDEN_STITCH_MAX_MM,
   PLAIN_STITCH_MM,
   planTrims,
+  PROBE_MIN_MM,
   trimAfterIds,
   VISIBLE_MAX_MM,
   withMinJumpLength,
@@ -83,7 +86,7 @@ export async function setTrims({ routedPath, probePath, outPath, colours }) {
 
   const probe = await run("jump_to_trim (Sonde)", {
     extension: "jump_to_trim",
-    options: { "minimum-jump-length": PLAIN_STITCH_MM },
+    options: { "minimum-jump-length": PROBE_MIN_MM },
     svg: routedPath,
   });
   const probeSvg = probe.stdout.toString("utf8");
@@ -121,7 +124,7 @@ export async function setTrims({ routedPath, probePath, outPath, colours }) {
 }
 
 /**
- * The lines of the output of `pnpm inkstitch` about the cuts: how many moves of 3 mm and more the rule
+ * The lines of the output of `pnpm inkstitch` about the cuts: how many moves of 1 mm and more the rule
  * judged, how many of the cuts stay and why, how many do not.
  */
 export function trimLines({ plan, probe, fallback }) {
@@ -138,13 +141,18 @@ export function trimLines({ plan, probe, fallback }) {
   const hiddenLong = plan.decisions.filter(
     (d) => d.reason === "long" && d.visibleMm <= VISIBLE_MAX_MM,
   ).length;
+  // Short and yet cut: a stitch Ink/Stitch would have set straight on, over bare fabric.
+  const visibleShort = plan.decisions.filter(
+    (d) => d.reason === "visible" && d.lengthMm <= PLAIN_STITCH_MM,
+  ).length;
   return [
-    `Fadenschnitte (Spec §10.2.1): ${plan.decisions.length} Verbindungen ab ${PLAIN_STITCH_MM} mm geprüft, ` +
+    `Fadenschnitte (Spec §10.2.1): ${plan.decisions.length} Verbindungen ab ${PROBE_MIN_MM} mm geprüft, ` +
       `${plan.cut.length} geschnitten, ${kept} ohne Schnitt`,
     `  geschnitten: ${by.long} über ${HIDDEN_JUMP_MAX_MM} mm lang (davon ${hiddenLong} verdeckt, aber über ` +
       `${HIDDEN_STITCH_MAX_MM} mm), ${by.visible} mit über ${VISIBLE_MAX_MM} mm auf blankem Stoff` +
+      (visibleShort > 0 ? ` (davon ${visibleShort} bis ${PLAIN_STITCH_MM} mm lang)` : "") +
       (by.forced > 0 ? `, ${by.forced} von der Quelle verlangt` : "") +
       ` · ohne Schnitt: ${by.hidden} verdeckt als Sprung, ${by.stitched} verdeckt durchgestickt` +
-      (by.short > 0 ? `, ${by.short} kurz` : ""),
+      (by.short > 0 ? `, ${by.short} verdeckt als Stich bis ${PLAIN_STITCH_MM} mm` : ""),
   ];
 }

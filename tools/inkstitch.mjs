@@ -76,13 +76,15 @@
  *    packages/engine/src/inkstitch/trims.ts) -> out/<name>.trimmed.svg. Without
  *    `inkstitch:trim_after` Ink/Stitch writes no cut: up to 3 mm (its collapse length) it stitches
  *    straight from one object to the next, from there it ties off, jumps and ties on — the thread lies
- *    on top of the fabric. A probe (jump_to_trim from 3 mm, stitched to a DST: out/<name>.probe.svg)
- *    cuts after every object that a jump follows; the rule reads the real end and start of every one of
- *    those moves in that DST (a fill ends towards the next object, but not exactly) and takes out the
- *    cuts that are not needed: a jump up to 5 mm (CONNECT_DEFAULTS.jumpTrimMm) of which at most 1 mm lies
- *    on bare fabric — the rest under stitches that come later or on stitches of its own colour — stays
- *    without a cut. The DST then carries a trim (three jump records, +2/+2, -4/-4, +2/+2, which readDst
- *    reads back as one trim) only where the rule cuts.
+ *    on top of the fabric. A probe (jump_to_trim from 1 mm, stitched to a DST: out/<name>.probe.svg)
+ *    cuts after every object that a move of that length follows; the rule reads the real end and start
+ *    of every one of those moves in that DST (a fill ends towards the next object, but not exactly) and
+ *    takes out the cuts that are not needed: a move of which at most 1 mm lies on bare fabric — the rest
+ *    under stitches that come later or on stitches of its own colour — stays without a cut (a stitch
+ *    straight on up to 3 mm, a jump up to 5 mm (CONNECT_DEFAULTS.jumpTrimMm), a stitch straight across
+ *    up to 7 mm); every move with more than that on bare fabric is cut, however short. The DST then
+ *    carries a trim (three jump records, +2/+2, -4/-4, +2/+2, which readDst reads back as one trim)
+ *    only where the rule cuts.
  * 4. output --format=dst -> out/<name>.dst.
  * 5. The Nacharbeit file (spec §13.4, tools/nacharbeit.mjs), once the DST is written and
  *    reported: out/<name>.nacharbeit.svg — the document of step 3 with a layer per colour
