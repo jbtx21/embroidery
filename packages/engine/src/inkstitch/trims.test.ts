@@ -19,6 +19,7 @@ import {
   HIDDEN_STITCH_MAX_MM,
   PLAIN_STITCH_MM,
   planTrims,
+  PROBE_MIN_MM,
   THREAD_REACH_MM,
   trimAfterIds,
   VISIBLE_MAX_MM,
@@ -40,6 +41,8 @@ describe("the constants of the rule (spec §10.2.1)", () => {
     expect(HIDDEN_STITCH_MAX_MM).toBe(7);
     // What Ink/Stitch's auto_satin leaves outside both columns before it cuts.
     expect(VISIBLE_MAX_MM).toBe(1);
+    // A move shorter than that cannot lie more than that on bare fabric: the probe needs none of them.
+    expect(PROBE_MIN_MM).toBe(VISIBLE_MAX_MM);
     expect(THREAD_REACH_MM).toBeGreaterThan(0.1);
     expect(THREAD_REACH_MM).toBeLessThan(0.5);
   });
@@ -197,11 +200,29 @@ describe("planTrims (spec §10.2.1)", () => {
   const ids = (n: number): { id: string }[] =>
     Array.from({ length: n }, (_, i) => ({ id: `e${i}` }));
 
-  it("leaves a connection of up to 3 mm to Ink/Stitch's own stitch: no cut, bare fabric or not", () => {
-    const { stitches } = pair(PLAIN_STITCH_MM);
-    const plan = planTrims(stitches, ids(1));
+  it("leaves a connection of up to 3 mm that lies hidden to Ink/Stitch's own stitch: no cut", () => {
+    const { stitches, from } = pair(PLAIN_STITCH_MM);
+    const area = dense(from.x - 0.5, -1, PLAIN_STITCH_MM + 1, 2);
+    const plan = planTrims([...stitches, change(last(stitches)), ...area], ids(1));
     expect(plan.decisions[0]).toMatchObject({ id: "e0", cut: false, reason: "short" });
+    expect(plan.decisions[0]!.visibleMm).toBeLessThan(VISIBLE_MAX_MM);
     expect(plan.cut).toEqual([]);
+  });
+
+  it("cuts a connection of up to 3 mm that lies on bare fabric: a stitch across it is a thread in plain sight", () => {
+    const plan = planTrims(pair(PLAIN_STITCH_MM).stitches, ids(1));
+    expect(plan.decisions[0]).toMatchObject({ id: "e0", cut: true, reason: "visible" });
+    expect(plan.cut).toEqual(["e0"]);
+    // Up to 1 mm of it on bare fabric is no thread worth a cut: a gap of 1.5 mm is 0.9 mm bare, less the
+    // reach of the thread at both ends.
+    const near = planTrims(pair(1.5).stitches, ids(1));
+    expect(near.decisions[0]!.visibleMm).toBeLessThanOrEqual(VISIBLE_MAX_MM);
+    expect(near.decisions[0]).toMatchObject({ cut: false, reason: "short" });
+    // A gap of 2 mm is 1.4 mm bare.
+    expect(planTrims(pair(2).stitches, ids(1)).decisions[0]).toMatchObject({
+      cut: true,
+      reason: "visible",
+    });
   });
 
   it("cuts a connection over bare fabric from 3 mm on", () => {
@@ -310,7 +331,7 @@ describe("planTrims (spec §10.2.1)", () => {
   });
 
   it("matches the trims to the elements in order, one decision for each", () => {
-    // 1: bare and 4 mm (cut) · 2: under a later area (kept) · 3: short (kept) · 4: 8 mm (cut)
+    // 1: bare and 4 mm (cut) · 2: under a later area (kept) · 3: 2 mm under it (short, kept) · 4: 8 mm (cut)
     const a1 = run(at(0, 0), at(2, 0));
     const b1 = run(at(6, 0), at(8, 0));
     const b2 = run(at(12, 0), at(14, 0));
@@ -327,7 +348,7 @@ describe("planTrims (spec §10.2.1)", () => {
       ...hop(last(b3), first(b4), true),
       ...b4,
       change(last(b4)),
-      ...dense(7.5, -1, 5, 2),
+      ...dense(7.5, -1, 9, 2),
     ];
     const plan = planTrims(stitches, [{ id: "p" }, { id: "q" }, { id: "r" }, { id: "s" }]);
     expect(plan.decisions.map((d) => [d.id, d.cut, d.reason])).toEqual([
@@ -355,8 +376,14 @@ describe("planTrims (spec §10.2.1)", () => {
     const { stitches } = pair(4);
     const plan = planTrims(stitches, ids(1), { visibleMm: 5 });
     expect(plan.decisions[0]).toMatchObject({ cut: false, reason: "hidden" });
-    const strict = planTrims(pair(2).stitches, ids(1), { plainMm: 0 });
-    expect(strict.decisions[0]).toMatchObject({ cut: true, reason: "visible" });
+    // A hidden connection of 2 mm is a stitch straight on; with no stitch allowed it is a jump.
+    const { stitches: two, from } = pair(2);
+    const covered = [...two, change(last(two)), ...dense(from.x - 0.5, -1, 3, 2)];
+    expect(planTrims(covered, ids(1)).decisions[0]).toMatchObject({ cut: false, reason: "short" });
+    expect(planTrims(covered, ids(1), { plainMm: 0 }).decisions[0]).toMatchObject({
+      cut: false,
+      reason: "hidden",
+    });
   });
 
   it("takes the longest stitch it is given", () => {

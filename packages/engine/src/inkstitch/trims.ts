@@ -5,22 +5,23 @@
  * Ink/Stitch writes no cut of its own. What cuts in the pipeline is `auto_satin --trim` (every jump
  * of a satin run whose part outside both columns is over 1 mm, and the end of every run, whatever
  * follows) and `jump_to_trim`. The rule here replaces both: the run is routed without `--trim`, a
- * probe run of `jump_to_trim` puts a cut after every object that is followed by a move of 3 mm or
- * more (what Ink/Stitch would write as a jump), the DST of that probe says where each move runs
- * (`threadMoves`), and `planTrims` decides which of the cuts stay. The ones that do not stay are
- * taken out of the probe document again (`withoutTrimAfter`), and what is left is the final one.
+ * probe run of `jump_to_trim` puts a cut after every object that is followed by a move of
+ * `PROBE_MIN_MM` or more, the DST of that probe says where each move runs (`threadMoves`), and
+ * `planTrims` decides which of the cuts stay. The ones that do not stay are taken out of the probe
+ * document again (`withoutTrimAfter`), and what is left is the final one.
  *
- * The rule, per move between the end of one object and the start of the next:
+ * The rule, per move between the end of one object and the start of the next: the thread is **hidden**
+ * when at most `VISIBLE_MAX_MM` (1 mm) of the line from the end to the start lies on bare fabric: the
+ * rest runs under stitches that come later (of any colour) or over stitches of its own colour that are
+ * there already. A move that is not hidden is cut, however short it is: a thread across bare fabric is
+ * in plain sight. A hidden move is left without a cut, as
  *
- * - up to `PLAIN_STITCH_MM` (3 mm, Ink/Stitch's collapse length): Ink/Stitch stitches straight on.
- *   No cut, no jump.
- * - otherwise the thread is **hidden** when at most `VISIBLE_MAX_MM` (1 mm) of the line from the end
- *   to the start lies on bare fabric: the rest runs under stitches that come later (of any colour) or
- *   over stitches of its own colour that are there already. Up to `HIDDEN_JUMP_MAX_MM` (5 mm,
- *   `CONNECT_DEFAULTS.jumpTrimMm`) no cut: a jump with its lock stitches. Up to `HIDDEN_STITCH_MAX_MM`
- *   (7 mm) no cut either, and no jump: Ink/Stitch stitches straight across (`withMinJumpLength`), so
- *   that no long jump stays open (`untrimmedJumps`).
- * - else cut.
+ * - a stitch straight on, up to `PLAIN_STITCH_MM` (3 mm, Ink/Stitch's collapse length): no jump, no
+ *   lock stitches;
+ * - a jump with its lock stitches, up to `HIDDEN_JUMP_MAX_MM` (5 mm, `CONNECT_DEFAULTS.jumpTrimMm`);
+ * - a stitch straight across, up to `HIDDEN_STITCH_MAX_MM` (7 mm): no jump (`withMinJumpLength`), so
+ *   that no long jump stays open (`untrimmedJumps`);
+ * - longer than that it is cut all the same.
  *
  * Everything is measured on the stitches Ink/Stitch wrote, not on the template: where a fill ends
  * and where the next object begins is only known there (`inkstitch/README.md`).
@@ -68,6 +69,14 @@ export const HIDDEN_STITCH_MAX_MM = 7;
  * `auto_satin` leaves outside the two columns before it cuts (`JumpStitch.should_trim`, 1 mm).
  */
 export const VISIBLE_MAX_MM = 1;
+
+/**
+ * The probe cuts after every object that a move of at least this length follows. Below
+ * `VISIBLE_MAX_MM` a move cannot lie more than that on bare fabric, so there is nothing to decide.
+ * (Up to `PLAIN_STITCH_MM` Ink/Stitch would stitch straight on, with no cut at all; the probe cuts there
+ * as well, to see where the move runs.)
+ */
+export const PROBE_MIN_MM = VISIBLE_MAX_MM;
 
 /**
  * How far from the line of a stitch a thread still counts as covered by it: a stitch is a strip this
@@ -318,11 +327,12 @@ export type TrimTarget = {
 };
 
 /**
- * Why a cut stays or goes: `forced` the source asked for it (or no move follows it), `short` Ink/Stitch
- * stitches straight on, `hidden` the thread lies under later stitches or on its own colour (a jump up
- * to `HIDDEN_JUMP_MAX_MM`), `stitched` the same, longer, up to `HIDDEN_STITCH_MAX_MM`: stitched across,
- * `long` over `HIDDEN_JUMP_MAX_MM` and not hidden, or over `HIDDEN_STITCH_MAX_MM`, `visible` up to
- * `HIDDEN_JUMP_MAX_MM` and more than `VISIBLE_MAX_MM` of it on the bare fabric.
+ * Why a cut stays or goes: `forced` the source asked for it (or no move follows it), `short` up to
+ * `PLAIN_STITCH_MM` and hidden: Ink/Stitch stitches straight on, `hidden` the thread lies under later
+ * stitches or on its own colour (a jump up to `HIDDEN_JUMP_MAX_MM`), `stitched` the same, longer, up to
+ * `HIDDEN_STITCH_MAX_MM`: stitched across, `long` over `HIDDEN_JUMP_MAX_MM` and not hidden, or over
+ * `HIDDEN_STITCH_MAX_MM`, `visible` up to `HIDDEN_JUMP_MAX_MM` and more than `VISIBLE_MAX_MM` of it on
+ * the bare fabric (a stitch straight on that lies bare included).
  */
 export type TrimReason = "forced" | "short" | "hidden" | "stitched" | "long" | "visible";
 
@@ -411,8 +421,13 @@ export function planTrims(
       block: here.block,
     };
     if (target.forced === true) return { ...seen, cut: true, reason: "forced" };
-    if (here.lengthMm <= plainMm + SLACK_MM) return { ...seen, cut: false, reason: "short" };
     const hidden = here.visibleMm <= visibleMm + SLACK_MM;
+    if (here.lengthMm <= plainMm + SLACK_MM) {
+      // Ink/Stitch would stitch straight on, but a stitch across bare fabric is a thread in plain sight.
+      return hidden
+        ? { ...seen, cut: false, reason: "short" }
+        : { ...seen, cut: true, reason: "visible" };
+    }
     if (here.lengthMm > hiddenJumpMm + SLACK_MM) {
       // No jump this long stays open: hidden and not too long, it is stitched across, else it is cut.
       return hidden && here.lengthMm <= stitchMm + SLACK_MM
