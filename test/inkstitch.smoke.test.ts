@@ -33,8 +33,12 @@ import {
   inkstitchSvgVersion,
   PLAIN_STITCH_MM,
   PRESETS,
+  satinColumnAttributes,
   tatamiAttributes,
   threadMoves,
+  TIE_IN_STEP_MM,
+  TIE_IN_STEPS,
+  TIE_OFF_STEP_MM,
   trimAfterIds,
   untrimmedJumps,
   VISIBLE_MAX_MM,
@@ -1048,6 +1052,170 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
         expect(counts.setUnder03).toBe(0);
         expect(counts.setUnder04).toBeLessThan(counts.plainUnder04);
         expect(set.length).toBeLessThan(plain.length);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 2,
+  );
+
+  it(
+    "Vernähung (§10.3): Anfang zwei Stiche à 0,5 mm vorwärts auf dem folgenden Weg und einer zurück, Ende zwei à 0,8 mm hin und zurück — Ink/Stitchs Standard stickt am Anfang hin und her auf der Stelle",
+    async () => {
+      // Two straight lines and a tatami square of one colour, apart: every object starts after a jump
+      // and ends before one, so each carries a tie-in and a tie-off. The second file is the template
+      // without the lock attributes, i.e. Ink/Stitch's half stitch.
+      await initEngine();
+      const line = (id: string, y: number) => ({
+        kind: "line" as const,
+        id,
+        polyline: [
+          { x: 5, y },
+          { x: 35, y },
+        ],
+        closed: false,
+        color: "#1f3a93",
+        attrs: {},
+        trimAfter: "auto" as const,
+      });
+      const square = {
+        kind: "area" as const,
+        id: "quadrat",
+        polygon: polygonOf(rect(44, 4, 12, 12)),
+        color: "#1f3a93",
+        attrs: {},
+        trimAfter: "auto" as const,
+      };
+      const template = buildInkstitchTemplate(
+        [line("oben", 5), line("unten", 17), square],
+        PRESETS.pique,
+        { widthMm: 60, heightMm: 22 },
+      );
+      expect(template.objects.map((o) => o.kind)).toEqual(["running", "running", "tatami"]);
+      const dir = mkdtempSync(join(tmpdir(), "texma-vernaehung-"));
+      try {
+        const ours = join(dir, "vorlage.svg");
+        const plain = join(dir, "standard.svg");
+        writeFileSync(ours, template.svg);
+        writeFileSync(plain, template.svg.replace(/ inkstitch:lock_[a-z_]+="[^"]*"/g, ""));
+        expect(readFileSync(plain, "utf8")).not.toContain("lock_");
+        type Step = { dx: number; dy: number };
+        /** The needle moves of every run between jumps, trims and colour changes. */
+        const runsOf = async (svg: string, name: string): Promise<Step[][]> => {
+          const st = unitsToMm(
+            readDst(new Uint8Array(await inFreshCache(dir, name, () => dstOf(svg)))).stitches,
+          );
+          const runs: Step[][] = [];
+          let run: Step[] = [];
+          for (let i = 1; i < st.length; i++) {
+            const a = st[i - 1]!;
+            const b = st[i]!;
+            if (a.cmd === "stitch" && b.cmd === "stitch")
+              run.push({ dx: b.x - a.x, dy: b.y - a.y });
+            else if (b.cmd !== "stitch") {
+              if (run.length > 0) runs.push(run);
+              run = [];
+            }
+          }
+          if (run.length > 0) runs.push(run);
+          return runs;
+        };
+        const len = (v: Step): number => Math.hypot(v.dx, v.dy);
+        const dot = (a: Step, b: Step): number => a.dx * b.dx + a.dy * b.dy;
+        /** The first moves of a run, after the stitch on the spot where the jump landed. */
+        const head = (run: Step[]): Step[] => run.slice(run.findIndex((v) => len(v) > 0.05));
+
+        const set = await runsOf(ours, "vorlage");
+        const std = await runsOf(plain, "standard");
+        expect(set).toHaveLength(3);
+        expect(std).toHaveLength(3);
+        set.forEach((run, k) => {
+          const h = head(run);
+          // The tie-in moves, each of the step (the DST's 0.1-mm grid allows ±0.15)…
+          for (const v of h.slice(0, TIE_IN_STEPS)) {
+            expect(len(v)).toBeGreaterThan(TIE_IN_STEP_MM - 0.15);
+            expect(len(v)).toBeLessThan(TIE_IN_STEP_MM + 0.15);
+          }
+          if (k < 2) {
+            // …on a line: forward along the first stitch, then one stitch back to the start, and
+            // the line runs over them.
+            for (let i = 1; i < TIE_IN_STEPS; i++) {
+              expect(dot(h[i]!, h[i - 1]!)).toBeGreaterThan(0);
+            }
+            const back = h[TIE_IN_STEPS]!;
+            expect(dot(back, h[TIE_IN_STEPS - 1]!)).toBeLessThan(0);
+            expect(len(back)).toBeCloseTo(TIE_IN_STEPS * TIE_IN_STEP_MM, 0);
+          }
+          // The tie-off: two moves back and forth. Ink/Stitch measures the step along the last
+          // stitches; where they turn within it (a tatami row at its edge) the move is shorter in a
+          // straight line, never under the minimum stitch length.
+          const [a, b] = run.slice(-2) as [Step, Step];
+          const least = k < 2 ? TIE_OFF_STEP_MM - 0.15 : INKSTITCH_MIN_STITCH_MM;
+          for (const v of [a, b]) {
+            expect(len(v)).toBeGreaterThan(least);
+            expect(len(v)).toBeLessThan(TIE_OFF_STEP_MM + 0.15);
+          }
+          expect(dot(a, b)).toBeLessThan(0);
+        });
+        // Ink/Stitch's own half stitch goes back and forth on the spot at the start of each line.
+        for (const run of std.slice(0, 2)) {
+          const h = head(run).slice(0, 4);
+          expect(h.slice(1).some((v, i) => dot(v, h[i]!) < 0)).toBe(true);
+        }
+        // No tie leaves a stitch under 0.3 mm (Ink/Stitch never drops lock stitches, §11).
+        expect(set.flat().filter((v) => len(v) > 0.05 && len(v) < 0.3)).toHaveLength(0);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SUBPROCESS_TIMEOUT_MS * 2,
+  );
+
+  it(
+    "Satin über 7 mm (§7.4): die Teilungspunkte stehen versetzt — mit Ink/Stitchs Standard reihen sie sich in der Mitte zu einer Naht",
+    async () => {
+      // One satin column of 9 mm, 24 mm long, without underlay: every stitch across it is longer than
+      // SATIN_SPLIT_MM and is split. The second file lacks split_method: Ink/Stitch's default.
+      const attrs: Record<string, string> = { ...satinColumnAttributes(9, PRESETS.pique) };
+      for (const k of Object.keys(attrs)) if (k.includes("underlay")) delete attrs[k];
+      expect(attrs.split_method).toBe("staggered");
+      const svgOf = (a: Record<string, string>): string =>
+        `<?xml version="1.0" encoding="UTF-8"?>\n` +
+        `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkstitch="http://inkstitch.org/namespace" ` +
+        `width="40mm" height="20mm" viewBox="0 0 40 20">` +
+        `<path id="saeule" d="M 8,5.5 L 32,5.5 M 8,14.5 L 32,14.5 M 9,4.5 L 9,15.5 M 31,4.5 L 31,15.5" ` +
+        `style="fill:none;stroke:#1f3a93;stroke-width:0.1"` +
+        Object.entries(a)
+          .map(([k, v]) => ` inkstitch:${k}="${v}"`)
+          .join("") +
+        `/></svg>\n`;
+      const plainAttrs = { ...attrs };
+      delete plainAttrs.split_method;
+      const dir = mkdtempSync(join(tmpdir(), "texma-teilung-satin-"));
+      try {
+        /**
+         * Where the needle goes in between the rails: the split points. The DST is centred, the rails
+         * at ±4.5 mm, the column from −12 to 12 mm; its ends carry the ties, which lie inside too.
+         */
+        const inside = async (a: Record<string, string>, name: string): Promise<number[]> => {
+          const svg = join(dir, `${name}.svg`);
+          writeFileSync(svg, svgOf(a));
+          const st = unitsToMm(
+            readDst(new Uint8Array(await inFreshCache(dir, name, () => dstOf(svg)))).stitches,
+          );
+          return st
+            .filter((s) => s.cmd === "stitch" && Math.abs(s.x) < 8 && Math.abs(s.y) < 3.5)
+            .map((s) => s.y);
+        };
+        const staggered = await inside(attrs, "versetzt");
+        const plain = await inside(plainAttrs, "standard");
+        const spread = (ys: number[]): number => Math.max(...ys) - Math.min(...ys);
+        expect(staggered.length).toBeGreaterThan(20);
+        expect(plain.length).toBeGreaterThan(20);
+        // The default sets every split point in the middle of its stitch: a seam down the column.
+        expect(spread(plain)).toBeLessThan(1);
+        // Staggered, they spread across the column.
+        expect(spread(staggered)).toBeGreaterThan(3);
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }

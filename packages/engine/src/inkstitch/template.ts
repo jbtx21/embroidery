@@ -332,12 +332,57 @@ export function satinColumnAttributes(
     zigzag_spacing_mm: num(preset.satinSpacingMm),
     pull_compensation_mm: pullAttribute(pull ?? [side, side]),
     max_stitch_length_mm: num(SATIN_SPLIT_MM),
+    // Ink/Stitch's default sets the split points in the middle of each stitch, where they line up
+    // into a seam down the column; staggered they move row by row (spec §7.4, 05.10.2026).
+    split_method: "staggered",
     ...underlay,
   };
 }
 
 const pullAttribute = ([a, b]: [number, number]): string =>
   a === b ? num(a) : `${num(a)} ${num(b)}`;
+
+/**
+ * The ties after the puncher's pattern (spec §10.3, 05.10.2026), measured in the 23 professional
+ * DSTs of phase 1b step 6 and the puncher's Elektrotechnik Yer: the tie-in is short stitches of
+ * 0.5 mm forward along the path the object is about to stitch (four or five there), the tie-off two
+ * stitches of about 0.8 mm back and forth. Ink/Stitch's own default is the half stitch at both ends:
+ * four stitches back and forth on the spot, half the first stitch long (0.25 to 0.75 mm), several of
+ * them on the same holes, and some under 0.3 mm after the DST's rounding. Lock stitches are never
+ * filtered (§11), so these keep the minimum stitch length themselves.
+ */
+export const TIE_IN_STEP_MM = 0.5;
+/**
+ * Tie-in stitches forward from the start — two, not the puncher's four: Ink/Stitch lays them along
+ * the path ahead, and where it turns within the tie (a row end, a small object) the stitches fold
+ * into short ones; over 1 mm instead of 2 mm that happens about half as often (measured on four
+ * logos). Ink/Stitch begins the object at its start again after the tie (`AbsoluteLock`), so one
+ * stitch goes back over them, and the object's path runs over all of them. The jump still lands on
+ * the start: a tie-in that began ahead would lengthen every connection and move it across the
+ * limits of §10.2.1.
+ */
+export const TIE_IN_STEPS = 2;
+/** Each of the two tie-off stitches, back along the last stitches and forth again. */
+export const TIE_OFF_STEP_MM = 0.8;
+
+/**
+ * Ink/Stitch's lock attributes for these ties: custom paths in units of the scale. At the start the
+ * steps go forward along the path ahead, the last one back to the start; at the end they go back
+ * along what was stitched and return to the last stitch.
+ */
+export function tieAttributes(): Record<string, string> {
+  return {
+    lock_start: "custom",
+    lock_custom_start: [
+      ...Array.from({ length: TIE_IN_STEPS }, () => "1"),
+      `-${TIE_IN_STEPS}`,
+    ].join(" "),
+    lock_start_scale_mm: num(TIE_IN_STEP_MM),
+    lock_end: "custom",
+    lock_custom_end: "1 -1",
+    lock_end_scale_mm: num(TIE_OFF_STEP_MM),
+  };
+}
 
 const inkAttrs = (attrs: Record<string, string>): string =>
   Object.entries(attrs)
@@ -946,7 +991,7 @@ function emitTemplate(
       const underlay = gridUnderlay(p.polygon, preset, angleDeg);
       body.push(
         `<path id="${xmlEscape(p.id)}" d="${polygonD(p.polygon)}" style="fill:${xmlEscape(p.color)};stroke:none"` +
-          `${inkAttrs({ ...tatamiAttributes(preset, angleDeg, underlay.grid), ...trimAttr(p) })}/>`,
+          `${inkAttrs({ ...tatamiAttributes(preset, angleDeg, underlay.grid), ...tieAttributes(), ...trimAttr(p) })}/>`,
       );
       objects.push({
         id: p.id,
@@ -966,6 +1011,7 @@ function emitTemplate(
       const attrs: Record<string, string> = {
         stroke_method: "running_stitch",
         running_stitch_length_mm: num(RUNNING_STITCH_MM),
+        ...tieAttributes(),
       };
       // One element per line: Ink/Stitch cuts after an element and never between the lines
       // of one, so the jumps between the lines of a hairline with a junction would stay open
@@ -994,7 +1040,7 @@ function emitTemplate(
         (c) =>
           `<path id="${xmlEscape(c.id)}" d="${satinColumnD(c)}" ` +
           `style="fill:none;stroke:${xmlEscape(p.color)};stroke-width:0.1"` +
-          `${inkAttrs(satinColumnAttributes(c.widthMm, preset, pulls?.get(c.id)?.pull))}/>`,
+          `${inkAttrs({ ...satinColumnAttributes(c.widthMm, preset, pulls?.get(c.id)?.pull), ...tieAttributes() })}/>`,
       );
       body.push(`<g id="${xmlEscape(p.id)}">${inner.join("")}</g>`);
       run.ids.push(...p.columns.map((c) => c.id));

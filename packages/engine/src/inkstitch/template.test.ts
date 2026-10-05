@@ -36,6 +36,10 @@ import {
   satinColumnAttributes,
   satinColumnD,
   satinPullCompMm,
+  TIE_IN_STEP_MM,
+  TIE_IN_STEPS,
+  TIE_OFF_STEP_MM,
+  tieAttributes,
   UNDERLAY_WIDE_FROM_MM,
 } from "./template.js";
 import type { TemplateResult } from "./template.js";
@@ -77,6 +81,9 @@ describe("satinColumnAttributes", () => {
       zigzag_spacing_mm: String(pique.satinSpacingMm),
       pull_compensation_mm: "0.06",
       max_stitch_length_mm: String(SATIN_SPLIT_MM),
+      // Split points staggered row by row, so they never line up into a seam down the column
+      // (BERNINA's special satin does it at random; Ink/Stitch's default sets them in the middle).
+      split_method: "staggered",
       center_walk_underlay: "true",
       center_walk_underlay_stitch_length_mm: String(CENTER_WALK_STITCH_MM),
     });
@@ -106,6 +113,25 @@ describe("satinColumnAttributes with a pull per rail (spec §7.8.3)", () => {
     expect(satinColumnAttributes(2.4, pique, [0.288, 0.288]).pull_compensation_mm).toBe("0.288");
     expect(satinColumnAttributes(0.8, pique, [0, 0]).pull_compensation_mm).toBe("0");
     expect(satinColumnAttributes(2.4, pique).pull_compensation_mm).toBe("0.072");
+  });
+});
+
+describe("tieAttributes (spec §10.3, the puncher's ties)", () => {
+  it("ties in with two 0.5-mm stitches forward along the path and one back, off with two 0.8-mm stitches back and forth", () => {
+    expect([TIE_IN_STEPS, TIE_IN_STEP_MM, TIE_OFF_STEP_MM]).toEqual([2, 0.5, 0.8]);
+    expect(tieAttributes()).toEqual({
+      lock_start: "custom",
+      lock_custom_start: "1 1 -2",
+      lock_start_scale_mm: "0.5",
+      lock_end: "custom",
+      lock_custom_end: "1 -1",
+      lock_end_scale_mm: "0.8",
+    });
+  });
+
+  it("keeps every tie stitch above the minimum stitch length: Ink/Stitch never filters lock stitches (§11)", () => {
+    expect(TIE_IN_STEP_MM).toBeGreaterThan(INKSTITCH_MIN_STITCH_MM);
+    expect(TIE_OFF_STEP_MM).toBeGreaterThan(INKSTITCH_MIN_STITCH_MM);
   });
 });
 
@@ -195,6 +221,17 @@ describe("buildInkstitchTemplate", () => {
     expect(t.svg).toMatch(/<path id="hairline"[^>]*inkstitch:stroke_method="running_stitch"/);
     expect(t.svg).toMatch(/<path id="hairline"[^>]*inkstitch:running_stitch_length_mm="2"/);
     expect(t.svg).toMatch(/<path id="rule_1"[^>]*inkstitch:stroke_method="running_stitch"/);
+  });
+
+  it("ties every object the way the puncher does (spec §10.3): satin, tatami and running stitch alike", () => {
+    const elements = t.svg.match(/<path [^>]*inkstitch:[^>]*>/g)!;
+    const kinds = ["satin_column", "row_spacing_mm", "stroke_method"];
+    for (const kind of kinds)
+      expect(elements.some((e) => e.includes(`inkstitch:${kind}=`))).toBe(true);
+    for (const e of elements) {
+      for (const [k, v] of Object.entries(tieAttributes()))
+        expect(e).toContain(`inkstitch:${k}="${v}"`);
+    }
   });
 
   it("sets Ink/Stitch's minimum stitch length in the metadata, first thing in the document (spec §11)", () => {
