@@ -941,14 +941,17 @@ export type FarbfolgeInput = {
   stitches: number;
   /** The preset, by its id ("cap"). */
   preset: string;
+  /** Backing or topping the preset names (`Preset.stabilizer`, spec §14), if it names one. */
+  stabilizer?: string;
   stops: ReworkStop[];
 };
 
 /**
- * The needle occupancy per stop as a text file (spec §13.4): a header with size, stitches and preset, then
- * one line per stop — number, colour name and value. A colour that comes back is named by number and
- * name alone. A colour close to an earlier one, but not the same (`SAME_NEEDLE_RGB`), gets the
- * question “dieselbe Nadel wie Stopp N?”.
+ * The needle occupancy per stop as a text file (spec §13.4): a header with size, stitches and preset,
+ * under it the preset's backing or topping where it names one, then one line per stop — number,
+ * colour name and value. A colour that comes back is named by number and name alone. A colour close
+ * to an earlier one, but not the same (`SAME_NEEDLE_RGB`), gets the question “dieselbe Nadel wie
+ * Stopp N?”.
  */
 export function farbfolge(input: FarbfolgeInput): string {
   const { stops } = input;
@@ -956,6 +959,7 @@ export function farbfolge(input: FarbfolgeInput): string {
     `${input.name}   ${german(input.widthMm, 1)} x ${german(input.heightMm, 1)} mm   ` +
       `${german(input.stitches, 0)} Stiche   Preset ${input.preset}`,
   ];
+  if (input.stabilizer !== undefined) lines.push(`  Stoffhinweis: ${input.stabilizer}`);
   const numberWidth = String(stops.length).length;
   // The colour values line up among the stops that show one.
   const nameWidth = Math.max(

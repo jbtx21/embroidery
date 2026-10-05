@@ -618,6 +618,15 @@ describe("presets (spec §14)", () => {
     }
   });
 
+  it("names backing or topping only where the table's note names one (spec §14, printed by §13.4)", () => {
+    expect(PRESETS.jersey.stabilizer).toBe("Schneidvlies");
+    expect(PRESETS.fleece.stabilizer).toBe("Topping (wasserlösliche Folie) empfohlen");
+    expect(PRESETS.frottee.stabilizer).toBe("Topping (wasserlösliche Folie) empfohlen");
+    for (const id of ["pique", "softshell", "cap"] as const) {
+      expect(PRESETS[id].stabilizer).toBeUndefined();
+    }
+  });
+
   it("thins the rows out for 60 weight thread (spec §14)", () => {
     expect(densityFactor(MACHINE_DEFAULT)).toBe(1);
     expect(densityFactor({ ...MACHINE_DEFAULT, threadWeight: 60 })).toBe(0.8);

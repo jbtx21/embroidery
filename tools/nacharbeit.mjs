@@ -56,6 +56,7 @@ import {
   needleSpots,
   openJumps,
   pageSizeMm,
+  PRESETS,
 } from "@texma-stitch/engine";
 import { renderPlanSvg } from "@texma-stitch/render";
 import { svgZuPng } from "./feinheit.mjs";
@@ -558,6 +559,7 @@ export async function writeRework(run) {
       heightMm: run.stats.bboxMm.h,
       stitches: run.stats.stitches,
       preset: run.presetName,
+      stabilizer: PRESETS[run.presetName]?.stabilizer,
       stops: rework.stops,
     }),
   );

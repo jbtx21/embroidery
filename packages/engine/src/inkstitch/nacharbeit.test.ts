@@ -689,6 +689,23 @@ describe("farbfolge", () => {
     );
   });
 
+  it("prints the preset's backing or topping under the header, where the preset names one (§14)", () => {
+    const base = {
+      name: "x",
+      widthMm: 10,
+      heightMm: 10,
+      stitches: 12,
+      preset: "fleece",
+      stops: [stop("#d1b35a", "Gold")],
+    };
+    expect(farbfolge({ ...base, stabilizer: "Topping (wasserlösliche Folie) empfohlen" })).toBe(
+      "x   10,0 x 10,0 mm   12 Stiche   Preset fleece\n" +
+        "  Stoffhinweis: Topping (wasserlösliche Folie) empfohlen\n" +
+        "  1 Gold  #D1B35A\n",
+    );
+    expect(farbfolge(base)).not.toContain("Stoffhinweis");
+  });
+
   it("names a repeated colour by number and name alone", () => {
     const text = farbfolge({
       name: "x",

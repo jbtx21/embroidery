@@ -44,6 +44,12 @@ export type Preset = {
   fillUnderlay: FillUnderlay;
   satinUnderlay: SatinUnderlay;
   note?: string;
+  /**
+   * What goes under or on the fabric at the machine: backing or topping (spec §14, column
+   * "Hinweis"). The colour sequence file prints it under its header (§13.4), so the operator has it
+   * where the file is stitched. Only what the preset's rule names; nothing where it names nothing.
+   */
+  stabilizer?: string;
 };
 
 const fillUnderlayOf = (
@@ -95,6 +101,7 @@ export const PRESETS: Record<PresetId, Preset> = {
     fillUnderlay: fillUnderlayOf("single"),
     satinUnderlay: satinUnderlayOf(),
     note: "dünne Shirtware, Schneidvlies",
+    stabilizer: "Schneidvlies",
   },
   softshell: {
     id: "softshell",
@@ -128,6 +135,7 @@ export const PRESETS: Record<PresetId, Preset> = {
     fillUnderlay: fillUnderlayOf("double"),
     satinUnderlay: satinUnderlayOf({ insetMm: 0.3 }),
     note: "Topping empfohlen",
+    stabilizer: "Topping (wasserlösliche Folie) empfohlen",
   },
   cap: {
     id: "cap",
@@ -162,6 +170,7 @@ export const PRESETS: Record<PresetId, Preset> = {
     fillUnderlay: fillUnderlayOf("double"),
     satinUnderlay: satinUnderlayOf(),
     note: "Knockdown-Fill unter Motiv, Topping",
+    stabilizer: "Topping (wasserlösliche Folie) empfohlen",
   },
 };
 
