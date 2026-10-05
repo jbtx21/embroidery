@@ -3,6 +3,17 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Presets nach dem Probestick (05.10.2026)
+
+- **Andere Stoffe am Stoff prüfen.** Halbierter Reihenabstand und kleiner Zugausgleich sind nur auf
+  Piqué gestickt (STUTTGART 91 mm). Jersey (0,225 mm, 4 %), Fleece, Cap, Softshell und Frottee
+  brauchen je einen Probestick.
+- **Christliche, Dichtespitze 29 → 34** je mm² am Pferdekopf (Halfter, Auge, Ohr). Die Grenze von 40
+  ist nicht erreicht, der Puncher liegt dort bei 20.
+- **Laufzeit:** Flächenreiche Motive brauchen 20–50 % länger (STUTTGART 250 mm mit Tor 12:46 min).
+- **Eingefrorene Engine:** Sie rechnet mit denselben Presets. Ihre schmalsten Spalten können unter
+  ihre Mindeststichlänge von 0,6 mm fallen (§7.2). Für Aufträge nicht mehr in Gebrauch.
+
 ## Fadenschnitte nach Sichtbarkeit (02.10.2026)
 
 - **Schwelle 1 mm blank (`VISIBLE_MAX_MM`).** Ungeschnitten bleibt eine Verbindung, von der höchstens

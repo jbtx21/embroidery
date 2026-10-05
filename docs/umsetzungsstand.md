@@ -879,3 +879,38 @@ Herkunft der 716 Schnitte vorher:
 - **Tests:** 1.299 → 1.343, Rauchtest 16 → 17.
 - **Grenzen** (kleine sichtbare Hälse bis 1 mm, Durchsticken bis 7 mm, Laufzeit) stehen in
   `docs/backlog.md`.
+
+**Reihenabstand halbiert, Satin-Zugausgleich auf Profi-Niveau (05.10.2026, Spec §14, §7.2).**
+Entscheidung des Nutzers nach dem Probestick STUTTGART 91 mm auf Piqué: „Zugausgleich zu viel, und
+dem Tatami fehlt Faden." Umgestellt sind alle Stoffe:
+
+- Tatami-Reihenabstand: Piqué 0,40 → 0,20, Jersey 0,45 → 0,225, Softshell 0,42 → 0,21,
+  Fleece 0,40 → 0,20, Cap und Frottee 0,38 → 0,19 mm.
+- Satin-Zugausgleich: 12 % (Jersey und Fleece 15 %) mit 0,2–0,4 mm → 3 % (4 %) mit 0,05–0,25 mm je
+  Seite.
+
+Die Wendestiche unter 0,4 mm fallen jetzt an den meisten Flächenkanten weg (Mindeststichlänge, §11).
+Die Reihen laufen dort ineinander wie in der Zickzack-Füllung der Profi-Dateien.
+
+Gemessen an den acht Referenzlogos (mit Tor, Christliche ohne Tor), vorher Stand `0894b00`:
+
+| Motiv                        |          Stiche |   Trims | Dichtespitze | Zellen > 18 | Nadelhäufung |
+| ---------------------------- | --------------: | ------: | -----------: | ----------- | -----------: |
+| STUTTGART 91 mm              | 16.115 → 19.118 | 29 → 31 |      27 → 26 | 4 → 11      |        6 → 6 |
+| STUTTGART 250 mm             | 73.306 → 96.515 | 42 → 42 |      28 → 28 | 12 → 21     |        8 → 7 |
+| Köln 134 mm                  | 33.645 → 44.925 | 64 → 73 |      22 → 24 | 3 → 7       |        7 → 6 |
+| Eislingen 274 mm             | 49.899 → 63.700 | 79 → 79 |      19 → 18 | 1 → 0       |        8 → 6 |
+| Atzensport 107 mm            | 18.702 → 21.000 | 72 → 78 |      18 → 18 | 0 → 0       |        7 → 5 |
+| Hofbräu 110,8 mm (`cap`)     |   9.133 → 9.097 | 49 → 51 |      19 → 19 | 1 → 1       |        6 → 7 |
+| Elektrotechnik Yer 89,8 mm   |   2.813 → 2.929 | 13 → 15 |      12 → 12 | 0 → 0       |        4 → 5 |
+| Christliche 90,2 mm (Jersey) | 10.038 → 10.335 | 68 → 71 |      29 → 34 | 10 → 10     |        9 → 7 |
+
+- **Stiche:** Mit viel Fläche steigen sie um 12–33 %, Satin-lastige Motive bleiben fast gleich.
+- **Gegen den Puncher:** Elektrotechnik Yer 2.929 gegen 2.905 Stiche, die Christliche 10.335 gegen
+  11.120.
+- **Kennzahlen:** Dichtespitze, Zellen über 18 und Nadelhäufung bleiben unter den Fehlergrenzen von
+  §11.
+- **Laufzeit** mit Tor, drei Läufe parallel: Bei flächenreichen Motiven steigt sie um 20–50 %, z. B.
+  STUTTGART 250 mm von 9:07 auf 12:46 min.
+- **Tests:** 1.343 grün. Im Rauchtest prüft der Fall „Zugausgleich je Rail" die Regel jetzt mit dem
+  alten, starken Ausgleich. Mit dem neuen Preset bleibt der Spalt auch symmetrisch offen.
