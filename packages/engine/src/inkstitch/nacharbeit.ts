@@ -167,15 +167,28 @@ export const PALETTE: readonly PaletteEntry[] = [
 ];
 
 /**
- * The name of the palette colour nearest in RGB; on a tie the first of the palette. "Unbekannt" for a
- * colour that cannot be read.
+ * A colour whose channels lie this close together (largest minus smallest, 0 to 255) is achromatic: a
+ * grey, black or white. Measured 05.10.2026: the anthracite of Elektrotechnik Yer (#333132, 2) came out
+ * "Dunkelblau" by RGB distance alone, 60.3 against 60.6 for "Dunkelgrau"; the most neutral coloured
+ * thread of the customer logos, a brown (#89724a), lies at 63, and the greys at 0 to 10.
+ */
+export const NEUTRAL_CHROMA = 16;
+
+const chroma = (c: Rgb): number => Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b);
+
+/**
+ * The name of the palette colour nearest in RGB; on a tie the first of the palette. An achromatic colour
+ * (`NEUTRAL_CHROMA`) is named after the achromatic entries only — a grey is never called by a hue —
+ * unless the palette has none. "Unbekannt" for a colour that cannot be read.
  */
 export function colourName(text: string, palette: readonly PaletteEntry[] = PALETTE): string {
   const c = parseColour(text);
   if (c === undefined) return "Unbekannt";
+  const greys = palette.filter((p) => chroma(p.rgb) <= NEUTRAL_CHROMA);
+  const candidates = chroma(c) <= NEUTRAL_CHROMA && greys.length > 0 ? greys : palette;
   let best = "Unbekannt";
   let bestD = Infinity;
-  for (const p of palette) {
+  for (const p of candidates) {
     const d = (p.rgb.r - c.r) ** 2 + (p.rgb.g - c.g) ** 2 + (p.rgb.b - c.b) ** 2;
     if (d < bestD) {
       best = p.name;

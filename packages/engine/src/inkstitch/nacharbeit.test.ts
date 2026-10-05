@@ -10,6 +10,7 @@ import {
   colourDistance,
   colourKey,
   colourName,
+  NEUTRAL_CHROMA,
   documentBounds,
   elementCentres,
   elementKinds,
@@ -163,8 +164,23 @@ describe("colourName / colourDistance", () => {
       ["#fedd01", "Gelb"],
       ["#c4ab7a", "Beige"],
       ["#89724a", "Braun"],
+      ["#333132", "Dunkelgrau"], // Elektrotechnik Yer: nearer to Dunkelblau than to Dunkelgrau in RGB
+      ["#231f20", "Schwarz"], // Christliche Gemeindereitschule
     ];
     for (const [hex, name] of names) expect(colourName(hex), hex).toBe(name);
+  });
+
+  it("names an almost achromatic colour with a grey, never with a hue (05.10.2026)", () => {
+    // #333132 is 60.3 from Dunkelblau and 60.6 from Dunkelgrau; by RGB alone it was "Dunkelblau".
+    expect(NEUTRAL_CHROMA).toBe(16);
+    for (const hex of ["#333132", "#3a3a3c", "#2f3034", "#565451"]) {
+      expect(["Schwarz", "Dunkelgrau", "Grau", "Hellgrau", "Weiß"], hex).toContain(colourName(hex));
+    }
+    // Over the limit the hue counts as before.
+    expect(colourName("#1e2a5c")).toBe("Dunkelblau");
+    // A palette without a single grey still names the colour.
+    const hues = [{ name: "Rot", rgb: { r: 220, g: 0, b: 10 } }];
+    expect(colourName("#333132", hues)).toBe("Rot");
   });
 
   it("takes upper and lower case, short hex and names alike", () => {
