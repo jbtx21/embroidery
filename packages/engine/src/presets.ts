@@ -2,13 +2,15 @@
  * Presets (spec §14) and machine profiles. Starting values — to be adjusted
  * against test sew-outs in phase 5.
  *
- * Row spacing and stitch length follow the production values of ZSK EPCwin
- * (0.4-0.6 mm spacing, 4-5 mm stitch length) — 21.09.2026. Before that the
- * spacings ran down to 0.35 mm and the stitch length was 3.0 mm, which is
- * denser and shorter than a production file needs: more needle holes for the
- * same coverage. Fleece and terry are our own mapping, not taken from the
- * rule — both are thick and lofty, so the stitches sink in. They are the two to
- * check first on a test sew-out.
+ * Row spacing is the distance between neighbouring rows, as Ink/Stitch's
+ * `row_spacing_mm` reads it — half the ZSK EPCwin value (0.4-0.6 mm), which
+ * counts rows of the same direction (05.10.2026, the user's decision after the
+ * test sew-out of 02.10.2026). Measured on 24 puncher files: their fills are
+ * zigzags with the stitch lines 0.21 mm apart (p10-p90 0.16-0.23), rows of one
+ * direction 0.43 mm. The stitch length stays 4.0 mm (EPCwin, 21.09.2026).
+ * Fleece and terry are our own mapping, not taken from the rule — both are
+ * thick and lofty, so the stitches sink in. They are the two to check first on
+ * a test sew-out.
  */
 import type { FillUnderlay, PresetId, SatinUnderlay } from "./types.js";
 
@@ -24,12 +26,14 @@ export type Preset = {
   pullCompMm: number;
   /**
    * Satin: pull compensation per side as a percentage of the column width
-   * (§7.2). 12 % is the house value; stretchy and lofty goods get 15 %.
+   * (§7.2). 3 % is the house value, stretchy and lofty goods get 4 % — the level
+   * of the puncher files (0.06-0.07 mm a side), since 05.10.2026; before 12 and
+   * 15 %.
    */
   pullCompPct: number;
   /** Satin: lower limit of that compensation in mm — the thread pulls a roughly
-   * constant amount, so a narrow column needs the same floor as a wide one
-   * (§7.2). */
+   * constant amount, so a narrow column needs a floor as a wide one does
+   * (§7.2). 0.05 since 05.10.2026, before 0.2. */
   pullCompMinMm: number;
   /** Satin: upper limit of that compensation in mm (§7.2). */
   pullCompMaxMm: number;
@@ -61,14 +65,14 @@ export const PRESETS: Record<PresetId, Preset> = {
   pique: {
     id: "pique",
     label: "Piqué",
-    fillRowSpacingMm: 0.4,
+    fillRowSpacingMm: 0.2,
     fillStitchLengthMm: 4.0,
     fillStaggerRows: 4,
     satinSpacingMm: 0.38,
     pullCompMm: 0.2,
-    pullCompPct: 12,
-    pullCompMinMm: 0.2,
-    pullCompMaxMm: 0.4,
+    pullCompPct: 3,
+    pullCompMinMm: 0.05,
+    pullCompMaxMm: 0.25,
     pushCompMm: 0.1,
     underlapMm: 0.2,
     fillUnderlay: fillUnderlayOf("single"),
@@ -78,14 +82,14 @@ export const PRESETS: Record<PresetId, Preset> = {
   jersey: {
     id: "jersey",
     label: "Jersey",
-    fillRowSpacingMm: 0.45,
+    fillRowSpacingMm: 0.225,
     fillStitchLengthMm: 4.0,
     fillStaggerRows: 4,
     satinSpacingMm: 0.4,
     pullCompMm: 0.25,
-    pullCompPct: 15,
-    pullCompMinMm: 0.2,
-    pullCompMaxMm: 0.4,
+    pullCompPct: 4,
+    pullCompMinMm: 0.05,
+    pullCompMaxMm: 0.25,
     pushCompMm: 0.15,
     underlapMm: 0.25,
     fillUnderlay: fillUnderlayOf("single"),
@@ -95,14 +99,14 @@ export const PRESETS: Record<PresetId, Preset> = {
   softshell: {
     id: "softshell",
     label: "Softshell",
-    fillRowSpacingMm: 0.42,
+    fillRowSpacingMm: 0.21,
     fillStitchLengthMm: 4.0,
     fillStaggerRows: 4,
     satinSpacingMm: 0.4,
     pullCompMm: 0.25,
-    pullCompPct: 12,
-    pullCompMinMm: 0.2,
-    pullCompMaxMm: 0.4,
+    pullCompPct: 3,
+    pullCompMinMm: 0.05,
+    pullCompMaxMm: 0.25,
     pushCompMm: 0.1,
     underlapMm: 0.2,
     fillUnderlay: fillUnderlayOf("single"),
@@ -111,14 +115,14 @@ export const PRESETS: Record<PresetId, Preset> = {
   fleece: {
     id: "fleece",
     label: "Fleece",
-    fillRowSpacingMm: 0.4,
+    fillRowSpacingMm: 0.2,
     fillStitchLengthMm: 4.0,
     fillStaggerRows: 4,
     satinSpacingMm: 0.4,
     pullCompMm: 0.3,
-    pullCompPct: 15,
-    pullCompMinMm: 0.2,
-    pullCompMaxMm: 0.4,
+    pullCompPct: 4,
+    pullCompMinMm: 0.05,
+    pullCompMaxMm: 0.25,
     pushCompMm: 0.15,
     underlapMm: 0.25,
     fillUnderlay: fillUnderlayOf("double"),
@@ -128,14 +132,14 @@ export const PRESETS: Record<PresetId, Preset> = {
   cap: {
     id: "cap",
     label: "Cap",
-    fillRowSpacingMm: 0.38,
+    fillRowSpacingMm: 0.19,
     fillStitchLengthMm: 4.0,
     fillStaggerRows: 4,
     satinSpacingMm: 0.35,
     pullCompMm: 0.2,
-    pullCompPct: 12,
-    pullCompMinMm: 0.2,
-    pullCompMaxMm: 0.4,
+    pullCompPct: 3,
+    pullCompMinMm: 0.05,
+    pullCompMaxMm: 0.25,
     pushCompMm: 0.1,
     underlapMm: 0.2,
     fillUnderlay: fillUnderlayOf("single"),
@@ -145,14 +149,14 @@ export const PRESETS: Record<PresetId, Preset> = {
   frottee: {
     id: "frottee",
     label: "Frottee",
-    fillRowSpacingMm: 0.38,
+    fillRowSpacingMm: 0.19,
     fillStitchLengthMm: 4.0,
     fillStaggerRows: 4,
     satinSpacingMm: 0.35,
     pullCompMm: 0.2,
-    pullCompPct: 12,
-    pullCompMinMm: 0.2,
-    pullCompMaxMm: 0.4,
+    pullCompPct: 3,
+    pullCompMinMm: 0.05,
+    pullCompMaxMm: 0.25,
     pushCompMm: 0.15,
     underlapMm: 0.3,
     fillUnderlay: fillUnderlayOf("double"),

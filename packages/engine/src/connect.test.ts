@@ -583,23 +583,25 @@ describe("object helpers", () => {
 
 describe("presets (spec §14)", () => {
   it("carries the values from the table", () => {
-    // EPCwin production values since 21.09.2026: row spacing 0,38 to 0,45,
-    // stitch length 4,0.
-    expect(PRESETS.pique.fillRowSpacingMm).toBe(0.4);
-    expect(PRESETS.softshell.fillRowSpacingMm).toBe(0.42);
-    expect(PRESETS.fleece.fillRowSpacingMm).toBe(0.4);
-    expect(PRESETS.cap.fillRowSpacingMm).toBe(0.38);
-    expect(PRESETS.jersey.fillRowSpacingMm).toBe(0.45);
-    expect(PRESETS.frottee.fillRowSpacingMm).toBe(0.38);
+    // Since 05.10.2026 the row spacing is the distance between neighbouring
+    // rows, half the EPCwin value (which counts rows of the same direction):
+    // 0,19 to 0,225; stitch length 4,0.
+    expect(PRESETS.pique.fillRowSpacingMm).toBe(0.2);
+    expect(PRESETS.softshell.fillRowSpacingMm).toBe(0.21);
+    expect(PRESETS.fleece.fillRowSpacingMm).toBe(0.2);
+    expect(PRESETS.cap.fillRowSpacingMm).toBe(0.19);
+    expect(PRESETS.jersey.fillRowSpacingMm).toBe(0.225);
+    expect(PRESETS.frottee.fillRowSpacingMm).toBe(0.19);
     for (const p of Object.values(PRESETS)) {
       expect(p.fillStitchLengthMm).toBe(4.0);
-      expect(p.fillRowSpacingMm).toBeGreaterThanOrEqual(0.38);
-      expect(p.fillRowSpacingMm).toBeLessThanOrEqual(0.45);
-      // Satin pull compensation is a percentage of the column width now.
-      // Stretchy and lofty goods pull more, so Jersey and Fleece get 15 %.
-      expect(p.pullCompPct).toBe(p.id === "jersey" || p.id === "fleece" ? 15 : 12);
-      expect(p.pullCompMinMm).toBe(0.2);
-      expect(p.pullCompMaxMm).toBe(0.4);
+      expect(p.fillRowSpacingMm).toBeGreaterThanOrEqual(0.19);
+      expect(p.fillRowSpacingMm).toBeLessThanOrEqual(0.225);
+      // Satin pull compensation is a percentage of the column width, at the
+      // level of the puncher files since 05.10.2026. Stretchy and lofty goods
+      // pull more, so Jersey and Fleece get 4 %.
+      expect(p.pullCompPct).toBe(p.id === "jersey" || p.id === "fleece" ? 4 : 3);
+      expect(p.pullCompMinMm).toBe(0.05);
+      expect(p.pullCompMaxMm).toBe(0.25);
     }
     expect(PRESETS.fleece.pullCompMm).toBe(0.3);
     expect(PRESETS.fleece.fillUnderlay.fill).toBe("double");
@@ -607,7 +609,7 @@ describe("presets (spec §14)", () => {
     expect(PRESETS.frottee.satinSpacingMm).toBe(0.35);
     expect(preset("softshell").id).toBe("softshell");
     // Jersey and the directional compensation, 19.09.2026
-    expect(PRESETS.jersey.fillRowSpacingMm).toBe(0.45);
+    expect(PRESETS.jersey.fillRowSpacingMm).toBe(0.225);
     expect(PRESETS.cap.satinSpacingMm).toBe(0.35);
     for (const p of Object.values(PRESETS)) {
       expect(p.pushCompMm).toBeGreaterThan(0);
@@ -620,7 +622,7 @@ describe("presets (spec §14)", () => {
     expect(densityFactor(MACHINE_DEFAULT)).toBe(1);
     expect(densityFactor({ ...MACHINE_DEFAULT, threadWeight: 60 })).toBe(0.8);
     const fine = presetForMachine("pique", { ...MACHINE_DEFAULT, threadWeight: 60 });
-    expect(fine.fillRowSpacingMm).toBeCloseTo(0.32, 9);
+    expect(fine.fillRowSpacingMm).toBeCloseTo(0.16, 9);
     expect(fine.satinSpacingMm).toBeCloseTo(0.304, 9);
     // Everything else stays put.
     expect(fine.pullCompMm).toBe(PRESETS.pique.pullCompMm);

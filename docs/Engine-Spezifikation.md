@@ -50,6 +50,13 @@ gefüllt und Splitter bis 4 mm² im Abstand bis 0,4 mm angeschlossen. Staub unte
 mit schmalem Band wird geteilt, der breite Teil bleibt Tatami, das Band wird Satin. Ein Band ist
 mindestens 1,3 mm breit, 15 Breiten lang, gleichmäßig breit und hängt an einem Kopf ab 20 mm². §10.2.1 neu: Die Fadenschnitte der Ink/Stitch-Vorlage richten sich danach, ob Faden auf blankem Stoff läge. `auto_satin` läuft ohne `--trim`. Geschnitten wird, wo mehr als 1 mm der Verbindung blank läge oder sie länger als 7 mm ist. Über die acht Referenzlogos: 716 → 416 Schnitte.
 
+**Änderung 05.10.2026** — §14 und §7.2, Entscheidung des Nutzers nach dem Probestick:
+- Tatami-Reihenabstand für alle Stoffe halbiert: Piqué 0,20, Jersey 0,225, Softshell 0,21,
+  Fleece 0,20, Cap und Frottee 0,19 mm. Grund: Die EPCwin-Zahl meint gleichgerichtete Reihen,
+  die Profi-Dateien liegen bei 0,21 mm zwischen benachbarten Stichlinien.
+- Satin-Zugausgleich 3 % je Seite (Jersey und Fleece 4 %), 0,05–0,25 mm.
+- §11: Die Wendestiche unter 0,4 mm entfallen, wie in der Zickzack-Füllung der Profis.
+
 ---
 
 ## 1. Zweck und Grundsätze *(28.09.2026 neu gefasst — vorher: die Engine erzeugt die Stiche selbst)*
@@ -660,10 +667,17 @@ Neu:
 
 | Größe | Bedeutung |
 |---|---|
-| `pullCompPct` | Prozent der **medianen Spaltenbreite**, **je Seite**. Standard 12; Jersey und Fleece 15. |
-| `pullCompMinMm` | **Untergrenze**, je Seite. Standard 0,2. |
-| `pullCompMaxMm` | Obergrenze dafür, je Seite. Standard 0,4. |
+| `pullCompPct` | Prozent der **medianen Spaltenbreite**, **je Seite**. Standard 3; Jersey und Fleece 4 *(05.10.2026, vorher 12 und 15; §14)*. |
+| `pullCompMinMm` | **Untergrenze**, je Seite. Standard 0,05 *(05.10.2026, vorher 0,2)*. |
+| `pullCompMaxMm` | Obergrenze dafür, je Seite. Standard 0,25 *(05.10.2026, vorher 0,4)*. |
 | `pullCompMm` | **Override** in Millimetern. Gesetzt, gilt er allein — so bringt eine Schrift mit, womit sie gezeichnet wurde (§9.2). |
+
+**Werte seit 05.10.2026** (§14): Die Profi-Dateien verbreitern eine Säule nur um 0,06 bis 0,07 mm
+je Seite, der Probestick bestätigte das. Die Untergrenze von 0,2 mm unten stammt aus der eigenen
+Engine: Deren `postProcess` räumte Stiche unter 0,6 mm ab. In der Ink/Stitch-Vorlage gilt das nicht:
+Säulen unter 0,7 mm sind dort Laufstich (§7.8), und Ink/Stitch lässt erst Stiche bis 0,4 mm weg
+(§11). Die eingefrorene Engine rechnet mit denselben Presets; ihre schmalsten Spalten können
+wieder unter ihre 0,6 mm fallen. Für Aufträge ist sie nicht mehr in Gebrauch.
 
 **Die Untergrenze ist so wichtig wie der Deckel** *(21.09.2026)*. Der Faden zieht das Gewebe
 um einen annähernd **konstanten** Betrag zusammen; der Anteil, der mit der Breite skaliert,
@@ -1778,7 +1792,7 @@ und 0,7 mm und 17 zwischen 0,7 und 1 mm auf blankem Stoff.
 - **In der Ink/Stitch-Vorlage: 0,4 mm** *(02.10.2026, Entscheidung des Nutzers)*. Die Punkte oben gelten für die eingefrorene eigene Engine. Bei Ink/Stitch entscheidet die Dokument-Einstellung `min_stitch_len_mm` (Ink/Stitch-Standard 0,1 mm): Ink/Stitch lässt beim Erzeugen jeden Stich weg, der **höchstens** so lang ist (`ColorBlock.filter_duplicate_stitches`). Ausgenommen sind Verriegelungsstiche (`lock_stitch`), der erste Stich nach einem Sprung sowie Schnitt-, Stopp- und Farbwechselbefehle. Die Vorlage schreibt deshalb `<inkstitch:min_stitch_len_mm>0.4</inkstitch:min_stitch_len_mm>` in ihr `<metadata>`. Ink/Stitch ergänzt dort nur fehlende Werte. Die Nacharbeit-Datei (§13.4) übernimmt den Wert mit dem Kopf der Datei, am Arbeitsplatz entsteht also dieselbe DST.
   - **Anlass:** Unsere Probestick-DSTs hatten 2,8–6,0 % Stiche unter 0,4 mm, die beiden Profi-Dateien aus Schritt 6 (§16) nur 0,5 und 0,6 %. Die iPad-App StitchPencil entfernt Stiche unter 0,4 mm beim Import mit der Begründung, dass daran bei hoher Drehzahl der Faden reißt.
   - **Gemessen** an STUTTGART 91 mm (Piqué): Stiche unter 0,3 mm von 2,1 auf 0,1 %, unter 0,4 mm von 3,8 auf 1,2 %. Es fallen 482 Stiche weg (−2,9 %), davon 8 Reihenwechsel im Tatami; die Maße bleiben gleich. Atzensport 107 mm: unter 0,4 mm von 4,4 auf 2,1 %.
-  - **Offen** (vor jeder Änderung des Reihenabstands messen): Der Reihenwechsel an einer Tatami-Kante ist Reihenabstand / sin α lang, α ist der Winkel zwischen Kante und Reihen. Bei 0,40 mm Reihenabstand ist er nie kürzer als 0,4 mm und fällt nur an Kanten quer zu den Reihen weg (die 8 Stiche oben). Bei 0,2 mm ist er an jeder Kante mit α ≥ 30° höchstens 0,4 mm und fiele weg. So dicht stickt der Puncher den Pferdekörper der Christlichen Gemeindereitschule; ob das die Regel ist, klärt Schritt 6 (§16). Dann braucht Tatami einen eigenen Wert: Ink/Stitch erlaubt `min_stitch_length_mm` je Objekt.
+  - **Entschieden 05.10.2026** (vorher offen): Der Reihenwechsel an einer Tatami-Kante ist Reihenabstand / sin α lang, α ist der Winkel zwischen Kante und Reihen. Bei 0,40 mm Reihenabstand war er nie kürzer als 0,4 mm und fiel nur an Kanten quer zu den Reihen weg (die 8 Stiche oben). Mit den halbierten Reihenabständen (0,19–0,225 mm, §14) ist er an jeder Kante mit α ≥ 30° höchstens 0,4 mm und fällt weg. Die Reihen laufen dort ineinander wie in der Zickzack-Füllung der Profi-Dateien. Der Nutzer bestätigte nach dem Probestick, dass dem Tatami mit 0,40 mm Faden fehlt. In den vergrößerten Ausschnitten der Fassungen C und D blieben die Kanten am Bildschirm sauber. Tatami bekommt keinen eigenen Wert je Objekt.
 - Stiche und Sprünge > 12,1 mm in Teilstücke splitten (DST-Limit 121 Einheiten).
 - **Rundung: kaufmännisch-symmetrisch** (`roundHalfEven`, halbe Werte zur geraden Zahl), überall dort, wo Millimeter zu ganzen Formateinheiten werden. Grund: die Kreuzprüfung aus §13.2 läuft gegen Python, dessen `round()` genauso rundet. Bei Reihenabstand 0,25 mm liegt jede zweite Koordinate exakt auf der halben DST-Einheit — mit `Math.round` wäre die Datei nicht byte-identisch. *(19.09.2026)*
 - Stats:
@@ -1879,14 +1893,38 @@ Startwerte, in Phase 5 gegen Probesticks justieren.
 
 | Preset | Fill Reihe | Fill Stich | Satin Abstand | Zug Fill | Zug Satin | Schub | Überlappung | Unterlage Fill | Unterlage Satin | Hinweis |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Piqué | 0,40 | 4,0 | 0,38 | 0,20 | 12 % / 0,2–0,4 | 0,10 | 0,20 | contour + single | contour + zigzag | Standard |
-| Jersey | 0,45 | 4,0 | 0,40 | 0,25 | **15 %** / 0,2–0,4 | 0,15 | 0,25 | contour + single | contour + zigzag | dünne Shirtware, Schneidvlies |
-| Softshell | 0,42 | 4,0 | 0,40 | 0,25 | 12 % / 0,2–0,4 | 0,10 | 0,20 | contour + single | contour + zigzag | |
-| Fleece | 0,40 | 4,0 | 0,40 | 0,30 | **15 %** / 0,2–0,4 | 0,15 | 0,25 | contour + double | contour + zigzag, Inset 0,3 | Topping empfohlen |
-| Cap | 0,38 | 4,0 | 0,35 | 0,20 | 12 % / 0,2–0,4 | 0,10 | 0,20 | contour + single | center + contour | Reihenfolge Mitte → außen, unten → oben (§10.1) |
-| Frottee | 0,38 | 4,0 | 0,35 | 0,20 | 12 % / 0,2–0,4 | 0,15 | 0,30 | contour + double | contour + zigzag | Knockdown-Fill unter Motiv, Topping |
+| Piqué | 0,20 | 4,0 | 0,38 | 0,20 | 3 % / 0,05–0,25 | 0,10 | 0,20 | contour + single | contour + zigzag | Standard |
+| Jersey | 0,225 | 4,0 | 0,40 | 0,25 | **4 %** / 0,05–0,25 | 0,15 | 0,25 | contour + single | contour + zigzag | dünne Shirtware, Schneidvlies |
+| Softshell | 0,21 | 4,0 | 0,40 | 0,25 | 3 % / 0,05–0,25 | 0,10 | 0,20 | contour + single | contour + zigzag | |
+| Fleece | 0,20 | 4,0 | 0,40 | 0,30 | **4 %** / 0,05–0,25 | 0,15 | 0,25 | contour + double | contour + zigzag, Inset 0,3 | Topping empfohlen |
+| Cap | 0,19 | 4,0 | 0,35 | 0,20 | 3 % / 0,05–0,25 | 0,10 | 0,20 | contour + single | center + contour | Reihenfolge Mitte → außen, unten → oben (§10.1) |
+| Frottee | 0,19 | 4,0 | 0,35 | 0,20 | 3 % / 0,05–0,25 | 0,15 | 0,30 | contour + double | contour + zigzag | Knockdown-Fill unter Motiv, Topping |
 
-**Referenz ZSK EPCwin** *(21.09.2026)*. Die Produktionswerte der EPCwin-Dokumentation sind
+**Reihenabstand halbiert, Satin-Zugausgleich auf Profi-Niveau** *(05.10.2026, Entscheidung des
+Nutzers nach dem Probestick vom 02.10.2026: „Zugausgleich zu viel, und dem Tatami fehlt Faden.")*
+
+- **Reihenabstand.** Die 24 Profi-DSTs (Phase 1b Schritt 6) sticken Flächen als Zickzack-Füllung: Die
+  Reihen gehen am Rand ohne Wendestich ineinander über. Benachbarte Stichlinien liegen 0,21 mm
+  auseinander (p10–p90 0,16–0,23), gleichgerichtete Reihen 0,43 mm. Die Ink/Stitch-Vorlage trug
+  0,40 mm als `row_spacing_mm` ein, also als Abstand **benachbarter** Reihen, und legte damit halb so
+  viel Faden: 0,63 Einstiche je mm² gegen 1,7 beim Profi. Die EPCwin-Angabe unten (0,4 bis 0,6 mm)
+  meint den Abstand **gleichgerichteter** Reihen. Deshalb sind alle Werte halbiert, und die
+  Abstufung der Stoffe bleibt. Die iPad-App StitchPencil nennt für Jersey mit 40er-Garn dieselbe
+  Grenze (0,20 mm; 0,22 sprenkelt noch).
+- **Satin-Zugausgleich.** Die Profi-Dateien verbreitern eine Säule um 0,06 mm je Seite
+  (Elektrotechnik Yer) bzw. etwa 0,07 mm (Christliche Gemeindereitschule). Wir gaben 0,26 bzw.
+  0,13 mm. Neu sind 3 % der Breite, für Jersey und Fleece 4 %, zwischen 0,05 und 0,25 mm je Seite.
+  Mit 0,06 mm je Seite trafen die gestickten Säulenbreiten von Elektrotechnik Yer die des
+  Punchers auf ±0,05 mm. 3 % einer Säule von 2 mm sind 0,06 mm.
+- **Probestick** (STUTTGART 91 mm, Piqué): Vier Fassungen. A heute, B Zugausgleich wie Profi,
+  C Reihenabstand 0,20 mm, D beides. Befund des Nutzers: Zugausgleich zu viel, und dem Tatami fehlt
+  Faden. Das ist die Richtung von B und C, zusammen also D.
+- **Folge für die Mindeststichlänge** (§11): Bei diesen Abständen fallen die Wendestiche an den
+  meisten Kanten weg (≤ 0,4 mm). Die Reihen laufen dort ineinander wie in der Zickzack-Füllung der
+  Profis. Einen eigenen Wert je Objekt braucht Tatami deshalb nicht.
+
+**Referenz ZSK EPCwin** *(21.09.2026; seit 05.10.2026 gelesen als Abstand gleichgerichteter Reihen,
+siehe oben)*. Die Produktionswerte der EPCwin-Dokumentation sind
 **0,4 bis 0,6 mm Reihenabstand** und **4 bis 5 mm Stichlänge**. Unsere Werte lagen darunter:
 Reihenabstände bis 0,35 mm und durchweg 3,0 mm Stichlänge — dichter und kürzer, als eine
 Produktionsdatei braucht, also mehr Nadeleinstiche für dieselbe Deckung. Korrigiert:
@@ -1906,8 +1944,8 @@ Spannung und der Rahmen dreht unter der Nadel; die dichtere Spalte deckt das ab.
 Prozent seiner Breite (§7.2). Der **Schub beim Satin** bleibt offen — dort steht weiterhin
 nur der Zug.
 
-**Der Satin-Zugausgleich ist je Preset** *(21.09.2026)*: 12 %, bei **Jersey und Fleece
-15 %**, immer zwischen 0,2 und 0,4 mm je Seite. Dehnbare und flauschige Ware zieht stärker
+**Der Satin-Zugausgleich ist je Preset** *(21.09.2026; seit 05.10.2026 3 % bzw. 4 % und 0,05
+bis 0,25 mm, siehe oben)*: 12 %, bei **Jersey und Fleece 15 %**, immer zwischen 0,2 und 0,4 mm je Seite. Dehnbare und flauschige Ware zieht stärker
 zusammen; die Breite der Spalte wiegt trotzdem schwerer als die Ware, deshalb der Prozentsatz
 und nicht ein fester Aufschlag.
 

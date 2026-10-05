@@ -43,7 +43,7 @@ describe("tatamiAttributes (spec §14 preset values as Ink/Stitch attributes)", 
   it("sets density, stitch length, stagger, angle and the single underlay — and no pull compensation", () => {
     // The pull goes into the area's outline instead (`template.ts`, spec §8.1.1).
     expect(tatamiAttributes(pique, 45)).toEqual({
-      row_spacing_mm: "0.4",
+      row_spacing_mm: "0.2",
       max_stitch_length_mm: "4",
       staggers: "4",
       angle: "-45",
@@ -81,13 +81,13 @@ describe("tatamiAttributes (spec §14 preset values as Ink/Stitch attributes)", 
     const a = tatamiAttributes(pique, 45, false);
     expect(a.fill_underlay).toBe("false");
     expect(Object.keys(a).filter((k) => k.startsWith("fill_underlay"))).toEqual(["fill_underlay"]);
-    expect(a.row_spacing_mm).toBe("0.4");
+    expect(a.row_spacing_mm).toBe("0.2");
   });
 
   it("follows the preset: row spacing, stitch length, stagger", () => {
     const jersey = tatamiAttributes(PRESETS.jersey, 45);
     expect(jersey).toMatchObject({
-      row_spacing_mm: "0.45",
+      row_spacing_mm: "0.225",
       max_stitch_length_mm: "4",
       staggers: String(PRESETS.jersey.fillStaggerRows),
     });

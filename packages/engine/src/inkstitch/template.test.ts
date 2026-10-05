@@ -62,9 +62,10 @@ const area = (id: string, polygon: Polygon, color = "#1f3a93"): ImportedShape =>
 
 describe("satinPullCompMm (spec §7.2)", () => {
   it("is a share of the width, between the floor and the lid", () => {
+    // 3 % per side since 05.10.2026: 1 mm → 0.03, under the floor of 0.05; the lid of 0.25 from 8.33 mm.
     expect(satinPullCompMm(1, pique)).toBe(pique.pullCompMinMm);
-    expect(satinPullCompMm(2.5, pique)).toBeCloseTo(0.3, 6);
-    expect(satinPullCompMm(5, pique)).toBe(pique.pullCompMaxMm);
+    expect(satinPullCompMm(2.5, pique)).toBeCloseTo(0.075, 6);
+    expect(satinPullCompMm(10, pique)).toBe(pique.pullCompMaxMm);
   });
 });
 
@@ -74,7 +75,7 @@ describe("satinColumnAttributes", () => {
     expect(a).toMatchObject({
       satin_column: "true",
       zigzag_spacing_mm: String(pique.satinSpacingMm),
-      pull_compensation_mm: "0.24",
+      pull_compensation_mm: "0.06",
       max_stitch_length_mm: String(SATIN_SPLIT_MM),
       center_walk_underlay: "true",
       center_walk_underlay_stitch_length_mm: String(CENTER_WALK_STITCH_MM),
@@ -104,7 +105,7 @@ describe("satinColumnAttributes with a pull per rail (spec §7.8.3)", () => {
   it("writes one value where both rails are alike, as before", () => {
     expect(satinColumnAttributes(2.4, pique, [0.288, 0.288]).pull_compensation_mm).toBe("0.288");
     expect(satinColumnAttributes(0.8, pique, [0, 0]).pull_compensation_mm).toBe("0");
-    expect(satinColumnAttributes(2.4, pique).pull_compensation_mm).toBe("0.288");
+    expect(satinColumnAttributes(2.4, pique).pull_compensation_mm).toBe("0.072");
   });
 });
 
@@ -190,7 +191,7 @@ describe("buildInkstitchTemplate", () => {
       expect(c).toContain(`inkstitch:zigzag_spacing_mm="${pique.satinSpacingMm}"`);
       expect(c).toContain("stroke:#1f3a93");
     }
-    expect(t.svg).toMatch(/<path id="block"[^>]*fill:#1f3a93[^>]*inkstitch:row_spacing_mm="0.4"/);
+    expect(t.svg).toMatch(/<path id="block"[^>]*fill:#1f3a93[^>]*inkstitch:row_spacing_mm="0.2"/);
     expect(t.svg).toMatch(/<path id="hairline"[^>]*inkstitch:stroke_method="running_stitch"/);
     expect(t.svg).toMatch(/<path id="hairline"[^>]*inkstitch:running_stitch_length_mm="2"/);
     expect(t.svg).toMatch(/<path id="rule_1"[^>]*inkstitch:stroke_method="running_stitch"/);
@@ -796,7 +797,7 @@ describe("grid underlay only where it holds (spec §8.6)", () => {
     expect(path).toContain('inkstitch:fill_underlay="false"');
     expect(path).not.toContain("fill_underlay_angle");
     // The rest of the area's parameters stay.
-    expect(path).toContain('inkstitch:row_spacing_mm="0.4"');
+    expect(path).toContain('inkstitch:row_spacing_mm="0.2"');
     expect(t.underlay).toEqual({ grid: 1, without: [{ id: "waist", pieces: 2 }] });
   });
 
@@ -1011,7 +1012,7 @@ describe("a wide shape with a narrow band is split (spec §7.8.7)", () => {
 
     // The head is a path with the preset's tatami values, the band a group of native satin columns.
     expect(t.svg).toMatch(
-      /<path id="lolli_bulk"[^>]*fill:#d25c1c[^>]*inkstitch:row_spacing_mm="0.4"/,
+      /<path id="lolli_bulk"[^>]*fill:#d25c1c[^>]*inkstitch:row_spacing_mm="0.2"/,
     );
     expect(t.svg).toContain('<g id="lolli_band0">');
     expect(t.svg.match(/inkstitch:satin_column="true"/g)).toHaveLength(band.columnIds.length);

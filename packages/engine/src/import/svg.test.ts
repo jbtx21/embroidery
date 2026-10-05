@@ -323,10 +323,10 @@ describe("filled paths", () => {
   it("falls back to the preset where no attribute says otherwise", () => {
     const ring = byId("ring") as FillObject;
     expect(ring.angleDeg).toBe(45); // default since 20.09.2026, spec §5.1
-    expect(ring.rowSpacingMm).toBe(0.4); // Piqué
+    expect(ring.rowSpacingMm).toBe(0.2); // Piqué
     const fleece = importSvg(SVG_FILLED, { preset: "fleece" });
     const ringFleece = fleece.design.objects.find((o) => o.id === "ring") as FillObject;
-    expect(ringFleece.rowSpacingMm).toBe(0.4); // EPCwin value since 21.09.2026
+    expect(ringFleece.rowSpacingMm).toBe(0.2); // half the EPCwin value since 05.10.2026
   });
 
   it("keeps fill=none with a stroke a running stitch", () => {
