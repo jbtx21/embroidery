@@ -541,9 +541,13 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
     "Zugausgleich je Rail (§7.8.3): der Stoffspalt zwischen Rot und Gold bleibt in der DST offen — symmetrisch wächst er zu",
     async () => {
       // The Hofbräu cap in miniature (cap preset): a red stroke of 2.4 mm and, 0.53 mm below it, a gold
-      // line of 0.75 mm. Symmetric, red pulls 0.29 mm and gold 0.2 mm into the gap (0.04 mm left);
-      // per rail, the two rails that face each other stay as drawn. The gap in the DST is the distance
-      // between the stitches of the two colours, so where the DST puts its origin does not matter.
+      // line of 0.75 mm. With the pull of 12 % between 0.2 and 0.4 mm (the presets until 05.10.2026),
+      // red pulls 0.29 mm and gold 0.2 mm into the gap symmetrically (0.04 mm left); per rail, the two
+      // rails that face each other stay as drawn. Since 05.10.2026 the presets pull 3 % between 0.05
+      // and 0.25 mm (§7.2, §14), 0.07 and 0.05 mm here, and the gap stays open either way — so the
+      // mechanism is shown with the old values and the current preset is checked on its own. The gap
+      // in the DST is the distance between the stitches of the two colours, so where the DST puts its
+      // origin does not matter.
       await initEngine();
       const shape = (id: string, y: number, h: number, color: string) => ({
         kind: "area" as const,
@@ -554,15 +558,25 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
         trimAfter: "auto" as const,
       });
       const shapes = [shape("gold", 2.93, 0.75, "#d1b35a"), shape("red", 0, 2.4, "#d2060d")];
+      const strongPull = {
+        ...PRESETS.cap,
+        pullCompPct: 12,
+        pullCompMinMm: 0.2,
+        pullCompMaxMm: 0.4,
+      };
       const dir = mkdtempSync(join(tmpdir(), "texma-luecke-"));
       try {
-        const gap = async (railPullBySide: boolean): Promise<number> => {
-          const template = buildInkstitchTemplate(shapes, PRESETS.cap, {
+        const gap = async (
+          name: string,
+          preset: typeof PRESETS.cap,
+          railPullBySide: boolean,
+        ): Promise<number> => {
+          const template = buildInkstitchTemplate(shapes, preset, {
             widthMm: 40,
             heightMm: 10,
             railPullBySide,
           });
-          const svg = join(dir, `g${railPullBySide}.svg`);
+          const svg = join(dir, `${name}.svg`);
           writeFileSync(svg, template.svg);
           const r = await runInkstitch({ extension: "output", options: { format: "dst" }, svg });
           expect(r.stderr.trim()).toBe("");
@@ -579,10 +593,20 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
             Math.min(...first) - Math.max(...second),
           );
         };
-        const [symmetric, perRail] = await Promise.all([gap(false), gap(true)]);
+        const [symmetric, perRail, presetSymmetric, presetPerRail] = await Promise.all([
+          gap("stark-symmetrisch", strongPull, false),
+          gap("stark-je-rail", strongPull, true),
+          gap("preset-symmetrisch", PRESETS.cap, false),
+          gap("preset-je-rail", PRESETS.cap, true),
+        ]);
         expect(perRail).toBeGreaterThan(0.43);
         expect(perRail).toBeLessThan(0.63);
         expect(symmetric).toBeLessThan(0.2);
+        // The current preset: the rails facing the gap stay as drawn, and even the symmetric pull
+        // leaves most of it open (0.53 - 0.07 - 0.05 mm, on the DST's 0.1-mm grid).
+        expect(presetPerRail).toBeGreaterThan(0.43);
+        expect(presetPerRail).toBeLessThan(0.63);
+        expect(presetSymmetric).toBeGreaterThan(0.3);
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }

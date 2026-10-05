@@ -885,7 +885,9 @@ beiden Seiten; zwischen zwei Formen frisst er den Stoffspalt, der sichtbar bleib
 am Hofbräu-Motiv in 110 mm: rote Buchstaben 2,4 mm (0,29 mm Ausgleich je Seite), goldene
 Schattenlinien 0,75 mm (0,2 mm), der Spalt dazwischen 0,53 mm — übrig blieben 0,04 mm, auf der
 Profi-Mütze bleibt dort sichtbar Stoff. Deshalb, mit Ink/Stitchs Zugausgleich je Rail
-(`pull_compensation_mm` mit zwei Werten):
+(`pull_compensation_mm` mit zwei Werten). *(Seit 05.10.2026 ist der Ausgleich klein: 3 % je Seite,
+0,05–0,25 mm, §7.2. Am selben Spalt sind es 0,07 und 0,05 mm, gut 0,4 mm bleiben auch symmetrisch.
+Die Regeln gelten weiter, verschieben aber nur noch so viel.)*
 
 1. **Zur Seite eines Stoffspalts unter 1,0 mm** bekommt eine Säule keinen Zugausgleich. Stoffspalt
    heißt: bis zur nächsten anderen Form (gleich welcher Farbe, nicht dieselbe Form) liegt nur Stoff.
