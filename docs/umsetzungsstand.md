@@ -914,3 +914,30 @@ Gemessen an den acht Referenzlogos (mit Tor, Christliche ohne Tor), vorher Stand
   STUTTGART 250 mm von 9:07 auf 12:46 min.
 - **Tests:** 1.343 grün. Im Rauchtest prüft der Fall „Zugausgleich je Rail" die Regel jetzt mit dem
   alten, starken Ausgleich. Mit dem neuen Preset bleibt der Spalt auch symmetrisch offen.
+
+**Vernähung nach dem Puncher-Muster, versetzte Satin-Teilung, Stoffhinweis (05.10.2026, Spec
+§10.3, §7.4, §13.4, §14).** Entscheidung des Nutzers („ja umsetzen") nach der Auswertung der
+EZ-Stitch-Berichte: Die Dichteflächen dort standen an Starts und Stopps, und alle Stiche unter
+0,3 mm lagen in Ink/Stitchs Halbstich-Vernähung.
+
+- **Vernähung** (`tieAttributes` in `template.ts`, an Satin, Tatami und Laufstich): am Anfang zwei
+  Stiche à 0,5 mm vorwärts auf dem folgenden Weg und einer zurück, am Ende zwei à 0,8 mm hin und
+  zurück. Der Sprung landet wie bisher am Start, die Schnitte bleiben gleich. Gewählt aus elf
+  Varianten an den vier Probestick-Dateien; StitchPencils Muster war schlechter.
+- **Satin über 7 mm** wird versetzt geteilt (`split_method` „staggered"), wie §7.4 es verlangt.
+- **Farbfolge-Datei:** Unter dem Kopf steht Vlies oder Topping des Presets (`Preset.stabilizer`:
+  Jersey Schneidvlies, Fleece und Frottee Topping).
+- **Abnahmeliste** mit sieben Fragen für jeden Probestick in `docs/probesticks.md`.
+
+| Motiv                                |          Stiche |  Schnitte | unter 0,4 mm | unter 0,3 mm | Dichteflächen |
+| ------------------------------------ | --------------: | --------: | -----------: | -----------: | ------------: |
+| Christliche 126 mm (Jersey)          | 15.126 → 14.697 | 111 → 111 |     159 → 67 |      48 → 24 |       26 → 16 |
+| Christliche 90 mm (Jersey)           | 10.335 → 10.078 |   71 → 71 |     157 → 70 |      50 → 31 |       23 → 19 |
+| Elektrotechnik Yer 90 mm (Softshell) |   2.851 → 2.796 |   16 → 16 |      15 → 12 |        2 → 6 |         0 → 0 |
+| Atzensport 107 mm (Fleece)           | 21.216 → 20.968 |   77 → 77 |     202 → 89 |      63 → 24 |         9 → 6 |
+
+- **Tests:** 1.344 → 1.349 (Vernähung, Stoffhinweis), Rauchtest 17 → 19 (Vernähung in
+  der DST mit Gegenprobe, versetzte Teilung mit Gegenprobe); die Nacharbeit-Datei gibt weiter
+  dieselbe DST.
+- **Offen:** Die Zahl der Starts und Stopps selbst (Christliche 90 mm: 93 Unterbrechungen, der
+  Puncher 26) hängt an der Reihenfolge der Objekte; das ist der nächste Schritt (`docs/backlog.md`).

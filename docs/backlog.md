@@ -3,6 +3,38 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Aus EZ-Stitch, BERNINA-Hilfe und Puncher-Messung (05.10.2026)
+
+- **EZ-Stitch-Note ist kein Maßstab.** Die drei Prüfungen sind nachgebaut und treffen die Berichte:
+  Sättigung = (Stiche + Sprünge) / umschließendes Rechteck; „fehlende Vernähung" nur an
+  Farbblockgrenzen, der Sprung zum Start zählt als erster Stich, verlangt sind Stiche unter etwa
+  0,7 mm; Dichteflächen = Zellen von 1 mm² mit mehr als 16 Datensätzen, Sprünge mitgezählt. Die
+  Puncher-Dateien schneiden bei Sättigung und Vernähung gleich oder schlechter ab; 143 von 192
+  Archivdateien liegen bei 0,88 oder höher, was EZ schon als „High Risk" anstreicht. Nur die
+  Dichteflächen trennen: Christliche 90 mm 23, Puncher 4,
+  Archiv-Median 0. Bei uns stehen sie an Starts und Stopps (Vernähung plus Schnitt), nicht in den
+  Flächen. Unsere eigenen Maße (Dichtespitze, Nadelhäufung §11) decken das zum Teil ab. Ob eine
+  Zählung der Starts und Stopps je mm² in die Kennzahlen gehört, ist offen.
+- **Breite Satinsäulen ab 6 mm** sticken die Puncher dichter (Archiv 0,36 mm, Profi-Satz 0,32 mm
+  statt 0,40). Bei uns gibt es keine: ab 5 mm wird eine Form Tatami. Keine Regel ohne Wirkung.
+- **Automatischer Satinabstand (BERNINA: schmale Säulen lockerer)** gemessen und verworfen: Die
+  Puncher halten 0,38–0,42 mm von 0,6 bis 6 mm Breite. Nur 23 von 157 Dateien sticken schmale
+  Säulen mindestens 15 % lockerer.
+- **Stichrichtung langer Flächen (BERNINA):** Reihen quer über die kürzeste Strecke, damit sich die
+  Fläche nicht in der Länge zusammenzieht. Wir wählen den Winkel nach den wenigsten
+  Reihenbrüchen, sonst 45°. Probestick: langer Balken 45° gegen quer.
+- **Dichte nach Größe und Farbe (BERNINA):** Kleine Elemente (Augenpunkte) lockerer, helle Farbe
+  über dunkler Fläche dichter. Bei uns eine Dichte je Stoff.
+- **Webware-Preset:** BERNINAs Standard ist „mittelschwere Webware". Unsere sechs Presets haben
+  keine Webware (Köper, Canvas); im Archiv liegen Dateien für Arbeitskleidung (Bundhose, Kragen).
+  Frage an den Nutzer offen.
+- **End-Vernähung des Punchers:** Bei etwa 40 % der Schnitte in den Profi-Dateien fehlt sie, ohne
+  erkennbare Regel (Sprungweite im Median 10,7 mm ohne, 12,3 mm mit). Nicht übernommen, wir vernähen
+  immer. Ob die ZSK vor dem Schnitt selbst vernäht, ist eine Frage an den Nutzer.
+- **Preset-Notizen** für Cap („Reihenfolge Mitte → außen") und Frottee („Knockdown-Fill") versprechen,
+  was die Ink/Stitch-Kette noch nicht tut. Die Farbfolge-Datei druckt deshalb nur `stabilizer`
+  (Vlies, Topping), nicht `note`.
+
 ## Presets nach dem Probestick (05.10.2026)
 
 - **Andere Stoffe am Stoff prüfen.** Halbierter Reihenabstand und kleiner Zugausgleich sind nur auf

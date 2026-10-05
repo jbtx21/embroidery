@@ -4,6 +4,22 @@ Alles vor dem ersten Probestick ist Rechnung. Hier steht, was die Engine vorhatt
 dem Stoff herauskam und was daraus folgte. Ein Abschnitt je Stick, neueste oben. Die Zahlen
 unter „Soll" stammen aus dem Lauf, der die Datei erzeugt hat, nicht aus der Erinnerung.
 
+## Abnahmeliste für jeden Probestick _(05.10.2026)_
+
+Damit die Befunde je Stoff vergleichbar werden, beantwortet jeder Probestick dieselben sieben
+Fragen. In Klammern steht, woran gedreht wird, wenn die Antwort nein lautet. Die Liste folgt
+einem Einsteiger-Leitfaden zum Digitalisieren (Fadenriss, Deckung, Passung, Verzug, Kräuseln)
+und ergänzt die Punkte, die unsere eigenen Auswertungen offen ließen.
+
+1. **Läuft die Datei ohne Fadenriss durch?** (Kurzstiche §7.5, Mindeststichlänge §11, Dichte)
+2. **Deckt sie, ohne dass Stoff durchscheint?** (Reihenabstand und Satinabstand §14, Unterlage §7.6)
+3. **Treffen Konturen und Flächen aufeinander, ohne Blitzer?** (Zugausgleich §7.2 und §8.1.1,
+   Überlappung)
+4. **Bleiben Kreise rund, ohne Verzug?** (Zug- und Schubausgleich, Vlies, Einspannen)
+5. **Liegt der Stoff flach, ohne Kräuseln?** (Dichte, Unterlage, Vlies)
+6. **Sind Satinspitzen und Säulenenden gedeckt?** (Säulen §7.8, Kurzstiche)
+7. **Gibt es Knötchen oder Löcher an Starts und Stopps?** (Vernähung §10.3, Fadenschnitte §10.2.1)
+
 ---
 
 ## Probestick 1 — STUTTGART 80 mm auf Piqué _(21.09.2026)_

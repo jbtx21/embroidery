@@ -57,6 +57,14 @@ mindestens 1,3 mm breit, 15 Breiten lang, gleichmäßig breit und hängt an eine
 - Satin-Zugausgleich 3 % je Seite (Jersey und Fleece 4 %), 0,05–0,25 mm.
 - §11: Die Wendestiche unter 0,4 mm entfallen, wie in der Zickzack-Füllung der Profis.
 
+**Änderung 05.10.2026, Vernähung** — Entscheidung des Nutzers nach der Auswertung der
+EZ-Stitch-Berichte und der BERNINA-Hilfe:
+- §10.3: Die Ink/Stitch-Vorlage vernäht nach dem Muster des Punchers. Am Anfang gehen zwei Stiche
+  à 0,5 mm vorwärts und einer zurück, am Ende zwei à 0,8 mm hin und zurück. Vorher galt Ink/Stitchs
+  Halbstich.
+- §7.4: Satinstiche über 7 mm werden versetzt geteilt, wie die Regel es verlangt.
+- §13.4, §14: Die Farbfolge-Datei nennt Vlies oder Topping des Presets.
+
 ---
 
 ## 1. Zweck und Grundsätze *(28.09.2026 neu gefasst — vorher: die Engine erzeugt die Stiche selbst)*
@@ -707,6 +715,13 @@ einem Ende ausläuft, soll nicht überall so breit behandelt werden.
 
 ### 7.4 Breitenkontrolle
 - Breite > `maxWidthMm` (Standard 7): Split-Satin, Sprosse in `ceil(b / maxWidthMm)` Teilstiche teilen, Zwischenpunkte versetzt (Stagger), damit keine Linie entsteht.
+  **In der Ink/Stitch-Vorlage** *(05.10.2026)*: `split_method` „staggered" (Zyklus `split_staggers` 4,
+  Ink/Stitchs Vorgabe), wie die Regel es verlangt. Bis dahin galt Ink/Stitchs Standard, der die
+  Teilungspunkte in die Mitte jedes Stichs setzt, wo sie sich zu einer Naht reihen; BERNINA nennt das
+  Gegenmittel „Spezialsatin" und verteilt die Einstiche zufällig. Rauchtest: Säule von 9 mm, die
+  Teilungspunkte streuen über mehr als 3 mm, mit dem Standard unter 1 mm. Betroffen sind nur
+  Stiche über 7 mm: ab 5 mm Breite wird eine Form Tatami (§7.8.1), so lange Stiche entstehen nur, wo
+  eine Säule örtlich breiter wird.
 - Breite < 1 mm: Warnung `SATIN_TOO_NARROW`. Breite < 0,6 mm: Vorschlag Running.
 - Breite > 12 mm: Warnung `SATIN_TOO_WIDE`, Vorschlag Fill.
 
@@ -1783,6 +1798,65 @@ und 0,7 mm und 17 zwischen 0,7 und 1 mm auf blankem Stoff.
 - Vor jedem `trim` und am Ende: dasselbe rückwärts.
 - Keine Verriegelung bei Running-Verbindungen.
 
+**In der Ink/Stitch-Vorlage: vernähen wie der Puncher** *(05.10.2026, Entscheidung des Nutzers nach
+der Auswertung der EZ-Stitch-Berichte)*. Die Punkte oben gelten für die eingefrorene Engine. **Wo**
+vernäht wird, entscheidet Ink/Stitch, und daran ändert die Vorlage nichts: am Anfang und am Ende,
+nach jedem Schnitt und Farbwechsel und wo es springt (Verbindung über `collapse_len_mm` 3 mm oder
+über `min_jump_stitch_length_mm` am Objekt davor, `stitch_groups_to_stitch_plan`). **Wie** vernäht
+wird, setzt die Vorlage an jedem Objekt, ob Satin, Tatami oder Laufstich (`tieAttributes`):
+
+- **Anfang:** Der Sprung landet am Start des Objekts. Von dort gehen zwei Stiche à 0,5 mm vorwärts
+  auf dem Weg, den das Objekt als Nächstes stickt, und ein Stich zurück zum Start. Dann läuft das
+  Objekt darüber (`lock_start` „custom", `lock_custom_start` „1 1 -2", `lock_start_scale_mm` 0,5).
+  - **Zwei statt der vier des Punchers:** Ink/Stitch legt die Stiche entlang des Wegs. Knickt der
+    Weg innerhalb der Vernähung ab (Reihenende, kleines Objekt), falten sie sich zu kurzen Stichen.
+    Über 1 mm statt 2 mm geschieht das etwa halb so oft: Christliche 90 mm 43 → 19 kurze Stiche am
+    Anfang, 126 mm 33 → 18. Die Glühbirnen-Strahlen der Yer (1,1 mm lang) passen jetzt hinein, statt
+    7 kurze Stiche zu werfen.
+  - **Der Sprung landet am Start.** Eine Vernähung, die voraus begänne und zum Start zurückliefe,
+    verlängerte jede Verbindung um ihre Länge. Sie schöbe Verbindungen über die Grenzen aus §10.2.1:
+    Im Rauchtest wurden mit 2 mm voraus fünf von sieben Verbindungen anders entschieden.
+- **Ende:** zwei Stiche à 0,8 mm zurück auf dem Gestickten und wieder vor (`lock_end` „custom",
+  „1 -1", 0,8 mm). Ink/Stitch misst die 0,8 mm entlang der letzten Stiche. Knicken sie ab (eine
+  Tatami-Reihe an der Kante, eine Satinspitze), ist der Stich in Luftlinie kürzer. Kürzer
+  eingestellt wird es schlechter, nicht besser: Mit 0,6 mm hatte die Christliche 90 mm 43 statt 27
+  kurze Stiche am Ende, mit 0,5 mm 50. Mit 1,0 mm waren es 26; das lohnt den längeren Stich nicht.
+- **Vorher** galt Ink/Stitchs Halbstich an beiden Enden: vier Stiche hin und her auf der Stelle,
+  halb so lang wie der erste Stich (0,25–0,75 mm), zwei Löcher je zweimal getroffen.
+  Vernähungsstiche filtert Ink/Stitch nie (§11). Nach der DST-Rundung blieben deshalb Stiche unter
+  0,3 mm: in der Christliche 90 mm lagen alle 50 Stiche unter 0,3 mm in Vernähungen, im Atzensport
+  62 von 63. Die Puncher-Datei der Christliche hat keinen einzigen.
+- **Gemessen beim Puncher**, an Läufen zwischen Sprüngen, Schnitten und Farbwechseln:
+  - Profi-Satz 42_2 (23 Dateien, 419 Läufe): am Anfang meist 4–6 kurze Stiche, Median 0,51 mm, zu
+    81 % vorwärts, über 1,9 mm. Am Ende zwei Stiche à 0,81 mm hin und zurück oder gar keine. 40 %
+    der Enden vor einem Schnitt sind unvernäht, ohne erkennbare Regel: Die Sprungweite liegt mit
+    und ohne Vernähung gleich (Median 12,3 bzw. 10,7 mm).
+  - Puncher Yer: am Anfang 5–6 Stiche à 0,50 mm vorwärts, am Ende 2 à 0,90 mm oder keine.
+  - Das Archiv (192 Dateien, mehrere Puncher) vernäht anders: 4 Stiche à 0,45 mm hin und her auf der
+    Stelle, an beiden Enden.
+  
+  Die Vorlage folgt dem Muster des aktuellen Punchers (kurze Stiche vorwärts, am Ende zwei hin und
+  zurück), vorne mit zwei statt vier Stichen, und vernäht am Ende immer.
+- **Nachweis:** `template.test.ts` prüft die Attribute an Satin, Tatami und Laufstich. Der Rauchtest
+  „Vernähung (§10.3)" prüft das Muster in der DST, mit Gegenprobe gegen Ink/Stitchs Standard. Der
+  Rauchtest „Fadenschnitte (§10.2.1)" zeigt, dass die Entscheidungen gleich bleiben.
+- **Gemessen an den vier Probestick-Dateien** (vorher Ink/Stitchs Halbstich, Stand `f271fd9`):
+
+  | Motiv | Stiche | Schnitte | Stiche unter 0,4 mm | unter 0,3 mm | Dichteflächen (EZ-Regel) |
+  |---|---:|---:|---:|---:|---:|
+  | Christliche 126 mm (Jersey) | 15.126 → 14.697 | 111 → 111 | 159 → 67 | 48 → 24 | 26 → 16 |
+  | Christliche 90 mm (Jersey, unter Mindestgröße) | 10.335 → 10.078 | 71 → 71 | 157 → 70 | 50 → 31 | 23 → 19 |
+  | Elektrotechnik Yer 90 mm (Softshell) | 2.851 → 2.796 | 16 → 16 | 15 → 12 | 2 → 6 | 0 → 0 |
+  | Atzensport 107 mm (Fleece) | 21.216 → 20.968 | 77 → 77 | 202 → 89 | 63 → 24 | 9 → 6 |
+
+  Unter 0,4 mm liegen damit 0,4–0,7 % der Stiche, so viel wie in den Profi-Dateien (0,5 und
+  0,6 %, §11). Die Schnitte bleiben gleich, die Dichteflächen (Zellen von 1 mm² mit mehr als 16
+  Datensätzen, die Zählung von EZ Stitch) gehen zurück. Bei Yer kommen vier Stiche unter 0,3 mm
+  an Satinspitzen hinzu, dort faltet sich das Ende.
+  - **Verworfen:** StitchPencils Muster (vier Stiche à 0,7 mm hin und her auf zwei Punkten, am
+    Ende zwei à 0,7 mm) gab an denselben Dateien mehr kurze Stiche (Christliche 126 mm: 76 statt
+    67) und mehr Dichteflächen (21 statt 16).
+
 ---
 
 ## 11. Post-Processing und Analyse
@@ -1881,7 +1955,9 @@ entstanden ist (nach Führung der Säulen und Fadenschnitten), als `<name>.nacha
 Daneben: DST **und PES** (Ink/Stitchs `output`), die Vorschau in Garnfarben mit den markierten
 Prüfstellen und die Nadelbelegung je Stopp (`<name>.farbfolge.txt`; „dieselbe Nadel wie Stopp N?"
 bei zwei Farben bis RGB-Abstand 8 — gemessen 1,4 für dasselbe Rot aus zwei PDF-Quellen, 15,8 für
-zwei verschiedene Rot derselben Datei).
+zwei verschiedene Rot derselben Datei). Unter dem Kopf der Farbfolge steht der **Stoffhinweis**
+des Presets, wo §14 Vlies oder Topping nennt (`Preset.stabilizer`: Jersey Schneidvlies, Fleece und
+Frottee Topping), damit er an der Maschine vorliegt *(05.10.2026)*.
 
 **Nachweis:** Die Nacharbeit-Datei unverändert durch Ink/Stitchs `output` gibt dieselbe DST,
 Byte für Byte, wie der Lauf (Rauchtest). Für einen externen Puncher ist dieselbe Datei eine
@@ -1901,6 +1977,11 @@ Startwerte, in Phase 5 gegen Probesticks justieren.
 | Fleece | 0,20 | 4,0 | 0,40 | 0,30 | **4 %** / 0,05–0,25 | 0,15 | 0,25 | contour + double | contour + zigzag, Inset 0,3 | Topping empfohlen |
 | Cap | 0,19 | 4,0 | 0,35 | 0,20 | 3 % / 0,05–0,25 | 0,10 | 0,20 | contour + single | center + contour | Reihenfolge Mitte → außen, unten → oben (§10.1) |
 | Frottee | 0,19 | 4,0 | 0,35 | 0,20 | 3 % / 0,05–0,25 | 0,15 | 0,30 | contour + double | contour + zigzag | Knockdown-Fill unter Motiv, Topping |
+
+**Hinweis an der Maschine** *(05.10.2026)*. Was die Spalte „Hinweis" an Vlies und Topping nennt,
+steht als `stabilizer` im Preset (Jersey Schneidvlies, Fleece und Frottee Topping), und die
+Farbfolge-Datei druckt es (§13.4). Die übrigen Hinweise (Reihenfolge der Cap, Knockdown für Frottee)
+setzt die Ink/Stitch-Kette noch nicht um; sie stehen deshalb nicht auf dem Blatt für die Maschine.
 
 **Reihenabstand halbiert, Satin-Zugausgleich auf Profi-Niveau** *(05.10.2026, Entscheidung des
 Nutzers nach dem Probestick vom 02.10.2026: „Zugausgleich zu viel, und dem Tatami fehlt Faden.")*
