@@ -68,6 +68,7 @@ pnpm typecheck
 pnpm bench           Benchmarks (packages/engine/bench)
 pnpm demo <svg>      SVG → DST + PNG-Vorschau nach ./out/ (ab Woche 1)
 pnpm inkstitch <svg> [preset] [--tatami]   SVG → Vorlage (Satin/Laufstich/Tatami) → Ink/Stitch → DST + PNG + Kennzahlen nach ./out/; --tatami: reiner Tatami-Lauf
+pnpm testmuster <preset>   Parameter-Matrix je Stoff (Tatami, Satin, Zugausgleich) → DST + PNG + Legende nach ./out/
 bash inkstitch/setup.sh         Ink/Stitch einrichten (läuft auch als SessionStart-Hook)
 ```
 

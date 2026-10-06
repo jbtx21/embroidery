@@ -30,8 +30,12 @@ import { inkstitchAngleDeg, tatamiAttributes } from "./tatami.js";
 import {
   buildInkstitchTemplate,
   CENTER_WALK_STITCH_MM,
+  inkAttrs,
   INKSTITCH_MIN_STITCH_MM,
   joinLines,
+  lineD,
+  num,
+  polygonD,
   SATIN_SPLIT_MM,
   satinColumnAttributes,
   satinColumnD,
@@ -62,6 +66,35 @@ const area = (id: string, polygon: Polygon, color = "#1f3a93"): ImportedShape =>
   color,
   attrs: {},
   trimAfter: "auto",
+});
+
+describe("the writing helpers of the template (num, lineD, polygonD, inkAttrs)", () => {
+  it("writes a number with four decimals at most and no trailing zeros", () => {
+    expect(num(1.23456)).toBe("1.2346");
+    expect(num(0.5)).toBe("0.5");
+    expect(num(2)).toBe("2");
+    expect(num(-0.00004)).toBe("0");
+  });
+
+  it("writes an open line as path data, and nothing for no points", () => {
+    expect(lineD([pt(0, 0), pt(1.5, 2), pt(3, 0)])).toBe("M 0,0 L 1.5,2 L 3,0");
+    expect(lineD([])).toBe("");
+  });
+
+  it("writes a polygon with its holes as closed rings and leaves out a ring under three points", () => {
+    const outer = [pt(0, 0), pt(4, 0), pt(4, 4), pt(0, 4)];
+    const hole = [pt(1, 1), pt(2, 1), pt(2, 2)];
+    expect(polygonD({ outer, holes: [hole, [pt(3, 3), pt(3.5, 3)]] })).toBe(
+      "M 0,0 L 4,0 L 4,4 L 0,4 Z M 1,1 L 2,1 L 2,2 Z",
+    );
+  });
+
+  it("writes parameters as inkstitch attributes, escaped for XML", () => {
+    expect(inkAttrs({ row_spacing_mm: "0.2", note: 'a<b & "c"' })).toBe(
+      ' inkstitch:row_spacing_mm="0.2" inkstitch:note="a&lt;b &amp; &quot;c&quot;"',
+    );
+    expect(inkAttrs({})).toBe("");
+  });
 });
 
 describe("satinPullCompMm (spec §7.2)", () => {

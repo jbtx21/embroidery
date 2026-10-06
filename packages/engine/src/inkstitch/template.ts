@@ -299,14 +299,17 @@ export type TemplateOptions = {
   splitBands?: boolean;
 };
 
-const num = (n: number): string => (Math.round(n * 1e4) / 1e4).toString();
+/** A number as the template writes it: four decimals at most, no trailing zeros. */
+export const num = (n: number): string => (Math.round(n * 1e4) / 1e4).toString();
 /** Ids as XML allows them (`importShapes` numbers split paths `id:n`). */
 const xmlId = (id: string): string => id.replace(/[^A-Za-z0-9_.-]/g, "_");
 const xmlEscape = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const lineD = (line: Polyline): string =>
+/** An open line as SVG path data, in mm (`M x,y L x,y …`); nothing for no points. */
+export const lineD = (line: Polyline): string =>
   line.length === 0 ? "" : `M ${line.map((p) => `${num(p.x)},${num(p.y)}`).join(" L ")}`;
-const polygonD = (poly: Polygon): string =>
+/** A polygon with its holes as SVG path data, every ring closed; rings under three points are left out. */
+export const polygonD = (poly: Polygon): string =>
   [poly.outer, ...poly.holes]
     .filter((r) => r.length >= 3)
     .map((r) => `${lineD(r)} Z`)
@@ -396,7 +399,8 @@ export function tieAttributes(): Record<string, string> {
   };
 }
 
-const inkAttrs = (attrs: Record<string, string>): string =>
+/** Parameters as `inkstitch:` attributes of an element, each value escaped for XML. */
+export const inkAttrs = (attrs: Record<string, string>): string =>
   Object.entries(attrs)
     .map(([k, v]) => ` inkstitch:${k}="${xmlEscape(v)}"`)
     .join("");

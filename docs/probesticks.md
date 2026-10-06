@@ -20,6 +20,105 @@ und ergänzt die Punkte, die unsere eigenen Auswertungen offen ließen.
 6. **Sind Satinspitzen und Säulenenden gedeckt?** (Säulen §7.8, Kurzstiche)
 7. **Gibt es Knötchen oder Löcher an Starts und Stopps?** (Vernähung §10.3, Fadenschnitte §10.2.1)
 
+## Testmuster je Stoff _(06.10.2026)_
+
+Ein Muster statt eines Probesticks mit Logo: **ein DST je Stoff-Preset, das die Stichparameter
+nebeneinander stickt.** Ein Feld je Wertepaar, alles andere wie im Preset. Am gestickten Stück
+liest man ab, welche Werte auf diesem Stoff am besten sind, ohne dass ein Logo alles zugleich
+verändert. Jedes Feld ist so in die Vorlage geschrieben wie die Form eines Auftrags (Unterlage,
+Zugausgleich, Vernähung, Mindeststichlänge; `packages/engine/src/inkstitch/testmuster.ts`): ein
+Feld mit den Werten des Presets sticht wie eine Form im Auftrag. Eine Garnfarbe, nach jedem Feld
+ein Fadenschnitt.
+
+### Erzeugen
+
+```bash
+pnpm testmuster <preset> [--reihenabstand a,b,c] [--stichlaenge a,b,c] [--satinbreite a,b,c] [--satinabstand a,b,c]
+```
+
+`<preset>` ist `pique`, `jersey`, `softshell`, `fleece`, `cap` oder `frottee`. Ein Lauf dauert gut
+30 Sekunden (Ink/Stitch rechnet) und schreibt nach `out/`:
+
+| Datei                             | Inhalt                                                                       |
+| --------------------------------- | ---------------------------------------------------------------------------- |
+| `testmuster-<preset>.dst`         | das Stickprogramm                                                            |
+| `testmuster-<preset>.svg`         | die Vorlage, aus der Ink/Stitch es rechnet (zum Nacharbeiten in Inkscape)    |
+| `testmuster-<preset>.png`         | Vorschau mit Sprüngen und Schnitten                                          |
+| `testmuster-<preset>.legende.txt` | was wo liegt, mit den Werten jedes Feldes: ausdrucken, neben das Stück legen |
+
+Die Werte der Matrix lassen sich ersetzen: je Liste genau drei Zahlen, Punkt als Dezimalzeichen,
+Komma dazwischen, etwa `pnpm testmuster jersey --reihenabstand 0.20,0.225,0.25`. Ohne Angabe
+gelten die Werte in der Tabelle unten; die Legende nennt immer die Werte, die im Muster stehen.
+
+### Sticken
+
+- Auf **dem Stoff, für den das Preset gilt**, mit **Vlies oder Topping, Garn und Nadel des
+  Auftrags**. Der Stoffhinweis des Presets steht oben in der Legende (Jersey Schneidvlies, Fleece
+  und Frottee Topping). Mit anderem Vlies liest man etwas anderes ab.
+- Rund 106 × 80 mm: das passt in den Standardrahmen (360 × 200 mm), **nicht** in den Cap-Rahmen
+  (130 × 60 mm), siehe Grenzen. Die Legende nennt die Größe und sagt, ob sie in den Rahmen des
+  Presets passt.
+- Die **Lagemarke**, ein Winkel aus zwei Schenkeln à 5 mm, liegt oben links. Das Stück beim
+  Ablesen so halten, dass sie dort liegt, sonst stimmt die Legende nicht.
+
+### Die Felder
+
+| Block                                                      | Felder | Zeilen (oben → unten)                                     | Spalten (links → rechts)                                        | Aus dem Preset                                          |
+| ---------------------------------------------------------- | ------ | --------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------- |
+| **A** Tatami, Quadrate 15 × 15 mm, Reihen unter 45°        | A1–A9  | Reihenabstand 0,19 / 0,21 / 0,24 mm                       | Stichlänge 3,0 / 4,0 / 5,0 mm                                   | Zug, Schub, Versatz, Unterlage                          |
+| **B** Satin, senkrechte Säulen, 15 mm lang                 | B1–B9  | Zickzack-Abstand 0,34 / 0,38 / 0,42 mm (Spitze zu Spitze) | Breite 1,0 / 2,5 / 4,5 mm                                       | Zugausgleich und Unterlage nach der Breite (§7.2, §7.6) |
+| **C** Zugausgleich, Quadrate 20 × 20 mm, Reihen waagerecht | C1–C4  | –                                                         | Zug / Schub 0 / 0, 0,20 / 0, die Werte des Presets, 0,30 / 0 mm | Reihenabstand, Stichlänge, Unterlage                    |
+
+Die Felder sind in Leserichtung nummeriert (A1 oben links, A3 oben rechts, A7 unten links); Block B
+liegt rechts neben A, Block C darunter. Der Reihenabstand ist der Abstand **benachbarter** Reihen
+(`row_spacing_mm`, §14), der Zickzack-Abstand der von Spitze zu Spitze (`zigzag_spacing_mm`). Die
+Legende nennt je Feld Kennung, Lage („Block A, oben links“) und Werte.
+
+### Ablesen
+
+Dieselben Fragen wie in der Abnahmeliste oben, nur je Feld statt je Logo. Gesucht ist das
+**sparsamste Feld, das noch trägt**:
+
+- **Block A, Tatami.** Scheint der Stoff zwischen den Reihen durch, ist der Reihenabstand zu weit
+  (die Zeile darüber nehmen). Wellt der Stoff, wird das Feld steif oder reißt der Faden, ist er zu
+  eng (die Zeile darunter). Die Stichlänge liest man an den Spalten: lange Stiche heben ab und
+  fangen sich leichter, kurze machen mehr Einstiche (Perforation, Fadenriss). Gesucht: der größte
+  Reihenabstand, der noch deckt, mit der längsten Stichlänge, die noch sauber liegt.
+- **Block B, Satin.** Deckung zwischen den Zickzack-Stichen (Zeilen: Abstand), Schlaufen oder
+  Ausbeulen bei der breiten Säule, ob die schmale (1,0 mm) noch sauber steht. Die Unterlage folgt
+  der Breite: unter 3 mm Mittellauf, ab da Kontur und Zickzack. Ein Sprung im Aussehen zwischen
+  2,5 und 4,5 mm kann also von der Unterlage kommen und nicht vom Abstand.
+- **Block C, Zugausgleich: messen, nicht ansehen.** **Breite (entlang der Reihen) und Höhe (quer)
+  mit dem Messschieber messen; Soll 20,0 × 20,0 mm.** Immer an derselben Stelle, außen über die
+  äußersten Stiche; die Legende hat je Feld eine Zeile zum Eintragen. Das Maß ist nur auf rund
+  0,2 mm genau: die Reihenenden stehen abwechselnd auf der Kante und 0,2 mm davor, und die
+  äußerste Reihe liegt bis zu einen Reihenabstand innerhalb der Kante. Kleinere Unterschiede sind
+  kein Befund. Der Faden zieht den Stoff entlang der Reihen zusammen: C1 (ohne Ausgleich) bleibt in
+  der Breite unter 20 mm, die Differenz ist der Zug, den der Stoff braucht. C2 und C4 legen 0,20
+  und 0,30 mm je Seite zu; das Feld, dessen Breite am nächsten an 20,0 mm liegt, nennt den Zug.
+  Quer dazu drückt der Stich auseinander: ist die Höhe über 20 mm, braucht der Stoff Schub, und C3
+  (der Schub des Presets) zeigt, ob er ihn ausgleicht. Zug und Schub gelten je Seite, die Maße
+  ändern sich also um das Doppelte.
+
+### Was daraus folgt
+
+Das beste Feld je Block unten in die Legende eintragen („Bestes Feld“) und den Befund festhalten
+wie bei den Probesticks. Die Werte gehören dann ins Preset (`packages/engine/src/presets.ts`,
+§14); das entscheidet der Nutzer, das Muster ändert nichts.
+
+### Grenzen
+
+- **Cap.** 106 × 80 mm passen nicht in den Cap-Rahmen (130 × 60 mm), auch gedreht nicht.
+  `pnpm testmuster cap` erzeugt das Muster trotzdem und meldet `OBJECT_OUTSIDE_HOOP`; die Legende
+  sagt es ebenfalls. Ein Muster je Block für den Cap-Rahmen gibt es noch nicht.
+- **Satin ohne `auto_satin`.** Aufträge schicken ihre Satinsäulen durch `auto_satin`; das zerlegt
+  eine einzelne Säule in zwei Stücke mit einem Lauf dazwischen und brächte eine Naht in jedes Feld
+  (gemessen bei 2,5 mm: 113 statt 100 Stiche). Das Muster lässt es weg, sonst ist jedes Feld wie
+  im Auftrag.
+- **Block C misst am Tatami-Quadrat**, nicht am Satinrand (so hatte der Backlog es vorgeschlagen).
+  Der Zugausgleich der Säulen steckt in Block B in der Breite (§7.2: ein Anteil der Breite je
+  Seite, mindestens 0,05 mm).
+
 ---
 
 ## Probestick 1 — STUTTGART 80 mm auf Piqué _(21.09.2026)_
