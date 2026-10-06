@@ -18,9 +18,11 @@
  *
  * - a stitch straight on, up to `PLAIN_STITCH_MM` (3 mm, Ink/Stitch's collapse length): no jump, no
  *   lock stitches;
- * - a jump with its lock stitches, up to `HIDDEN_JUMP_MAX_MM` (5 mm, `CONNECT_DEFAULTS.jumpTrimMm`);
  * - a stitch straight across, up to `HIDDEN_STITCH_MAX_MM` (7 mm): no jump (`withMinJumpLength`), so
- *   that no long jump stays open (`untrimmedJumps`);
+ *   no lock stitches either side and no long jump left open (`untrimmedJumps`). Until 06.10.2026 a
+ *   hidden move up to `HIDDEN_JUMP_MAX_MM` (5 mm, `CONNECT_DEFAULTS.jumpTrimMm`) stayed a jump with its
+ *   lock stitches; every such jump set two starts and stops into the file (Christliche 90 mm: 14 of
+ *   them), so it is stitched across too (`stitchHiddenJumps`);
  * - longer than that it is cut all the same.
  *
  * Everything is measured on the stitches Ink/Stitch wrote, not on the template: where a fill ends
@@ -328,11 +330,12 @@ export type TrimTarget = {
 
 /**
  * Why a cut stays or goes: `forced` the source asked for it (or no move follows it), `short` up to
- * `PLAIN_STITCH_MM` and hidden: Ink/Stitch stitches straight on, `hidden` the thread lies under later
- * stitches or on its own colour (a jump up to `HIDDEN_JUMP_MAX_MM`), `stitched` the same, longer, up to
- * `HIDDEN_STITCH_MAX_MM`: stitched across, `long` over `HIDDEN_JUMP_MAX_MM` and not hidden, or over
- * `HIDDEN_STITCH_MAX_MM`, `visible` up to `HIDDEN_JUMP_MAX_MM` and more than `VISIBLE_MAX_MM` of it on
- * the bare fabric (a stitch straight on that lies bare included).
+ * `PLAIN_STITCH_MM` and hidden: Ink/Stitch stitches straight on, `stitched` the thread lies under later
+ * stitches or on its own colour, longer, up to `HIDDEN_STITCH_MAX_MM`: stitched across, `hidden` the
+ * same up to `HIDDEN_JUMP_MAX_MM`, left a jump — only with `stitchHiddenJumps: false`, the rule before
+ * 06.10.2026 —, `long` over `HIDDEN_JUMP_MAX_MM` and not hidden, or over `HIDDEN_STITCH_MAX_MM`,
+ * `visible` up to `HIDDEN_JUMP_MAX_MM` and more than `VISIBLE_MAX_MM` of it on the bare fabric (a
+ * stitch straight on that lies bare included).
  */
 export type TrimReason = "forced" | "short" | "hidden" | "stitched" | "long" | "visible";
 
@@ -370,6 +373,11 @@ export type TrimRuleOptions = ThreadMoveOptions & {
   stitchMm?: number;
   /** Default `VISIBLE_MAX_MM`. */
   visibleMm?: number;
+  /**
+   * A hidden move over `plainMm` up to `hiddenJumpMm` is stitched across like a longer one (spec
+   * §10.2.1, 06.10.2026). Default true; false leaves it a jump with its lock stitches, as before.
+   */
+  stitchHiddenJumps?: boolean;
 };
 
 /** Rounding of the DST (0.1 mm) and of the floats: a limit is met by a length equal to it. */
@@ -390,6 +398,7 @@ export function planTrims(
   const hiddenJumpMm = opts.hiddenJumpMm ?? HIDDEN_JUMP_MAX_MM;
   const stitchMm = opts.stitchMm ?? HIDDEN_STITCH_MAX_MM;
   const visibleMm = opts.visibleMm ?? VISIBLE_MAX_MM;
+  const stitchHiddenJumps = opts.stitchHiddenJumps !== false;
 
   const trims: number[] = [];
   stitches.forEach((s, i) => {
@@ -434,9 +443,9 @@ export function planTrims(
         ? { ...seen, cut: false, reason: "stitched" }
         : { ...seen, cut: true, reason: "long" };
     }
-    return hidden
-      ? { ...seen, cut: false, reason: "hidden" }
-      : { ...seen, cut: true, reason: "visible" };
+    // Hidden and up to the longest jump: a jump costs lock stitches either side, a stitch across none.
+    if (!hidden) return { ...seen, cut: true, reason: "visible" };
+    return { ...seen, cut: false, reason: stitchHiddenJumps ? "stitched" : "hidden" };
   });
   return {
     decisions,

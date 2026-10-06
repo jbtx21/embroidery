@@ -41,7 +41,6 @@ import {
   TIE_OFF_STEP_MM,
   trimAfterIds,
   untrimmedJumps,
-  VISIBLE_MAX_MM,
 } from "@texma-stitch/engine";
 import { stickWithHead } from "../packages/engine/test/fixtures/bands.js";
 import { circle, polygonOf, rect } from "../packages/engine/test/fixtures/shapes.js";
@@ -740,8 +739,9 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
     async () => {
       // Eight lines of one colour in a row, the ends of every one exact: a–b 2.8 mm and b–c 3.2 mm over bare
       // fabric (cut: a thread in plain sight, even where Ink/Stitch would stitch straight on), c–d 4 mm,
-      // d–e 6.5 mm, e–f 4 mm and f–g 2 mm under a bar of another colour that is stitched later (a jump that
-      // stays, a stitch across, a jump that stays, a stitch straight on), g–z 27.5 mm (cut: bare from 94 mm).
+      // d–e 6.5 mm, e–f 4 mm and f–g 2 mm under a bar of another colour that is stitched later (three
+      // stitches across — the 4 mm ones stayed jumps until 06.10.2026 — and a stitch straight on), g–z
+      // 27.5 mm (cut: bare from 94 mm).
       await initEngine();
       const line = (id: string, x0: number, x1: number) => ({
         kind: "line" as const,
@@ -795,32 +795,48 @@ describe.skipIf(!RUN)("Ink/Stitch-Subprozess (RUN_INKSTITCH_TESTS=1)", () => {
         expect(trims.plan!.decisions.map((d) => [d.id, d.reason])).toEqual([
           ["a", "visible"],
           ["b", "visible"],
-          ["c", "hidden"],
+          ["c", "stitched"],
           ["d", "stitched"],
-          ["e", "hidden"],
+          ["e", "stitched"],
           ["f", "short"],
           ["g", "long"],
         ]);
         const trimmed = readFileSync(trimmedPath, "utf8");
         expect(trimAfterIds(trimmed)).toEqual(["a", "b", "g"]);
-        expect(trimmed).toMatch(/<path id="d"[^>]*inkstitch:min_jump_stitch_length_mm="[\d.]+"/);
+        for (const id of ["c", "d", "e"]) {
+          expect(trimmed).toMatch(
+            new RegExp(`<path id="${id}"[^>]*inkstitch:min_jump_stitch_length_mm="[\\d.]+"`),
+          );
+        }
 
         const dst = await inFreshCache(dir, "schnitt", () => dstOf(trimmedPath));
         const stitches = unitsToMm(readDst(new Uint8Array(dst)).stitches);
         expect(stitches.filter((st) => st.cmd === "trim")).toHaveLength(3);
         expect(untrimmedJumps(stitches, CONNECT_DEFAULTS.jumpTrimMm).count).toBe(0);
-        // Five moves: a–b, b–c and g–z with a cut, c–d and e–f the jumps that stay with next to nothing bare.
-        // d–e is no move at all but one long stitch (Ink/Stitch stitched across, with no jump and no lock
-        // stitches), and f–g one stitch of 2 mm straight on.
+        // Three moves, every one with a cut: a–b, b–c and g–z. c–d, d–e and e–f are no moves at all but one
+        // stitch each from object to object (Ink/Stitch stitched across, with no jump and no lock stitches),
+        // and f–g one stitch of 2 mm straight on.
         const moves = threadMoves(stitches, {
           blockColours: blockColoursOf(template.objects.map((o) => o.color)),
         });
-        expect(moves.map((m) => m.trimmed)).toEqual([true, true, false, false, true]);
-        for (const m of [moves[2]!, moves[3]!]) {
-          expect(m.lengthMm).toBeGreaterThan(PLAIN_STITCH_MM);
-          expect(m.lengthMm).toBeLessThanOrEqual(HIDDEN_JUMP_MAX_MM);
-          expect(m.visibleMm).toBeLessThanOrEqual(VISIBLE_MAX_MM);
-        }
+        expect(moves.map((m) => m.trimmed)).toEqual([true, true, true]);
+        // In the block of the lines (stitches of 2 mm) the only longer ones are those three: 4, 6.5 and 4 mm.
+        const lines = stitches.slice(
+          0,
+          stitches.findIndex((st) => st.cmd === "color"),
+        );
+        const longer = lines
+          .map((st, i) =>
+            i > 0 && st.cmd === "stitch" && lines[i - 1]!.cmd === "stitch"
+              ? Math.hypot(st.x - lines[i - 1]!.x, st.y - lines[i - 1]!.y)
+              : 0,
+          )
+          .filter((len) => len > PLAIN_STITCH_MM)
+          .sort((p, q) => p - q);
+        expect(longer).toHaveLength(3);
+        expect(longer[0]).toBeCloseTo(4, 0);
+        expect(longer[1]).toBeCloseTo(4, 0);
+        expect(longer[2]).toBeCloseTo(6.5, 0);
         const across = stitches.filter(
           (st, i) =>
             i > 0 &&

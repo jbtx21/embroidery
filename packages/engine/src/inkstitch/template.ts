@@ -264,8 +264,9 @@ export type TemplateOptions = {
   minOverlapMm2?: number;
   /**
    * With `order: "colour"`: put the objects inside every colour block in the order that leaves the fewest thread
-   * cuts (`route.ts`, spec §10.2.1) and write running objects the way round that joins them to their neighbours.
-   * The colour blocks, the order of what overlaps and the stage rule of §10.1 stay as they are. Default: off.
+   * cuts (`route.ts`, spec §10.1, §10.2.1) and write running objects the way round that joins them to their
+   * neighbours. The colour blocks, the order of what overlaps and the stage rule of §10.1 stay as they are.
+   * Default: on (since 06.10.2026); false keeps the order of the nearest outline (`sequenceByColour`).
    */
   route?: boolean;
   /** With `route`: false lets go of the stage rule of §10.1 (a measurement, not the spec). Default: true. */
@@ -1123,7 +1124,7 @@ export function buildInkstitchTemplate(
     const ordered = orderByColour(
       planned,
       opts.minOverlapMm2,
-      opts.route === true,
+      opts.route !== false,
       opts.routeStageRule !== false,
     );
     planned = ordered.planned;

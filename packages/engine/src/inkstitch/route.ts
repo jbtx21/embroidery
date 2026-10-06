@@ -18,9 +18,11 @@
  *   shape nearest to the next object.
  *
  * The cost of the step X → Y is 1000 for a cut (more than `VISIBLE_MAX_MM` of the line from the end of X to the
- * start of Y on bare fabric, or longer than `HIDDEN_STITCH_MAX_MM`), 150 for a hidden jump with lock stitches
- * (over `PLAIN_STITCH_MM` up to `HIDDEN_JUMP_MAX_MM`), and the length in mm besides — the thresholds are the ones
- * `planTrims` decides by (`trims.ts`). "Bare" is what no later stitch and no earlier stitch of the same
+ * start of Y on bare fabric, or longer than `HIDDEN_STITCH_MAX_MM`) and the length in mm besides — the thresholds
+ * are the ones `planTrims` decides by (`trims.ts`). A hidden connection over `PLAIN_STITCH_MM` is stitched
+ * across since 06.10.2026 and costs no more than its length; `jumpCost` prices the jump with its lock stitches
+ * that it was before (over `PLAIN_STITCH_MM` up to `HIDDEN_JUMP_MAX_MM`, 150 in the first measurements, for
+ * `planTrims` with `stitchHiddenJumps: false`). "Bare" is what no later stitch and no earlier stitch of the same
  * colour covers; that does not depend on the order inside the block, so it is measured once per block on a
  * raster of 0.1 mm. Measured against what Ink/Stitch wrote for four logos (452 connections of 1 mm and more) the
  * model says cut or not cut right in 97 % of them.
@@ -64,7 +66,10 @@ export type RouteNode = {
 export type RouteOptions = {
   /** Cost of a cut. Default 1000. */
   cutCost?: number;
-  /** Cost of a hidden jump with lock stitches. Default 150. */
+  /**
+   * Cost of a hidden connection over `PLAIN_STITCH_MM` up to `HIDDEN_JUMP_MAX_MM`, besides its length. Default 0:
+   * it is stitched across (`planTrims`, spec §10.2.1). 150 where it stays a jump with lock stitches.
+   */
   jumpCost?: number;
   /**
    * Keep the stage rule of §10.1 (areas, then satin, then lines). Default true. Off, the stage only rules
@@ -759,7 +764,7 @@ export function routeBlocks(
 ): RouteResult {
   const opts: Required<RouteOptions> = {
     cutCost: 1000,
-    jumpCost: 150,
+    jumpCost: 0,
     stageRule: true,
     ...options,
   };

@@ -693,7 +693,7 @@ describe("order option (spec §10.1)", () => {
     expect(r.objects.map((o) => o.shapeId)).toEqual(["block", "letter"]);
   });
 
-  it("route: puts the lines of a block end to end, turns one round, and leaves colours and overlaps alone", () => {
+  it("route (the standard since 06.10.2026): puts the lines of a block end to end, turns one round, and leaves colours and overlaps alone", () => {
     // Three lines along y = 3, written in the order 0..5, 10..15, 5..10 and the third one backwards (10 → 5),
     // under a ground of another colour that has to stay first.
     const line = (id: string, a: number, b: number): ImportedShape => ({
@@ -711,10 +711,18 @@ describe("order option (spec §10.1)", () => {
       line("l3", 10, 5),
       line("l2", 10, 15),
     ];
-    const plain = buildInkstitchTemplate(shapes, pique, { ...PAGE, order: "colour" });
-    const routed = buildInkstitchTemplate(shapes, pique, { ...PAGE, order: "colour", route: true });
+    const plain = buildInkstitchTemplate(shapes, pique, { ...PAGE, order: "colour", route: false });
+    const routed = buildInkstitchTemplate(shapes, pique, { ...PAGE, order: "colour" });
     expect(plain.routed).toBeUndefined();
     expect(routed.routed).toBeDefined();
+    // Asked for by name it is the same.
+    expect(
+      buildInkstitchTemplate(shapes, pique, { ...PAGE, order: "colour", route: true }).svg,
+    ).toBe(routed.svg);
+    // The lines are joined end to end, l3 between the other two (either way along the chain does).
+    const ids = routed.objects.map((o) => o.shapeId);
+    expect(ids[2]).toBe("l3");
+    expect([ids[1], ids[3]].sort()).toEqual(["l1", "l2"]);
     expect(routed.routed!.cutsAfter).toBeLessThanOrEqual(routed.routed!.cutsBefore);
     // Same objects, same colour blocks, the overlaps' order kept: the ground stays before the lines it carries.
     expect([...routed.objects.map((o) => o.shapeId)].sort()).toEqual(
@@ -723,7 +731,7 @@ describe("order option (spec §10.1)", () => {
     expect(routed.colourBlocks).toBe(plain.colourBlocks);
     expect(routed.objects[0]!.shapeId).toBe("ground");
     // Deterministic.
-    const again = buildInkstitchTemplate(shapes, pique, { ...PAGE, order: "colour", route: true });
+    const again = buildInkstitchTemplate(shapes, pique, { ...PAGE, order: "colour" });
     expect(again.svg).toBe(routed.svg);
   });
 

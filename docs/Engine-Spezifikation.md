@@ -65,6 +65,13 @@ EZ-Stitch-Berichte und der BERNINA-Hilfe:
 - §7.4: Satinstiche über 7 mm werden versetzt geteilt, wie die Regel es verlangt.
 - §13.4, §14: Die Farbfolge-Datei nennt Vlies oder Topping des Presets.
 
+**Änderung 06.10.2026** — Entscheidung des Nutzers nach der Messung an zehn Logos:
+- §10.1: In der Ink/Stitch-Vorlage bestimmen innerhalb eines Farbblocks die Fadenschnitte die
+  Reihenfolge (`route.ts`). Laufstich-Objekte dürfen dafür andersherum laufen. Farbblöcke, Überdeckung
+  und Stufen bleiben.
+- §10.2.1: Eine verdeckte Verbindung über 3 bis 5 mm wird durchgestickt. Vorher blieb sie ein Sprung
+  mit Verriegelung.
+
 ---
 
 ## 1. Zweck und Grundsätze *(28.09.2026 neu gefasst — vorher: die Engine erzeugt die Stiche selbst)*
@@ -1512,6 +1519,25 @@ Ein früherer Versuch, das Ende zu **schätzen** (Mitte der oberen Kante), hat a
 verschlechtert und ist zurückgenommen worden: eine falsche Schätzung ist schlechter als eine
 grobe, die auf der Form liegt.
 
+**In der Ink/Stitch-Vorlage entscheiden innerhalb eines Farbblocks die Fadenschnitte** *(06.10.2026,
+Entscheidung des Nutzers)*. Farbblöcke, Überdeckung und Stufe bleiben, wie oben beschrieben. Innerhalb
+eines Blocks gilt aber nicht der kürzeste Weg zum nächsten Umriss, sondern die Folge, deren
+Verbindungen die wenigsten Fadenschnitte nach §10.2.1 kosten (`routeBlocks`,
+`packages/engine/src/inkstitch/route.ts`). Ein Laufstich-Objekt darf dafür andersherum gestickt werden.
+
+- **Anfang und Ende eines Objekts** legt Ink/Stitch erst beim Sticken fest. Ein Modell bildet seine
+  Regeln nach (`auto_satin`, Füllung, Laufstich); an 452 Verbindungen von vier Logos trifft es die
+  echte Entscheidung in 97 %. Ob geschnitten wird, entscheidet weiter `planTrims` an den echten
+  Stichen (§10.2.1). Die Reihenfolge kann also keinen sichtbaren Faden erzeugen.
+- **Kosten** einer Verbindung: 1000 je Schnitt, dazu ihre Länge in mm. Gesucht wird deterministisch:
+  nächster Nachbar von jedem möglichen Start, dann Verschieben und Umkehren von Abschnitten und die
+  Richtung der Laufstiche.
+- **Gemessen** an zehn Logos, vor dem Durchsticken von 3 bis 5 mm (§10.2.1): Schnitte 714 → 595.
+  Farbblöcke, Tatami-Winkel und „Sichtbare Fäden 0" bleiben in jedem Lauf gleich. Christliche 90 mm:
+  71 → 51 Schnitte, 93 → 75 Unterbrechungen. Am meisten bringt es, wo viele gleichfarbige Stücke nahe
+  beieinanderliegen. Abgelegene Stücke auf blankem Stoff verbindet keine Reihenfolge.
+- `--ohne-blockfolge` stellt für Vergleichsläufe die alte Folge her.
+
 ### 10.2 Verbindung zweier Blöcke
 Entscheidung zwischen Blockende A und Blockanfang B:
 
@@ -1606,16 +1632,16 @@ alle zwischen Stichläufen; wir hatten 17 in 2.757).
 wird nicht geschnitten, wo der Faden verdeckt liegt: höchstens 1 mm der Linie vom letzten zum
 ersten Stich auf blankem Stoff. Wo mehr als 1 mm blank liegt, wird geschnitten, wie kurz die
 Verbindung auch ist. Ungeschnitten bleibt eine verdeckte Verbindung bis 3 mm als gewöhnlicher
-Stich (so stickt Ink/Stitch sie), bis 5 mm als Sprung mit Verriegelung, bis 7 mm durchgestickt,
-damit kein Sprung über 5 mm offen bleibt; länger wird sie geschnitten. Länge und Verdeckung werden
+Stich (so stickt Ink/Stitch sie) und darüber bis 7 mm durchgestickt: ein Stich ohne Sprung und ohne
+Verriegelung *(06.10.2026; bis dahin blieb sie bis 5 mm ein Sprung mit Verriegelung)*. Länger wird sie
+geschnitten. Länge und Verdeckung werden
 an den Stichen gemessen, die Ink/Stitch schreibt, nicht an der Vorlage: wo eine Füllung endet und
 das nächste Objekt beginnt, steht erst dort fest.
 
 | Verbindung vom letzten Stich des einen zum ersten des nächsten Objekts | Entscheidung (`TrimReason`) | gestickt als |
 |---|---|---|
 | höchstens `VISIBLE_MAX_MM` = 1 mm auf blankem Stoff, bis `PLAIN_STITCH_MM` = 3 mm lang | **kurz** (`short`), kein Schnitt | gewöhnlicher Stich (Ink/Stitchs `collapse_len_mm`), ohne Sprung und ohne Verriegelung |
-| höchstens 1 mm blank, über 3 bis `HIDDEN_JUMP_MAX_MM` = 5 mm | **verdeckt** (`hidden`), kein Schnitt | Sprung mit Verriegelung (§10.3); der Faden liegt unter später Gesticktem oder auf gleichfarbigen Stichen |
-| höchstens 1 mm blank, über 5 bis `HIDDEN_STITCH_MAX_MM` = 7 mm | **durchgestickt** (`stitched`), kein Schnitt | ein Stich von Objekt zu Objekt, ohne Sprung und ohne Verriegelung (`inkstitch:min_jump_stitch_length_mm` am Objekt davor) |
+| höchstens 1 mm blank, über 3 bis `HIDDEN_STITCH_MAX_MM` = 7 mm | **durchgestickt** (`stitched`), kein Schnitt | ein Stich von Objekt zu Objekt, ohne Sprung und ohne Verriegelung (`inkstitch:min_jump_stitch_length_mm` am Objekt davor); der Faden liegt unter später Gesticktem oder auf gleichfarbigen Stichen. *Bis 06.10.2026 blieb eine solche Verbindung bis `HIDDEN_JUMP_MAX_MM` = 5 mm ein Sprung mit Verriegelung (**verdeckt**, `hidden`); `planTrims` kennt das noch als Option `stitchHiddenJumps: false`.* |
 | mehr als 1 mm auf blankem Stoff, bis 5 mm lang | **sichtbar** (`visible`), Schnitt | verriegeln, schneiden, springen, verriegeln — auch für eine Verbindung bis 3 mm, die Ink/Stitch durchsticken würde |
 | mehr als 1 mm blank und über 5 mm, oder über 7 mm | **lang** (`long`), Schnitt | wie oben; über 7 mm auch dort, wo die Strecke verdeckt wäre |
 
@@ -1633,14 +1659,17 @@ das nächste Objekt beginnt, steht erst dort fest.
   `CONNECT_DEFAULTS.jumpTrimMm`; ein Sprung darüber ohne Schnitt zählt `untrimmedJumps` (§10.2) als
   Faden auf dem Stoff, die Ausnahme „ein späteres Objekt derselben Farbe stickt darüber“ aus §10.2
   gibt es hier nicht — deshalb wird eine verdeckte Verbindung bis 7 mm durchgestickt, statt als
-  Sprung offen zu bleiben. 7 mm sind `maxWidthMm` (§7.4), der längste Stich, den eine Satinsäule
+  Sprung offen zu bleiben. Seit 06.10.2026 gilt das schon ab 3 mm: Jeder Sprung von 3 bis 5 mm kostete
+  zwei Vernähungen (Christliche 90 mm: 14 solche Sprünge). 7 mm sind `maxWidthMm` (§7.4), der längste Stich, den eine Satinsäule
   hat. 1 mm sind das, was `auto_satin` außerhalb der beiden Säulen duldet, bevor es schneidet.
 - **Gegenüber §10.2** ist die Regel strenger bei Verbindungen bis 5 mm: sie bleiben nur, wo sie
   verdeckt liegen (§10.2 lässt bis 5 mm alles stehen); lockerer bei einer verdeckten Verbindung von 5
   bis 7 mm, die ungeschnitten bleibt (§10.2 schneidet ab 5 mm immer).
 - Ein Schnitt, den die Quelle verlangt (`trimAfter: always`, §10.2), bleibt, was die Regel auch sagt.
 
-**Umsetzung** (`packages/engine/src/inkstitch/trims.ts`, `tools/fadenschnitt.mjs`):
+**Umsetzung** (`packages/engine/src/inkstitch/trims.ts`, `tools/fadenschnitt.mjs`). Schon die Vorlage
+legt die Objekte jedes Farbblocks so, dass ihre Verbindungen möglichst wenige Schnitte kosten (§10.1,
+`routeBlocks`).
 
 1. `auto_satin` läuft ohne `--trim` (§7.8.6). Ohne Schnitt bleiben die Laufstiche, die `--trim`
    entfernte, und der Weg zwischen den Säulen läuft wieder verdeckt unter ihnen.

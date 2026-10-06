@@ -231,13 +231,25 @@ describe("planTrims (spec §10.2.1)", () => {
     expect(plan.cut).toEqual(["e0"]);
   });
 
-  it("does not cut a connection of up to 5 mm that lies under a later area", () => {
+  it("stitches a hidden connection of 3 to 5 mm across: no cut, and no jump with its lock stitches", () => {
+    // Until 06.10.2026 it stayed a jump; every one set two starts and stops into the file.
     const { stitches, from } = pair(4);
     const area = dense(from.x - 0.5, -1, 5, 2);
     const plan = planTrims([...stitches, change(last(stitches)), ...area], ids(1));
-    expect(plan.decisions[0]).toMatchObject({ cut: false, reason: "hidden" });
+    expect(plan.decisions[0]).toMatchObject({ cut: false, reason: "stitched" });
     expect(plan.decisions[0]!.visibleMm).toBeLessThan(VISIBLE_MAX_MM);
     expect(plan.cut).toEqual([]);
+    expect(plan.stitched).toEqual([{ id: "e0", lengthMm: 4 }]);
+  });
+
+  it("leaves a hidden connection of 3 to 5 mm a jump with stitchHiddenJumps false, the rule before", () => {
+    const { stitches, from } = pair(4);
+    const area = dense(from.x - 0.5, -1, 5, 2);
+    const plan = planTrims([...stitches, change(last(stitches)), ...area], ids(1), {
+      stitchHiddenJumps: false,
+    });
+    expect(plan.decisions[0]).toMatchObject({ cut: false, reason: "hidden" });
+    expect(plan.stitched).toEqual([]);
   });
 
   it("does not cut a connection that lies inside the area of the same colour already stitched", () => {
@@ -248,7 +260,7 @@ describe("planTrims (spec §10.2.1)", () => {
       [...under, ...hop(last(under), first(a), false), ...a, ...hop(last(a), first(b), true), ...b],
       ids(1),
     );
-    expect(plan.decisions[0]).toMatchObject({ cut: false, reason: "hidden" });
+    expect(plan.decisions[0]).toMatchObject({ cut: false, reason: "stitched" });
   });
 
   it("stitches a hidden connection of 5 to 7 mm straight through instead of leaving a jump", () => {
@@ -285,11 +297,15 @@ describe("planTrims (spec §10.2.1)", () => {
     });
   });
 
-  it("leaves a hidden connection of exactly 5 mm: the limit is an inclusive one", () => {
+  it("leaves a hidden connection of exactly 5 mm a jump where jumps stay: the limit is an inclusive one", () => {
     const { stitches, from } = pair(HIDDEN_JUMP_MAX_MM);
     const area = dense(from.x - 0.5, -1, 6, 2);
-    const plan = planTrims([...stitches, change(last(stitches)), ...area], ids(1));
-    expect(plan.decisions[0]).toMatchObject({ cut: false, reason: "hidden" });
+    const list = [...stitches, change(last(stitches)), ...area];
+    expect(planTrims(list, ids(1), { stitchHiddenJumps: false }).decisions[0]).toMatchObject({
+      cut: false,
+      reason: "hidden",
+    });
+    expect(planTrims(list, ids(1)).decisions[0]).toMatchObject({ cut: false, reason: "stitched" });
   });
 
   it("allows a thread of up to 1 mm on the bare fabric, and no more", () => {
@@ -302,7 +318,7 @@ describe("planTrims (spec §10.2.1)", () => {
     // Bare: the part of the move from the end of the cover to Q, less the reach at Q itself (B covers that).
     const small = hidden(VISIBLE_MAX_MM - 0.1 + THREAD_REACH_MM);
     const large = hidden(VISIBLE_MAX_MM + 0.1 + THREAD_REACH_MM);
-    expect(small).toMatchObject({ cut: false, reason: "hidden" });
+    expect(small).toMatchObject({ cut: false, reason: "stitched" });
     expect(large).toMatchObject({ cut: true, reason: "visible" });
     expect(large.visibleMm - small.visibleMm).toBeCloseTo(0.2, 6);
   });
@@ -331,7 +347,7 @@ describe("planTrims (spec §10.2.1)", () => {
   });
 
   it("matches the trims to the elements in order, one decision for each", () => {
-    // 1: bare and 4 mm (cut) · 2: under a later area (kept) · 3: 2 mm under it (short, kept) · 4: 8 mm (cut)
+    // 1: bare and 4 mm (cut) · 2: under a later area (stitched across) · 3: 2 mm under it (short) · 4: 8 mm (cut)
     const a1 = run(at(0, 0), at(2, 0));
     const b1 = run(at(6, 0), at(8, 0));
     const b2 = run(at(12, 0), at(14, 0));
@@ -353,11 +369,12 @@ describe("planTrims (spec §10.2.1)", () => {
     const plan = planTrims(stitches, [{ id: "p" }, { id: "q" }, { id: "r" }, { id: "s" }]);
     expect(plan.decisions.map((d) => [d.id, d.cut, d.reason])).toEqual([
       ["p", true, "visible"],
-      ["q", false, "hidden"],
+      ["q", false, "stitched"],
       ["r", false, "short"],
       ["s", true, "long"],
     ]);
     expect(plan.cut).toEqual(["p", "s"]);
+    expect(plan.stitched.map((x) => x.id)).toEqual(["q"]);
   });
 
   it("refuses a probe whose trims do not match the elements one for one", () => {
@@ -375,15 +392,19 @@ describe("planTrims (spec §10.2.1)", () => {
   it("takes the limits it is given", () => {
     const { stitches } = pair(4);
     const plan = planTrims(stitches, ids(1), { visibleMm: 5 });
-    expect(plan.decisions[0]).toMatchObject({ cut: false, reason: "hidden" });
-    // A hidden connection of 2 mm is a stitch straight on; with no stitch allowed it is a jump.
+    expect(plan.decisions[0]).toMatchObject({ cut: false, reason: "stitched" });
+    // A hidden connection of 2 mm is a stitch straight on; with no stitch straight on allowed it is
+    // stitched across all the same, and a jump only where jumps stay.
     const { stitches: two, from } = pair(2);
     const covered = [...two, change(last(two)), ...dense(from.x - 0.5, -1, 3, 2)];
     expect(planTrims(covered, ids(1)).decisions[0]).toMatchObject({ cut: false, reason: "short" });
     expect(planTrims(covered, ids(1), { plainMm: 0 }).decisions[0]).toMatchObject({
       cut: false,
-      reason: "hidden",
+      reason: "stitched",
     });
+    expect(
+      planTrims(covered, ids(1), { plainMm: 0, stitchHiddenJumps: false }).decisions[0],
+    ).toMatchObject({ cut: false, reason: "hidden" });
   });
 
   it("takes the longest stitch it is given", () => {
