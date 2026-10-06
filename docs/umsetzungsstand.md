@@ -941,3 +941,43 @@ EZ-Stitch-Berichte: Die Dichteflächen dort standen an Starts und Stopps, und al
   dieselbe DST.
 - **Offen:** Die Zahl der Starts und Stopps selbst (Christliche 90 mm: 93 Unterbrechungen, der
   Puncher 26) hängt an der Reihenfolge der Objekte; das ist der nächste Schritt (`docs/backlog.md`).
+
+**Reihenfolge im Farbblock nach Schnitten, Option `--blockfolge` (06.10.2026, Spec §10.1,
+§10.2.1).** Auftrag „ja umsetzen" (weniger Starts und Stopps). Von den 71 Schnitten der Christlichen
+90 mm ließen sich 20 mit einer anderen Reihenfolge innerhalb der Farbe vermeiden und 14 mit einem
+anderen Anfangs- oder Endpunkt eines Objekts. 36 trennen abgelegene Stücke auf blankem Stoff, die keine
+Reihenfolge verbindet; über Farbwechsel ließe sich keiner sparen.
+
+- **`routeBlocks`** (`route.ts`, aufgerufen aus `orderByColour` in `template.ts`) ordnet die Objekte
+  jedes Farbblocks nach den Kosten ihrer Verbindungen: 1000 je Schnitt nach den Schwellen von
+  `trims.ts`, 150 je verdecktem Sprung mit Vernähung (über 3 bis 5 mm), dazu die Länge. Laufstich-Objekte
+  dreht es um, wo das ihre Enden zusammenbringt. Wo ein Objekt anfängt und endet, bildet ein Modell
+  von Ink/Stitchs Regeln nach (`auto_satin`, Füllung, Laufstich); an 452 Verbindungen von vier Logos
+  trifft es die echte Entscheidung in 97 %. Farbblöcke, die Reihenfolge überlappender Objekte und die
+  Stufenregel von §10.1 bleiben, `planTrims` entscheidet weiter an den echten Stichen. Die Suche ist
+  deterministisch: nächster Nachbar von jedem möglichen Start, dann Verschieben und Umkehren von
+  Abschnitten und die Richtung der Laufstiche.
+- **Im Standard aus**, bis der Nutzer über §10.1 entscheidet. `--blockfolge-frei` lässt zusätzlich die
+  Stufenregel los, nur zum Messen.
+
+| Motiv (Preset)                       |  Schnitte |   Sprünge |          Stiche |
+| ------------------------------------ | --------: | --------: | --------------: |
+| Christliche 90 mm (Jersey)           |   71 → 51 | 128 → 113 |  10.078 → 9.908 |
+| Christliche 126 mm (Jersey)          |  111 → 68 | 210 → 144 | 14.697 → 14.269 |
+| Atzensport 107 mm (Fleece)           |   77 → 63 | 170 → 146 | 20.968 → 20.877 |
+| Elektrotechnik Yer 90 mm (Softshell) |   16 → 10 |   33 → 29 |   2.796 → 2.755 |
+| STUTTGART 80 mm, in 91 mm (Piqué)    |   31 → 27 |   81 → 69 | 19.014 → 19.006 |
+| Köln 90 mm (Piqué)                   |   73 → 62 | 175 → 163 | 44.666 → 44.599 |
+| Atzensport 80 mm (Piqué)             |  104 → 95 | 259 → 244 | 21.144 → 21.028 |
+| Atzensport 200 mm (Piqué)            | 110 → 108 | 471 → 435 | 64.646 → 64.437 |
+| Eislingen 200 mm (Piqué)             |   79 → 71 | 314 → 249 | 63.451 → 63.324 |
+| STUTTGART 250 mm (Piqué)             |   42 → 40 | 178 → 170 | 96.388 → 96.707 |
+
+- **In allen zehn Läufen gleich:** Farbblöcke, Tatami-Winkel, „Fäden auf dem Stoff 0", „Sichtbare
+  Fäden 0". Die Dichtespitze bewegt sich um höchstens 1, die Nadelhäufung bleibt oder sinkt um 1.
+  Christliche 90 mm: Unterbrechungen 93 → 75, Vernähstiche 527 → 411.
+- **An den sechs Logos, an denen das Modell nicht geeicht wurde, spart es weniger:** 439 → 403 (−8 %)
+  gegen 275 → 192 (−30 %) an den ersten vier. Dort liegen die meisten Schnitte zwischen abgelegenen
+  Stücken. Die Ersparnis selbst sagt das Modell je Logo auf zwei Schnitte genau voraus.
+- **Tests:** 1.349 → 1.358 (`route.test.ts`, Vorlage mit `route`). Der Rauchtest bleibt bei 19 und
+  grün, ohne die Option sind die Dateien unverändert.
