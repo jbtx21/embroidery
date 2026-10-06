@@ -981,3 +981,46 @@ Reihenfolge verbindet; über Farbwechsel ließe sich keiner sparen.
   Stücken. Die Ersparnis selbst sagt das Modell je Logo auf zwei Schnitte genau voraus.
 - **Tests:** 1.349 → 1.358 (`route.test.ts`, Vorlage mit `route`). Der Rauchtest bleibt bei 19 und
   grün, ohne die Option sind die Dateien unverändert.
+
+**Blockfolge als Standard, verdeckte Verbindungen ab 3 mm durchgestickt, Testmuster je Stoff
+(06.10.2026, Spec §10.1, §10.2.1).** Entscheidung des Nutzers („ja") zu drei Vorschlägen nach der
+Messung oben.
+
+- **Blockfolge ist Standard** (`TemplateOptions.route`, `--ohne-blockfolge` für Vergleichsläufe).
+- **Durchsticken ab 3 mm:** `planTrims` stickt eine verdeckte Verbindung über 3 bis 5 mm durch, statt
+  sie als Sprung mit Verriegelung zu lassen (`stitchHiddenJumps`). `routeBlocks` bewertet sie
+  deshalb nur noch mit ihrer Länge (`jumpCost` 0 statt 150).
+- **Testmuster je Stoff** (`pnpm testmuster <preset>`, `testmuster.ts`, Anleitung in
+  `docs/probesticks.md`): Tatami 3 × 3, Satin 3 × 3, vier Quadrate zum Zugausgleich. 7.843 (Jersey)
+  bis 9.319 Stiche (Frottee), 106 × 80 mm, 23 Schnitte. In den Cap-Rahmen passt es nicht; das Werkzeug
+  meldet es.
+
+Gemessen an denselben zehn Logos, vorher → mit Blockfolge → dazu durchgestickt („Stichläufe" zählt
+jeden Ansatz nach Schnitt, Sprung oder Farbwechsel, also die Starts und Stopps):
+
+| Motiv (Preset)                       |            Schnitte |          Stichläufe |         Sprünge |          Stiche |  unter 0,3 mm |
+| ------------------------------------ | ------------------: | ------------------: | --------------: | --------------: | ------------: |
+| Christliche 90 mm (Jersey)           |        71 → 51 → 51 |        93 → 75 → 61 |  128 → 113 → 99 |  10.078 → 9.832 |       31 → 18 |
+| Christliche 126 mm (Jersey)          |       111 → 68 → 67 |       152 → 89 → 76 | 210 → 144 → 130 | 14.697 → 14.190 |       24 → 23 |
+| Atzensport 107 mm (Fleece)           |        77 → 63 → 61 |       100 → 85 → 69 | 170 → 146 → 129 | 20.968 → 20.750 |       24 → 14 |
+| Elektrotechnik Yer 90 mm (Softshell) |        16 → 10 → 10 |        22 → 16 → 13 |    33 → 29 → 26 |   2.796 → 2.738 |         6 → 2 |
+| STUTTGART 80 mm, in 91 mm (Piqué)    |        31 → 27 → 27 |        39 → 37 → 33 |    81 → 69 → 65 | 19.014 → 18.982 |        11 → 7 |
+| Köln 90 mm (Piqué)                   |        73 → 62 → 62 |        98 → 88 → 77 | 175 → 163 → 153 | 44.666 → 44.546 |       40 → 25 |
+| Atzensport 80 mm (Piqué)             |       104 → 95 → 95 |     114 → 106 → 102 | 259 → 244 → 240 | 21.144 → 21.011 |       34 → 30 |
+| Atzensport 200 mm (Piqué)            |     110 → 108 → 108 |     121 → 119 → 116 | 471 → 435 → 432 | 64.646 → 64.422 |       38 → 33 |
+| Eislingen 200 mm (Piqué)             |        79 → 71 → 71 |        97 → 88 → 78 | 314 → 249 → 238 | 63.451 → 63.266 |       43 → 27 |
+| STUTTGART 250 mm (Piqué)             |        42 → 40 → 40 |        51 → 51 → 46 | 178 → 170 → 165 | 96.388 → 96.680 |       10 → 11 |
+| **Summe**                            | **714 → 595 → 592** | **887 → 754 → 671** |                 |                 | **261 → 190** |
+
+- **Starts und Stopps −24 %** (887 → 671). Christliche 90 mm: 93 → 61, der Puncher hat 26.
+- **In allen zehn Läufen gleich:** Farbblöcke, Tatami-Winkel, „Fäden auf dem Stoff 0", „Sichtbare
+  Fäden 0", kein verdeckter Sprung mehr. Dichtespitze und Nadelhäufung bewegen sich um höchstens 2
+  (Christliche 90 mm Dichtespitze 28 → 30, Grenze 40).
+- **Zugausgleich für den Probestick:** dieselben vier Probestick-Logos noch einmal mit Schub 0 und Zug
+  0,20 mm (Fleece 0,25 mm), in einer Kopie mit geänderten Presets. Stiche: Christliche 90 mm
+  9.832 → 9.916, 126 mm 14.190 → 14.268, Atzensport 107 mm 20.750 → 19.962, Yer 2.738 → 2.734.
+  Schnitte gleich oder einer weniger, keine Fäden auf dem Stoff. `presets.ts` und §14 bleiben, bis der
+  Probestick entschieden ist.
+- **Tests:** 1.358 → 1.410 (Testmuster 47, Schreibhelfer der Vorlage 4, Regel ohne Durchsticken 1),
+  Rauchtest 19 → 22 (Testmuster 3). Der Fadenschnitt-Rauchtest erwartet drei durchgestickte
+  Verbindungen statt zweier Sprünge.
