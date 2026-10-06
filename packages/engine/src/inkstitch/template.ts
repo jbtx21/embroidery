@@ -61,6 +61,7 @@ import { satinColumns, STAYS_TATAMI } from "./columns.js";
 import { cutOutSatin, knockdownAreas } from "./knockdown.js";
 import { formIndex, isFabricGap, railPull, satinPullCompMm } from "./rail-pull.js";
 import type { Form, RailPull } from "./rail-pull.js";
+import { routeBlocks } from "./route.js";
 import { colourBlockCount, orderSwaps, sequenceByColour } from "./sequence.js";
 import type { SwapBox } from "./sequence.js";
 import { splitNarrowWide } from "./split.js";
@@ -231,6 +232,8 @@ export type TemplateResult = {
   colourBlocks: number;
   /** The fewest blocks the overlaps allow — present when `TemplateOptions.order` is `"colour"`. */
   colourBlocksLowerBound?: number;
+  /** The cuts the order inside the colour blocks is expected to leave (`route.ts`) — present with `route`. */
+  routed?: { cutsBefore: number; cutsAfter: number };
   /** Blocks the standard order of §10.1 makes — present when `minOverlapMm2` is set with the colour order. */
   colourBlocksStandard?: number;
   /** Overlaps `minOverlapMm2` turns round against the standard order, largest first — same condition. */
@@ -259,6 +262,14 @@ export type TemplateOptions = {
    * overlap does (spec §10.1). The result lists the overlaps that turn round because of it.
    */
   minOverlapMm2?: number;
+  /**
+   * With `order: "colour"`: put the objects inside every colour block in the order that leaves the fewest thread
+   * cuts (`route.ts`, spec §10.2.1) and write running objects the way round that joins them to their neighbours.
+   * The colour blocks, the order of what overlaps and the stage rule of §10.1 stay as they are. Default: off.
+   */
+  route?: boolean;
+  /** With `route`: false lets go of the stage rule of §10.1 (a measurement, not the spec). Default: true. */
+  routeStageRule?: boolean;
   /** Cut what later tatami areas cover out of the earlier ones (spec §4.1). Default: off. */
   knockdown?: boolean;
   /**
@@ -744,18 +755,51 @@ const stageOf = (p: Planned): number => (p.kind === "tatami" ? 0 : p.kind === "s
 function orderByColour(
   planned: Planned[],
   minOverlapMm2: number | undefined,
+  route: boolean,
+  stageRule: boolean,
 ): {
   planned: Planned[];
   lowerBound: number;
+  routed?: { cutsBefore: number; cutsAfter: number };
   standard?: { blocks: number; swaps: TemplateOrderSwap[] };
 } {
   const nodes = planned.map((p) => ({ colour: p.color, rank: stageOf(p), cover: p.cover }));
   const result = sequenceByColour(nodes, minOverlapMm2 === undefined ? {} : { minOverlapMm2 });
-  const ordered = result.order.map((i) => planned[i]!);
-  if (minOverlapMm2 === undefined) return { planned: ordered, lowerBound: result.lowerBound };
+  let order = result.order;
+  let ordered = order.map((i) => planned[i]!);
+  let routed: { cutsBefore: number; cutsAfter: number } | undefined;
+  if (route) {
+    const r = routeBlocks(
+      planned.map((p) => ({
+        kind: p.kind,
+        colour: p.color,
+        rank: stageOf(p),
+        cover: p.cover,
+        ...(p.kind === "running" ? { lines: p.lines } : {}),
+        ...(p.kind === "satin"
+          ? { columns: p.columns.map((c) => ({ railA: c.railA, railB: c.railB })) }
+          : {}),
+      })),
+      result.order,
+      result.after,
+      { stageRule },
+    );
+    order = r.order;
+    // A running object the router turned round is written from its last point to its first.
+    ordered = order.map((i) => {
+      const p = planned[i]!;
+      return p.kind === "running" && r.flip[i]
+        ? { ...p, lines: p.lines.map((l) => [...l].reverse()).reverse() }
+        : p;
+    });
+    routed = { cutsBefore: r.cuts.before, cutsAfter: r.cuts.after };
+  }
+  if (minOverlapMm2 === undefined) {
+    return { planned: ordered, lowerBound: result.lowerBound, ...(routed ? { routed } : {}) };
+  }
 
   const standard = sequenceByColour(nodes);
-  const swaps = orderSwaps(nodes, standard.order, result.order).map((w) => ({
+  const swaps = orderSwaps(nodes, standard.order, order).map((w) => ({
     under: { id: planned[w.under]!.id, colour: planned[w.under]!.color },
     over: { id: planned[w.over]!.id, colour: planned[w.over]!.color },
     overlapMm2: w.overlapMm2,
@@ -766,6 +810,7 @@ function orderByColour(
   return {
     planned: ordered,
     lowerBound: result.lowerBound,
+    ...(routed ? { routed } : {}),
     standard: { blocks: standard.blocks, swaps },
   };
 }
@@ -1073,11 +1118,18 @@ export function buildInkstitchTemplate(
   let planned = planShapes(shapes, preset, warnings, split, opts.splitBands !== false);
   let lowerBound: number | undefined;
   let standard: { blocks: number; swaps: TemplateOrderSwap[] } | undefined;
+  let routed: { cutsBefore: number; cutsAfter: number } | undefined;
   if (opts.order === "colour") {
-    const ordered = orderByColour(planned, opts.minOverlapMm2);
+    const ordered = orderByColour(
+      planned,
+      opts.minOverlapMm2,
+      opts.route === true,
+      opts.routeStageRule !== false,
+    );
     planned = ordered.planned;
     lowerBound = ordered.lowerBound;
     standard = ordered.standard;
+    routed = ordered.routed;
   }
   let knockdown: KnockdownReport | undefined;
   if (opts.knockdown) {
@@ -1113,6 +1165,7 @@ export function buildInkstitchTemplate(
     warnings,
     colourBlocks: colourBlockCount(objects.map((o) => o.color)),
     ...(lowerBound === undefined ? {} : { colourBlocksLowerBound: lowerBound }),
+    ...(routed === undefined ? {} : { routed }),
     ...(standard === undefined
       ? {}
       : { colourBlocksStandard: standard.blocks, orderSwaps: standard.swaps }),

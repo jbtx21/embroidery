@@ -15,6 +15,7 @@ export * from "./split.js";
 export * from "./smooth.js";
 export * from "./tatami.js";
 export * from "./template.js";
+export * from "./route.js";
 export * from "./min-size.js";
 export * from "./min-size-search.js";
 export * from "./hoop.js";

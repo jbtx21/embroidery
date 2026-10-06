@@ -43,6 +43,8 @@ export type SequenceResult = {
   blocks: number;
   /** The fewest blocks any order can make, given the overlaps (`blockLowerBound`). */
   lowerBound: number;
+  /** What has to come after each node: the overlaps (`coverPrecedence`), for `routeBlocks`. */
+  after: number[][];
 };
 
 /** Two spellings of one colour are one colour: `#BEBEBE`, `#bebebe`, `#BBB`→`#bbbbbb`. */
@@ -263,7 +265,7 @@ export function sequenceByColour(
   opts: SequenceOptions = {},
 ): SequenceResult {
   const n = nodes.length;
-  if (n === 0) return { order: [], blocks: 0, lowerBound: 0 };
+  if (n === 0) return { order: [], blocks: 0, lowerBound: 0, after: [] };
 
   const after = coverPrecedence(
     nodes.map((x) => x.cover),
@@ -361,6 +363,7 @@ export function sequenceByColour(
     order,
     blocks: colourBlockCount(order.map((i) => nodes[i]!.colour)),
     lowerBound,
+    after,
   };
 }
 

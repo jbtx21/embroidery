@@ -693,6 +693,40 @@ describe("order option (spec §10.1)", () => {
     expect(r.objects.map((o) => o.shapeId)).toEqual(["block", "letter"]);
   });
 
+  it("route: puts the lines of a block end to end, turns one round, and leaves colours and overlaps alone", () => {
+    // Three lines along y = 3, written in the order 0..5, 10..15, 5..10 and the third one backwards (10 → 5),
+    // under a ground of another colour that has to stay first.
+    const line = (id: string, a: number, b: number): ImportedShape => ({
+      kind: "line",
+      id,
+      polyline: [pt(a, 3), pt(b, 3)],
+      closed: false,
+      color: "#c8102e",
+      attrs: {},
+      trimAfter: "auto",
+    });
+    const shapes = [
+      area("ground", polygonOf(rect(0, 0, 40, 30)), "#1f3a93"),
+      line("l1", 0, 5),
+      line("l3", 10, 5),
+      line("l2", 10, 15),
+    ];
+    const plain = buildInkstitchTemplate(shapes, pique, { ...PAGE, order: "colour" });
+    const routed = buildInkstitchTemplate(shapes, pique, { ...PAGE, order: "colour", route: true });
+    expect(plain.routed).toBeUndefined();
+    expect(routed.routed).toBeDefined();
+    expect(routed.routed!.cutsAfter).toBeLessThanOrEqual(routed.routed!.cutsBefore);
+    // Same objects, same colour blocks, the overlaps' order kept: the ground stays before the lines it carries.
+    expect([...routed.objects.map((o) => o.shapeId)].sort()).toEqual(
+      [...plain.objects.map((o) => o.shapeId)].sort(),
+    );
+    expect(routed.colourBlocks).toBe(plain.colourBlocks);
+    expect(routed.objects[0]!.shapeId).toBe("ground");
+    // Deterministic.
+    const again = buildInkstitchTemplate(shapes, pique, { ...PAGE, order: "colour", route: true });
+    expect(again.svg).toBe(routed.svg);
+  });
+
   it("orders the areas before it cuts them, so the knockdown works on the stitch order", () => {
     const big = area("big", polygonOf(rect(0, 0, 40, 30)), "#1f3a93");
     const small = area("small", polygonOf(rect(10, 5, 20, 20)), "#c8102e");

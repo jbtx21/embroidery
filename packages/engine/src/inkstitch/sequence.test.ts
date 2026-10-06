@@ -168,8 +168,13 @@ describe("sequenceByColour (spec §10.1)", () => {
   });
 
   it("gives an empty order for nothing, and leaves a single object as it is", () => {
-    expect(sequenceByColour([])).toEqual({ order: [], blocks: 0, lowerBound: 0 });
-    expect(sequenceByColour([node("a", at(0))])).toEqual({ order: [0], blocks: 1, lowerBound: 1 });
+    expect(sequenceByColour([])).toEqual({ order: [], blocks: 0, lowerBound: 0, after: [] });
+    expect(sequenceByColour([node("a", at(0))])).toEqual({
+      order: [0],
+      blocks: 1,
+      lowerBound: 1,
+      after: [[]],
+    });
   });
 });
 

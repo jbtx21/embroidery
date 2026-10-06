@@ -4,7 +4,7 @@
  *
  *   pnpm inkstitch <svg> [preset] [--tatami] [--breite <mm>] [--ueberlappung <mm2>]
  *                        [--aussparen] [--naht <mm>] [--zug-symmetrisch] [--ohne-tor]
- *                        [--ohne-teilung]
+ *                        [--ohne-teilung] [--blockfolge[-frei]]
  *
  * --breite <mm> scales the motif proportionally to that width before anything is
  * imported (tools/breite.mjs); the output names the factor and the new size, and
@@ -50,6 +50,12 @@
  * tatami again. The standard is spec §7.8.7: the band becomes satin columns, the wide
  * part stays tatami, and the block "Geteilt" of the output lists every shape it split
  * (and every band that stayed in the wide part because its columns do not hold).
+ *
+ * --blockfolge puts the objects inside every colour block in the order that leaves the fewest thread cuts
+ * (packages/engine/src/inkstitch/route.ts, spec §10.2.1) and writes running objects the way round that joins
+ * them to their neighbours. Colour blocks, the order of what overlaps and the stage rule of §10.1 stay as
+ * they are; the output says how many cuts the model expects before and after. Experimental.
+ * --blockfolge-frei the same without the stage rule of §10.1 (a measurement of what the rule costs, not the spec).
  *
  * Satin (default) — lettering and narrow shapes set the way a puncher sets
  * them:
@@ -243,6 +249,8 @@ const satinCutout = args.includes("--aussparen");
 const railPullSymmetric = args.includes("--zug-symmetrisch");
 const ohneTor = args.includes("--ohne-tor");
 const ohneTeilung = args.includes("--ohne-teilung");
+const blockfolge = args.includes("--blockfolge") || args.includes("--blockfolge-frei");
+const blockfolgeFrei = args.includes("--blockfolge-frei");
 const [svgArg, presetArg = "pique"] = args.filter(
   (a, i) => !a.startsWith("--") && !VALUE_FLAGS.includes(args[i - 1]),
 );
@@ -267,7 +275,7 @@ const touchUnderlapMm = numberFlag("--naht", { min: 0 });
 if (!svgArg) {
   console.error(
     "Aufruf: pnpm inkstitch <svg> [preset] [--tatami] [--breite <mm>] [--ueberlappung <mm2>] " +
-      "[--aussparen] [--naht <mm>] [--zug-symmetrisch] [--ohne-tor] [--ohne-teilung]",
+      "[--aussparen] [--naht <mm>] [--zug-symmetrisch] [--ohne-tor] [--ohne-teilung] [--blockfolge[-frei]]",
   );
   console.error(`Presets: ${Object.keys(PRESETS).join(", ")}`);
   process.exit(1);
@@ -283,11 +291,12 @@ if (
     touchUnderlapMm !== undefined ||
     railPullSymmetric ||
     ohneTor ||
-    ohneTeilung)
+    ohneTeilung ||
+    blockfolge)
 ) {
   console.error(
-    "--ueberlappung, --aussparen, --naht, --zug-symmetrisch, --ohne-tor und --ohne-teilung gelten " +
-      "für die Vorlage und nicht mit --tatami",
+    "--ueberlappung, --aussparen, --naht, --zug-symmetrisch, --ohne-tor, --ohne-teilung und --blockfolge[-frei] " +
+      "gelten für die Vorlage und nicht mit --tatami",
   );
   process.exit(1);
 }
@@ -399,6 +408,8 @@ if (tatamiOnly) {
     ...(touchUnderlapMm === undefined ? {} : { touchUnderlapMm }),
     ...(railPullSymmetric ? { railPullBySide: false } : {}),
     ...(ohneTeilung ? { splitBands: false } : {}),
+    ...(blockfolge ? { route: true } : {}),
+    ...(blockfolgeFrei ? { routeStageRule: false } : {}),
     ...(minOverlapMm2 === undefined ? {} : { minOverlapMm2 }),
   });
   templateMs = performance.now() - started;
@@ -423,6 +434,12 @@ if (tatamiOnly) {
   fallbacks = template.objects.filter((o) => o.kind === "tatami" && o.reason);
   narrowLines = template.objects.filter((o) => o.kind === "running" && o.reason);
   smoothed = template.objects.filter((o) => o.kind === "satin" && o.smoothedMm > 0);
+  if (template.routed !== undefined) {
+    summary.push(
+      `Reihenfolge im Farbblock (--blockfolge): das Modell erwartet ${template.routed.cutsBefore} → ` +
+        `${template.routed.cutsAfter} Schnitte zwischen Objekten`,
+    );
+  }
   knockdown = template.knockdown;
   railPull = template.railPull;
   split = template.split;
