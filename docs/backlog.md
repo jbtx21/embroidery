@@ -5,14 +5,12 @@ Neue Einträge oben in den passenden Abschnitt.
 
 ## Reihenfolge im Farbblock, Flächen-Zugausgleich, Beh.Stitched-Handbuch (06.10.2026)
 
-- **Blockfolge als Standard?** `--blockfolge` (`route.ts`) ordnet die Objekte eines Farbblocks nach
-  den Schnitten, die ihre Verbindungen kosten, und dreht Laufstich-Objekte um, wo das ihre Enden
-  zusammenbringt (Messung in `docs/umsetzungsstand.md`). Im Standard aus, bis der Nutzer entscheidet;
-  dann gehört der Satz „im Farbblock entscheiden die Schnitte" in §10.1 und der Schritt in den Ablauf
-  von §10.2.1.
-- **Versteckte Verbindungen von 3 bis 5 mm durchsticken** statt springen und vernähen (eine
-  Verzweigung in `planTrims`). Christliche 90 mm mit Blockfolge: Sprünge mit Vernähung 14 → 0,
-  Vernähstiche 411 → 329, Unterbrechungen 75 → 61. Ändert die Tabelle in §10.2.1; Entscheidung offen.
+- **Blockfolge als Standard:** _entschieden 06.10.2026 (Nutzer), umgesetzt_ (§10.1, `route.ts`;
+  `--ohne-blockfolge` für Vergleichsläufe).
+- **Verdeckte Verbindungen von 3 bis 5 mm durchsticken** statt springen und vernähen: _entschieden
+  06.10.2026 (Nutzer), umgesetzt_ (§10.2.1, `planTrims` mit `stitchHiddenJumps`). Gemessen vorab,
+  Christliche 90 mm mit Blockfolge: Sprünge mit Vernähung 14 → 0, Vernähstiche 411 → 329,
+  Unterbrechungen 75 → 61.
 - **Stufenregel von §10.1 lockern** (`--blockfolge-frei`, nur zum Messen): je Logo 1 bis 8 Schnitte
   weniger, aber bei Christliche 90 mm 17 statt 5 Satin-Läufe für `auto_satin`. Entscheidung offen.
 - **Der größte Rest liegt in der Vorlage, nicht in der Reihenfolge.** Der Puncher stickt den
@@ -24,17 +22,20 @@ Neue Einträge oben in den passenden Abschnitt.
   legt an freien Kanten 0,20–0,22 mm nach außen, in jeder Richtung (ein Objekt 0,05 mm), **schiebt nicht
   nach innen** und gibt nichts nach der Reihenlänge zu (Beh.Stitched rechnet 3 bzw. 6 % der
   Reihenlänge). Empfehlung: Schub 0, Zug 0,20 mm, Fleece 0,25 mm. Gemessen ist das nur für Jersey und
-  Softshell, an drei freien Objekten; die übrigen Presets sind abgeleitet. Entscheidung des Nutzers und
-  Probestick offen (§14).
+  Softshell, an drei freien Objekten; die übrigen Presets sind abgeleitet. _Entschieden 06.10.2026
+  (Nutzer): umstellen nach einem Probestick._ Dafür: Probestick-Dateien (vier Logos, alter und neuer
+  Ausgleich) und das Testmuster je Stoff (Block C: Quadrate mit vier Ausgleichswerten). §14 und
+  `presets.ts` ändern sich nach dem Ergebnis.
 - **Satinspitzen** (Beh.Stitched lässt eine spitze Säule kurz vor der Spitze enden). Nach der neuen
   Vernähung liegen alle Stiche unter 0,3 mm in der Vernähung selbst: Yer 6 von 6 am Ende spitz
   auslaufender Säulen, Christliche 90 mm 31 von 31 (17 am Ende, davon 16 an spitzen oder schmalen
   Säulen, 14 am Anfang). Die End-Vernähung läuft 0,8 mm über die letzten engen Zickzacks zurück und
   landet 0,1 bis 0,3 mm neben dem letzten Einstich. Zu messen: die Säule enden lassen, bevor der
-  Zickzack unter etwa 0,8 mm fällt, oder spitze Säulen am breiten Ende enden lassen.
+  Zickzack unter etwa 0,8 mm fällt, oder spitze Säulen am breiten Ende enden lassen. _Messung
+  beauftragt 06.10.2026 (Nutzer)._
 - **Parameter-Matrix als Testmuster** (Beh.Stitched): ein Muster je Stoff statt Probesticks mit
-  Logos. Tatami Reihenabstand × Stichlänge, Satin Breite × Abstand, Zugausgleich an einem Satinrand;
-  die Werte jedes Feldes stehen in der Farbfolge-Datei. Vorschlag, Entscheidung offen.
+  Logos. _Entschieden 06.10.2026 (Nutzer), in Arbeit:_ Tatami Reihenabstand × Stichlänge, Satin
+  Breite × Abstand, Zugausgleich an freien Quadraten (mit dem Messschieber messen).
 - **Kleine Prüfungen:** deckungsgleiche Satin- und Laufstich-Objekte würden doppelt gestickt (der
   Knockdown fängt nur Flächen); Garnlänge je Farbe in der Farbfolge-Datei.
 - **Beh.Stitched-Werte abgeglichen, nichts geändert.** Satin 0,24 mm „je Stich" sind 0,48 mm von Spitze
