@@ -37,8 +37,15 @@ Neue Einträge oben in den passenden Abschnitt.
   auslaufender Säulen, Christliche 90 mm 31 von 31 (17 am Ende, davon 16 an spitzen oder schmalen
   Säulen, 14 am Anfang). Die End-Vernähung läuft 0,8 mm über die letzten engen Zickzacks zurück und
   landet 0,1 bis 0,3 mm neben dem letzten Einstich. Zu messen: die Säule enden lassen, bevor der
-  Zickzack unter etwa 0,8 mm fällt, oder spitze Säulen am breiten Ende enden lassen. _Messung
-  beauftragt 06.10.2026 (Nutzer)._
+  Zickzack unter etwa 0,8 mm fällt, oder spitze Säulen am breiten Ende enden lassen.
+  _Gemessen 06.10.2026:_ Alle 64 Stiche unter 0,3 mm der vier Logos sind Vernähstiche, 40 davon die
+  End-Vernähung an Satinspitzen. **Säule kürzen** (die Rails enden, wo ein Stich quer 0,8 mm lang ist,
+  höchstens 1,5 mm je Ende, mindestens 1,2 mm Rail bleiben): Stiche unter 0,3 mm Yer 2 → 0,
+  Christliche 90 mm 17 → 4, 126 mm 21 → 10, Atzensport 13 → 6; Schnitte Yer +2, sonst ±2. Die Spitze
+  verliert im Median 0,3–0,5 mm, etwa eine Fadenbreite. **Am breiten Ende enden lassen** geht nicht:
+  `auto_satin` wählt die Richtung jeder Säule selbst. Vernähung nur an spitzen Enden länger machen
+  wirkt ähnlich, braucht aber ein Umschreiben nach dem Routing. Patch liegt bereit (`tips.ts`, 21
+  Tests); er ändert §7.8.3 „Enden" und §10.3. _Entscheidung des Nutzers offen._
 - **Parameter-Matrix als Testmuster** (Beh.Stitched): ein Muster je Stoff statt Probesticks mit
   Logos. _Entschieden 06.10.2026 (Nutzer), in Arbeit:_ Tatami Reihenabstand × Stichlänge, Satin
   Breite × Abstand, Zugausgleich an freien Quadraten (mit dem Messschieber messen).
