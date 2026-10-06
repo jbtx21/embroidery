@@ -3,6 +3,46 @@
 Was auffiel, aber nicht in den laufenden Meilenstein gehört (CLAUDE.md, Arbeitsweise).
 Neue Einträge oben in den passenden Abschnitt.
 
+## Reihenfolge im Farbblock, Flächen-Zugausgleich, Beh.Stitched-Handbuch (06.10.2026)
+
+- **Blockfolge als Standard?** `--blockfolge` (`route.ts`) ordnet die Objekte eines Farbblocks nach
+  den Schnitten, die ihre Verbindungen kosten, und dreht Laufstich-Objekte um, wo das ihre Enden
+  zusammenbringt (Messung in `docs/umsetzungsstand.md`). Im Standard aus, bis der Nutzer entscheidet;
+  dann gehört der Satz „im Farbblock entscheiden die Schnitte" in §10.1 und der Schritt in den Ablauf
+  von §10.2.1.
+- **Versteckte Verbindungen von 3 bis 5 mm durchsticken** statt springen und vernähen (eine
+  Verzweigung in `planTrims`). Christliche 90 mm mit Blockfolge: Sprünge mit Vernähung 14 → 0,
+  Vernähstiche 411 → 329, Unterbrechungen 75 → 61. Ändert die Tabelle in §10.2.1; Entscheidung offen.
+- **Stufenregel von §10.1 lockern** (`--blockfolge-frei`, nur zum Messen): je Logo 1 bis 8 Schnitte
+  weniger, aber bei Christliche 90 mm 17 statt 5 Satin-Läufe für `auto_satin`. Entscheidung offen.
+- **Der größte Rest liegt in der Vorlage, nicht in der Reihenfolge.** Der Puncher stickt den
+  Pferdekopf der Christlichen in 11 Läufen; wir haben dort 96 Objekte, davon 83 Haarlinien als
+  Laufstich. 36 der 71 Schnitte sind abgelegene Stücke auf blankem Stoff, die keine Reihenfolge
+  verbindet. Hebel: gleichfarbige Stücke zusammenfassen, Grundflächen unter die Details legen.
+- **Flächen-Zugausgleich gegen den Puncher gemessen** (Yer 90 mm, Christliche 90 mm). Die Methode trifft
+  an unseren eigenen DSTs die bekannten Werte (Zug 0,25 auf 0,01 mm, Schub auf 0,013 mm). Der Puncher
+  legt an freien Kanten 0,20–0,22 mm nach außen, in jeder Richtung (ein Objekt 0,05 mm), **schiebt nicht
+  nach innen** und gibt nichts nach der Reihenlänge zu (Beh.Stitched rechnet 3 bzw. 6 % der
+  Reihenlänge). Empfehlung: Schub 0, Zug 0,20 mm, Fleece 0,25 mm. Gemessen ist das nur für Jersey und
+  Softshell, an drei freien Objekten; die übrigen Presets sind abgeleitet. Entscheidung des Nutzers und
+  Probestick offen (§14).
+- **Satinspitzen** (Beh.Stitched lässt eine spitze Säule kurz vor der Spitze enden). Nach der neuen
+  Vernähung liegen alle Stiche unter 0,3 mm in der Vernähung selbst: Yer 6 von 6 am Ende spitz
+  auslaufender Säulen, Christliche 90 mm 31 von 31 (17 am Ende, davon 16 an spitzen oder schmalen
+  Säulen, 14 am Anfang). Die End-Vernähung läuft 0,8 mm über die letzten engen Zickzacks zurück und
+  landet 0,1 bis 0,3 mm neben dem letzten Einstich. Zu messen: die Säule enden lassen, bevor der
+  Zickzack unter etwa 0,8 mm fällt, oder spitze Säulen am breiten Ende enden lassen.
+- **Parameter-Matrix als Testmuster** (Beh.Stitched): ein Muster je Stoff statt Probesticks mit
+  Logos. Tatami Reihenabstand × Stichlänge, Satin Breite × Abstand, Zugausgleich an einem Satinrand;
+  die Werte jedes Feldes stehen in der Farbfolge-Datei. Vorschlag, Entscheidung offen.
+- **Kleine Prüfungen:** deckungsgleiche Satin- und Laufstich-Objekte würden doppelt gestickt (der
+  Knockdown fängt nur Flächen); Garnlänge je Farbe in der Farbfolge-Datei.
+- **Beh.Stitched-Werte abgeglichen, nichts geändert.** Satin 0,24 mm „je Stich" sind 0,48 mm von Spitze
+  zu Spitze (Ink/Stitch zählt doppelt, wir 0,35–0,40, der Puncher 0,38–0,42). Die „Dichte nach Breite"
+  nach A&E ist die BERNINA-Regel, die wir am 05.10.2026 verworfen haben. Tatami 0,24 mm (wir
+  0,19–0,225, der Puncher 0,21), Fadenschnitt ab 8 mm Sprung (wir nach Sichtbarkeit). Den Füllwinkel
+  nach Reihenbrüchen (§8.2) und das Durchsticken versteckter Verbindungen (§10.2.1) haben wir schon.
+
 ## Aus EZ-Stitch, BERNINA-Hilfe und Puncher-Messung (05.10.2026)
 
 - **EZ-Stitch-Note ist kein Maßstab.** Die drei Prüfungen sind nachgebaut und treffen die Berichte:
