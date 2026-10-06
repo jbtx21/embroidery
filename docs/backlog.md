@@ -26,6 +26,12 @@ Neue Einträge oben in den passenden Abschnitt.
   (Nutzer): umstellen nach einem Probestick._ Dafür: Probestick-Dateien (vier Logos, alter und neuer
   Ausgleich) und das Testmuster je Stoff (Block C: Quadrate mit vier Ausgleichswerten). §14 und
   `presets.ts` ändern sich nach dem Ergebnis.
+- **Die Gitterunterlage kippt bei kleinen Umrissänderungen.** Beim Probestick-Satz für den neuen
+  Zugausgleich (Schub 0 statt 0,10–0,15 mm, Zug 0,05 mm kürzer) zerfiel der Einzug der großen beigen
+  Fläche von Atzensport 107 mm in zwei Stücke: keine Unterlage mehr, 788 Stiche weniger. Bei
+  Christliche 90 mm bekamen umgekehrt zwei Flächen eine (7 statt 5 von 18). Die Regel „Einzug hält als
+  ein Stück" (`gridUnderlay`) entscheidet an einer Kante, die sich mit 0,1 mm verschiebt. Robuster:
+  Unterlage je Stück als eigenes Objekt (siehe „Gitterunterlage nur auf einem Teil der Tatami-Fläche").
 - **Satinspitzen** (Beh.Stitched lässt eine spitze Säule kurz vor der Spitze enden). Nach der neuen
   Vernähung liegen alle Stiche unter 0,3 mm in der Vernähung selbst: Yer 6 von 6 am Ende spitz
   auslaufender Säulen, Christliche 90 mm 31 von 31 (17 am Ende, davon 16 an spitzen oder schmalen
